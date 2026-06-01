@@ -1,0 +1,29 @@
+{
+  "name": "@lattica/formula",
+  "version": "0.1.0",
+  "description": "Clean-room, dependency-free Excel-compatible formula engine for Lattica: lexer, Pratt parser, evaluator, and an incremental dependency graph.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lattica/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
