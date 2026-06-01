@@ -1,0 +1,29 @@
+{
+  "name": "@lattica/io",
+  "version": "0.1.0",
+  "description": "Import/export for Lattica: CSV/TSV parsing & serialization, clipboard (TSV + HTML) interop, and dependency-free XLSX (OOXML) export.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lattica/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
