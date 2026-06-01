@@ -54,6 +54,24 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.19)(happy-dom@15.11.7)
 
+  examples/playground:
+    dependencies:
+      '@lattica/collab':
+        specifier: workspace:*
+        version: link:../../packages/collab
+      '@lattica/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@lattica/formula':
+        specifier: workspace:*
+        version: link:../../packages/formula
+      '@lattica/io':
+        specifier: workspace:*
+        version: link:../../packages/io
+      '@lattica/react':
+        specifier: workspace:*
+        version: link:../../packages/react
+
   packages/collab:
     dependencies:
       '@lattica/core':
