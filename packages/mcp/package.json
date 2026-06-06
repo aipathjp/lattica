@@ -1,0 +1,16 @@
+{
+  "name": "@lattica/mcp",
+  "version": "0.1.0",
+  "description": "Expose a Lattica grid to AI agents: a transport-agnostic tool registry (get_cell/set_cell/get_range/evaluate/define_name) with handler-validated inputs and a result-enveloped dispatcher.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" } },
+  "scripts": { "build": "tsup", "typecheck": "tsc --noEmit" },
+  "dependencies": { "@lattica/formula": "workspace:*" },
+  "publishConfig": { "access": "public" }
+}
