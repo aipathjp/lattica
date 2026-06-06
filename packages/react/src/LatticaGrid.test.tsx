@@ -285,3 +285,132 @@ describe('LatticaGrid undo via keyboard', () => {
     expect(c.getDisplay(0, 0)).toBe('first');
   });
 });
+
+describe('LatticaGrid context menu', () => {
+  it('opens a menu on right-click with default items', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.contextMenu(grid, { clientX: 60, clientY: 40 });
+    expect(screen.getByTestId('lattica-menu')).toBeTruthy();
+    expect(screen.getByText('Copy')).toBeTruthy();
+    expect(screen.getByText('Clear contents')).toBeTruthy();
+  });
+
+  it('runs a menu item and closes the menu', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    c.setCellText(0, 0, 'x');
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 0, col: 0 });
+    fireEvent.contextMenu(grid, { clientX: 60, clientY: 40 });
+    fireEvent.mouseDown(screen.getByText('Clear contents'));
+    expect(c.getDisplay(0, 0)).toBe('');
+    expect(screen.queryByTestId('lattica-menu')).toBeNull();
+  });
+
+  it('does not act on a disabled item', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.contextMenu(grid, { clientX: 60, clientY: 40 });
+    // Undo is disabled when there is no history; clicking is a no-op and keeps the menu open.
+    const undo = screen.getByText('Undo');
+    fireEvent.mouseDown(undo);
+    expect(screen.queryByTestId('lattica-menu')).not.toBeNull();
+  });
+
+  it('closes on backdrop click', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.contextMenu(grid, { clientX: 60, clientY: 40 });
+    fireEvent.mouseDown(screen.getByTestId('lattica-menu-backdrop'));
+    expect(screen.queryByTestId('lattica-menu')).toBeNull();
+  });
+
+  it('uses a custom contextMenu builder with a separator', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    const onPick = vi.fn();
+    render(
+      <LatticaGrid
+        controller={c}
+        width={400}
+        height={200}
+        contextMenu={(target) => [
+          { id: 'info', label: `cell ${target.row},${target.col}`, action: onPick },
+          { id: 's', separator: true },
+          { id: 'x', label: 'Extra' },
+        ]}
+      />,
+    );
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.contextMenu(grid, { clientX: 60, clientY: 40 });
+    expect(screen.getByText(/^cell /)).toBeTruthy();
+    expect(screen.getByText('Extra')).toBeTruthy();
+    fireEvent.mouseDown(screen.getByText(/^cell /));
+    expect(onPick).toHaveBeenCalled();
+  });
+
+  it('runs a no-action item without error (just closes)', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    render(
+      <LatticaGrid
+        controller={c}
+        width={400}
+        height={200}
+        contextMenu={() => [{ id: 'noop', label: 'NoOp' }]}
+      />,
+    );
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.contextMenu(grid, { clientX: 60, clientY: 40 });
+    fireEvent.mouseDown(screen.getByText('NoOp'));
+    // no-action item: runMenuItem returns early, menu stays open
+    expect(screen.queryByTestId('lattica-menu')).not.toBeNull();
+  });
+});
+
+describe('LatticaGrid context-menu actions', () => {
+  const withClipboard = () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const readText = vi.fn().mockResolvedValue('z');
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText, readText },
+      configurable: true,
+      writable: true,
+    });
+    return { writeText, readText };
+  };
+
+  it('Copy and Paste menu items invoke the clipboard', async () => {
+    const { writeText, readText } = withClipboard();
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    c.setCellText(0, 0, 'hi');
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 0, col: 0 });
+
+    fireEvent.contextMenu(grid, { clientX: 60, clientY: 40 });
+    fireEvent.mouseDown(screen.getByText('Copy'));
+    expect(writeText).toHaveBeenCalled();
+
+    fireEvent.contextMenu(grid, { clientX: 60, clientY: 40 });
+    fireEvent.mouseDown(screen.getByText('Paste'));
+    expect(readText).toHaveBeenCalled();
+  });
+
+  it('Undo and Redo menu items run when history exists', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    c.setCellText(0, 0, 'v1');
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+
+    fireEvent.contextMenu(grid, { clientX: 60, clientY: 40 });
+    fireEvent.mouseDown(screen.getByText('Undo'));
+    expect(c.getDisplay(0, 0)).toBe('');
+
+    fireEvent.contextMenu(grid, { clientX: 60, clientY: 40 });
+    fireEvent.mouseDown(screen.getByText('Redo'));
+    expect(c.getDisplay(0, 0)).toBe('v1');
+  });
+});

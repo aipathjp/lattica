@@ -25,10 +25,11 @@ import type { GridController, EditState } from './controller.js';
 import { resolveTheme, type GridTheme } from './theme.js';
 import { buildScene } from './scene.js';
 import { paintScene, type Canvas2D } from './painter.js';
-import { cellRect, hitTest } from './geometry.js';
+import { cellRect, hitTest, type HitResult } from './geometry.js';
 import { interpretKey, type KeyInput } from './keyboard.js';
 import { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
 import { columnHeaderCells, rowHeaderCells } from './headers.js';
+import { buildMenu, type MenuItem, type MenuItemSpec } from './menu.js';
 
 export interface LatticaGridProps {
   controller: GridController;
@@ -39,6 +40,14 @@ export interface LatticaGridProps {
   height?: number;
   className?: string;
   style?: CSSProperties;
+  /** Build the right-click context menu for a hit target; defaults to the built-in menu. */
+  contextMenu?: (target: HitResult) => MenuItemSpec[];
+}
+
+interface MenuState {
+  x: number;
+  y: number;
+  items: MenuItem[];
 }
 
 export function LatticaGrid(props: LatticaGridProps): ReactElement {
@@ -53,6 +62,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
 
   const [scroll, setScroll] = useState<ScrollOffset>({ left: 0, top: 0 });
   const [edit, setEdit] = useState<EditState | null>(null);
+  const [menu, setMenu] = useState<MenuState | null>(null);
   const [, force] = useReducer((n: number) => n + 1, 0);
 
   const headerModelRef = useRef<HeaderModel | null>(null);
@@ -249,6 +259,44 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     draggingRef.current = false;
   }, []);
 
+  const defaultMenu = useCallback(
+    (): MenuItemSpec[] => [
+      { id: 'copy', label: 'Copy', action: () => void writeClipboard(controller.copySelection()) },
+      { id: 'paste', label: 'Paste', action: () => void readClipboardInto(controller) },
+      { id: 'clear', label: 'Clear contents', action: () => controller.deleteSelection() },
+      { id: 'sep1', separator: true },
+      { id: 'undo', label: 'Undo', disabled: !controller.undo.canUndo(), action: () => controller.undoLast() },
+      { id: 'redo', label: 'Redo', disabled: !controller.undo.canRedo(), action: () => controller.redoLast() },
+    ],
+    [controller],
+  );
+
+  const onContextMenu = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const root = rootRef.current;
+      /* v8 ignore next 3 -- root ref is always attached when handlers fire */
+      if (root === null) {
+        return;
+      }
+      const rect = root.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const hit = hitTest(controller.geometry(), scroll.left, scroll.top, x, y);
+      const items = buildMenu(props.contextMenu ? props.contextMenu(hit) : defaultMenu());
+      setMenu({ x, y, items });
+    },
+    [controller, scroll, props, defaultMenu],
+  );
+
+  const runMenuItem = useCallback((item: MenuItem) => {
+    if (item.disabled === true || item.action === undefined) {
+      return;
+    }
+    item.action();
+    setMenu(null);
+  }, []);
+
   const onDoubleClick = useCallback(() => {
     const { active } = controller.selection.getState();
     controller.beginEdit(active.row, active.col);
@@ -312,6 +360,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
+      onContextMenu={onContextMenu}
       onDoubleClick={onDoubleClick}
       onWheel={onWheel}
     >
@@ -467,6 +516,60 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
             outline: 'none',
           }}
         />
+      )}
+
+      {/* Context menu overlay. */}
+      {menu !== null && (
+        <>
+          <div
+            data-testid="lattica-menu-backdrop"
+            onMouseDown={() => setMenu(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 10 }}
+          />
+          <div
+            role="menu"
+            data-testid="lattica-menu"
+            style={{
+              position: 'absolute',
+              left: menu.x,
+              top: menu.y,
+              zIndex: 11,
+              minWidth: 160,
+              background: '#fff',
+              border: `1px solid ${theme.headerGridLineColor}`,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              padding: '4px 0',
+              fontFamily: theme.fontFamily,
+              fontSize: theme.fontSize,
+            }}
+          >
+            {menu.items.map((item) =>
+              item.separator === true ? (
+                <div
+                  key={item.id}
+                  style={{ height: 1, background: theme.headerGridLineColor, margin: '4px 0' }}
+                />
+              ) : (
+                <div
+                  key={item.id}
+                  role="menuitem"
+                  aria-disabled={item.disabled === true}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    runMenuItem(item);
+                  }}
+                  style={{
+                    padding: '4px 12px',
+                    cursor: item.disabled === true ? 'default' : 'pointer',
+                    color: item.disabled === true ? theme.headerGridLineColor : theme.textColor,
+                  }}
+                >
+                  {item.label}
+                </div>
+              ),
+            )}
+          </div>
+        </>
       )}
     </div>
   );
