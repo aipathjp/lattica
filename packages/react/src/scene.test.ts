@@ -64,6 +64,31 @@ describe('buildScene', () => {
     expect(scene.cells.some((c) => c.selected && c.row === 1 && c.col === 1)).toBe(true);
   });
 
+  it('populates type/align/value/cfStyle from accessors when provided', () => {
+    const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
+    const scene = buildScene({
+      geom: geom(),
+      scrollLeft: 0,
+      scrollTop: 0,
+      clientWidth: 200,
+      clientHeight: 60,
+      selection: sel,
+      getDisplay: () => 'x',
+      getType: (_r, c) => (c === 0 ? 'checkbox' : undefined),
+      getAlign: () => 'right',
+      getValue: () => true,
+      getCfStyle: (r) => (r === 0 ? { background: '#fee' } : null),
+    });
+    const a = scene.cells.find((k) => k.row === 0 && k.col === 0)!;
+    expect(a.type).toBe('checkbox');
+    expect(a.align).toBe('right');
+    expect(a.value).toBe(true);
+    expect(a.cfStyle).toEqual({ background: '#fee' });
+    const b = scene.cells.find((k) => k.row === 1 && k.col === 1)!;
+    expect(b.type).toBeUndefined();
+    expect(b.cfStyle).toBeUndefined();
+  });
+
   it('has a null active rect when the active cell is scrolled out of view', () => {
     const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
     sel.setActive({ row: 0, col: 0 });

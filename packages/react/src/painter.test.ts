@@ -63,6 +63,57 @@ describe('paintScene', () => {
     expect(methods(ctx)).not.toContain('strokeRect');
   });
 
+  it('paints a conditional-format background and text color', () => {
+    const ctx = createMockContext();
+    paintScene(
+      ctx,
+      scene({
+        cells: [
+          {
+            row: 0,
+            col: 0,
+            rect: { x: 0, y: 0, width: 50, height: 20 },
+            text: 'hi',
+            selected: false,
+            active: false,
+            cfStyle: { background: '#fee', color: '#a00' },
+          },
+        ],
+        activeRect: null,
+      }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    expect(methods(ctx)).toContain('fillRect');
+    expect(methods(ctx)).toContain('fillText');
+  });
+
+  it('renders typed cells via the registry (checkbox)', () => {
+    const ctx = createMockContext();
+    paintScene(
+      ctx,
+      scene({
+        cells: [
+          {
+            row: 0,
+            col: 0,
+            rect: { x: 0, y: 0, width: 50, height: 20 },
+            text: '',
+            selected: false,
+            active: false,
+            type: 'checkbox',
+            value: true,
+          },
+        ],
+        activeRect: null,
+      }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    expect(methods(ctx)).toContain('strokeRect');
+    expect(methods(ctx)).toContain('stroke');
+  });
+
   it('applies a DPR scale when provided', () => {
     const ctx = createMockContext();
     paintScene(ctx, scene(), defaultTheme, { width: 200, height: 100, dpr: 2 });

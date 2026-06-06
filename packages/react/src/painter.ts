@@ -7,6 +7,7 @@
 
 import type { GridTheme } from './theme.js';
 import type { Scene } from './scene.js';
+import { defaultCellTypes, type CellTypeRegistry } from './cell-types.js';
 
 export interface Canvas2D {
   fillStyle: string;
@@ -33,6 +34,8 @@ export interface PaintOptions {
   width: number;
   height: number;
   dpr?: number;
+  /** Cell-type registry for resolving renderers; defaults to the built-ins. */
+  cellTypes?: CellTypeRegistry;
 }
 
 /** Paint a scene onto the context. */
@@ -57,8 +60,15 @@ export function paintScene(
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
 
+  const registry = options.cellTypes ?? defaultCellTypes;
+
   for (const cell of scene.cells) {
     const { rect } = cell;
+    // Conditional-format background sits below the selection tint.
+    if (cell.cfStyle?.background !== undefined) {
+      ctx.fillStyle = cell.cfStyle.background;
+      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    }
     if (cell.selected) {
       ctx.fillStyle = theme.selectionFill;
       ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
@@ -74,15 +84,15 @@ export function paintScene(
     ctx.lineTo(rect.x + rect.width, rect.y + rect.height);
     ctx.stroke();
 
-    if (cell.text !== '') {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(rect.x, rect.y, rect.width, rect.height);
-      ctx.clip();
-      ctx.fillStyle = theme.textColor;
-      ctx.fillText(cell.text, rect.x + theme.cellPaddingX, rect.y + rect.height / 2);
-      ctx.restore();
-    }
+    registry.resolve(cell.type)({
+      ctx,
+      rect,
+      value: cell.value ?? cell.text,
+      text: cell.text,
+      theme,
+      align: cell.align ?? 'left',
+      color: cell.cfStyle?.color,
+    });
   }
 
   if (scene.activeRect !== null) {

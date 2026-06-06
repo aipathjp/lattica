@@ -24,6 +24,18 @@ export {
 } from './geometry.js';
 export { buildScene, visibleIndices, type Scene, type CellPaint } from './scene.js';
 export { paintScene, type Canvas2D, type PaintOptions } from './painter.js';
+export {
+  drawCellText,
+  textRenderer,
+  numberRenderer,
+  booleanRenderer,
+  builtinRenderers,
+  CellTypeRegistry,
+  defaultCellTypes,
+  type CellRenderer,
+  type CellRenderContext,
+  type CellAlign,
+} from './cell-types.js';
 export { interpretKey, type KeyInput, type KeyAction } from './keyboard.js';
 export { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
 export {
