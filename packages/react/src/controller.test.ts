@@ -191,3 +191,72 @@ describe('resizing', () => {
     expect(listener).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('getValue', () => {
+  it('returns the raw computed value and error type strings', () => {
+    const c = make();
+    c.setCellText(0, 0, '5');
+    c.setCellText(0, 1, 'TRUE');
+    c.setCellText(0, 2, '=1/0');
+    expect(c.getValue(0, 0)).toBe(5);
+    expect(c.getValue(0, 1)).toBe(true);
+    expect(c.getValue(0, 2)).toBe('#DIV/0!');
+    expect(c.getValue(9, 9)).toBeNull();
+  });
+});
+
+describe('column type & alignment', () => {
+  it('sets and reads column type and alignment, emitting change', () => {
+    const c = make();
+    const listener = vi.fn();
+    c.on('change', listener);
+    expect(c.getColumnType(0)).toBeUndefined();
+    expect(c.getColumnAlign(0)).toBeUndefined();
+    c.setColumnType(0, 'checkbox');
+    c.setColumnAlign(1, 'right');
+    expect(c.getColumnType(0)).toBe('checkbox');
+    expect(c.getColumnAlign(1)).toBe('right');
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('conditional formatting & search styling', () => {
+  it('applies a conditional-format rule by value', () => {
+    const c = make();
+    c.setCellText(0, 0, '120');
+    c.setCellText(0, 1, '5');
+    c.conditionalFormat.addRule({ kind: 'gt', value: 100, style: { background: '#fee' } });
+    expect(c.getCellStyle(0, 0)).toEqual({ background: '#fee' });
+    expect(c.getCellStyle(0, 1)).toBeNull();
+  });
+
+  it('overlays a search highlight and merges with conditional format', () => {
+    const c = make();
+    c.setCellText(0, 0, 'apple');
+    c.setCellText(1, 0, 'banana');
+    c.conditionalFormat.addRule({ kind: 'contains', text: 'apple', style: { color: '#a00' } });
+    const count = c.runSearch('apple');
+    expect(count).toBe(1);
+    expect(c.getCellStyle(0, 0)).toEqual({ color: '#a00', background: '#fff3a3' });
+    expect(c.getCellStyle(1, 0)).toBeNull();
+    expect(c.search.count).toBe(1);
+  });
+
+  it('search highlight without a conditional rule yields just the tint', () => {
+    const c = make();
+    c.setCellText(0, 0, 'find me');
+    c.runSearch('find');
+    expect(c.getCellStyle(0, 0)).toEqual({ background: '#fff3a3' });
+  });
+
+  it('runSearch emits change and clears prior matches', () => {
+    const c = make();
+    c.setCellText(0, 0, 'x');
+    const listener = vi.fn();
+    c.on('change', listener);
+    expect(c.runSearch('x')).toBe(1);
+    expect(c.runSearch('zzz')).toBe(0);
+    expect(c.getCellStyle(0, 0)).toBeNull();
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+});

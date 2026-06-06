@@ -11,13 +11,19 @@ import {
   SelectionModel,
   UndoManager,
   Emitter,
+  ConditionalFormatModel,
+  SearchState,
+  searchGrid,
   type Command,
   type CellAddress,
+  type CfStyle,
+  type SearchOptions,
   forEachCell,
   normalizeRange,
 } from '@lattica/core';
 import { SheetEngine, FormulaError, type CellContent } from '@lattica/formula';
 import type { GridGeometry } from './geometry.js';
+import type { CellAlign } from './cell-types.js';
 
 export interface GridControllerOptions {
   rowCount: number;
@@ -61,6 +67,13 @@ export class GridController {
   readonly colSizes: SizeManager;
   readonly selection: SelectionModel;
   readonly undo = new UndoManager();
+  /** Conditional-format rules applied across the grid (value-based). */
+  readonly conditionalFormat = new ConditionalFormatModel();
+  /** Current search matches/navigation state. */
+  readonly search = new SearchState();
+  private readonly columnTypes = new Map<number, string>();
+  private readonly columnAligns = new Map<number, CellAlign>();
+  private readonly searchKeys = new Set<string>();
   private readonly emitter = new Emitter<ControllerEvents>();
 
   private rowCount: number;
@@ -118,10 +131,62 @@ export class GridController {
     return formatValue(this.engine.getValue({ row, col }));
   }
 
+  /** Raw computed value of a cell (for value-based renderers / formatting). */
+  getValue(row: number, col: number): unknown {
+    const v = this.engine.getValue({ row, col });
+    return FormulaError.is(v) ? v.type : v;
+  }
+
   /** Raw editable text of a cell (`=formula` or literal). */
   getEditText(row: number, col: number): string {
     const content = this.engine.getContent({ row, col });
     return content === null ? '' : String(content);
+  }
+
+  // ── Column type & alignment ────────────────────────────────────────────────
+  setColumnType(col: number, type: string): void {
+    this.columnTypes.set(col, type);
+    this.emitter.emit('change', undefined);
+  }
+  getColumnType(col: number): string | undefined {
+    return this.columnTypes.get(col);
+  }
+  setColumnAlign(col: number, align: CellAlign): void {
+    this.columnAligns.set(col, align);
+    this.emitter.emit('change', undefined);
+  }
+  getColumnAlign(col: number): CellAlign | undefined {
+    return this.columnAligns.get(col);
+  }
+
+  // ── Conditional formatting & search styling ────────────────────────────────
+  /** Combined per-cell style: conditional-format rule, overlaid by a search-hit tint. */
+  getCellStyle(row: number, col: number): CfStyle | null {
+    const base = this.conditionalFormat.styleFor(
+      this.engine.getValue({ row, col }) as never,
+    );
+    if (this.searchKeys.has(`${row},${col}`)) {
+      return { ...(base ?? {}), background: '#fff3a3' };
+    }
+    return base;
+  }
+
+  /** Run a search over displayed cell text, updating match state. Returns hit count. */
+  runSearch(query: string, options?: SearchOptions): number {
+    const matches = searchGrid(
+      this.rowCount,
+      this.colCount,
+      (r, c) => this.getDisplay(r, c),
+      query,
+      options,
+    );
+    this.search.setMatches(matches);
+    this.searchKeys.clear();
+    for (const m of matches) {
+      this.searchKeys.add(`${m.row},${m.col}`);
+    }
+    this.emitter.emit('change', undefined);
+    return matches.length;
   }
 
   on<K extends keyof ControllerEvents>(event: K, handler: (p: ControllerEvents[K]) => void): () => void {
