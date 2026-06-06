@@ -260,3 +260,108 @@ describe('conditional formatting & search styling', () => {
     expect(listener).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('fillTo (fill handle)', () => {
+  const sel = (c: GridController, r0: number, c0: number, r1: number, c1: number) => {
+    c.selection.setActive({ row: r0, col: c0 });
+    c.selection.extendTo({ row: r1, col: c1 });
+  };
+
+  it('fills a numeric series downward', () => {
+    const c = make();
+    c.setCellText(0, 0, '1');
+    c.setCellText(1, 0, '2');
+    sel(c, 0, 0, 1, 0);
+    c.fillTo(4, 0);
+    expect(c.getDisplay(2, 0)).toBe('3');
+    expect(c.getDisplay(3, 0)).toBe('4');
+    expect(c.getDisplay(4, 0)).toBe('5');
+  });
+
+  it('fills a numeric series rightward', () => {
+    const c = make();
+    c.setCellText(0, 0, '1');
+    c.setCellText(0, 1, '2');
+    sel(c, 0, 0, 0, 1);
+    c.fillTo(0, 4);
+    expect(c.getDisplay(0, 2)).toBe('3');
+    expect(c.getDisplay(0, 4)).toBe('5');
+  });
+
+  it('fills upward (series continues above)', () => {
+    const c = make();
+    c.setCellText(3, 0, '5');
+    c.setCellText(4, 0, '6');
+    sel(c, 3, 0, 4, 0);
+    c.fillTo(0, 0);
+    expect(c.getDisplay(2, 0)).toBe('4');
+    expect(c.getDisplay(0, 0)).toBe('2');
+  });
+
+  it('fills leftward', () => {
+    const c = make();
+    c.setCellText(0, 4, '5');
+    c.setCellText(0, 5, '6');
+    sel(c, 0, 4, 0, 5);
+    c.fillTo(0, 0);
+    expect(c.getDisplay(0, 3)).toBe('4');
+    expect(c.getDisplay(0, 0)).toBe('1');
+  });
+
+  it('copies a single non-series cell', () => {
+    const c = make();
+    c.setCellText(0, 0, 'x');
+    sel(c, 0, 0, 0, 0);
+    c.fillTo(2, 0);
+    expect(c.getDisplay(1, 0)).toBe('x');
+    expect(c.getDisplay(2, 0)).toBe('x');
+  });
+
+  it('is a no-op when the target is within the selection', () => {
+    const c = make();
+    c.setCellText(0, 0, '7');
+    sel(c, 0, 0, 1, 1);
+    const listener = vi.fn();
+    c.on('change', listener);
+    c.fillTo(1, 1);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('clamps writes to the grid bounds (rows and cols)', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    c.setCellText(0, 0, '1');
+    sel(c, 0, 0, 0, 0);
+    c.fillTo(99, 0); // beyond rowCount
+    expect(c.getDisplay(4, 0)).toBe('1');
+    sel(c, 0, 0, 0, 0);
+    c.fillTo(0, 99); // beyond colCount
+    expect(c.getDisplay(0, 4)).toBe('1');
+  });
+
+  it('is undoable as a single batch', () => {
+    const c = make();
+    c.setCellText(0, 0, '1');
+    c.setCellText(1, 0, '2');
+    sel(c, 0, 0, 1, 0);
+    c.fillTo(4, 0);
+    expect(c.getDisplay(4, 0)).toBe('5');
+    c.undoLast();
+    expect(c.getDisplay(2, 0)).toBe('');
+    expect(c.getDisplay(4, 0)).toBe('');
+  });
+});
+
+describe('fillTo value formatting', () => {
+  it('writes boolean and empty values correctly', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    c.setCellText(0, 0, 'TRUE'); // boolean true
+    c.setCellText(0, 1, 'FALSE'); // boolean false
+    // 0,2 left empty (null)
+    c.selection.setActive({ row: 0, col: 0 });
+    c.selection.extendTo({ row: 0, col: 2 });
+    c.fillTo(1, 2); // fill the 1x3 block down by one row (copy)
+    expect(c.getDisplay(1, 0)).toBe('TRUE');
+    expect(c.getDisplay(1, 1)).toBe('FALSE');
+    expect(c.getDisplay(1, 2)).toBe('');
+  });
+});
