@@ -79,3 +79,9 @@ export {
   themePresets,
   getPreset,
 } from './theme-presets.js';
+export {
+  hitColumnBorder,
+  hitRowBorder,
+  hitResizeHandle,
+  type ResizeTarget,
+} from './resize.js';
