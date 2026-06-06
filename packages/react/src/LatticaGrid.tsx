@@ -49,6 +49,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const composingRef = useRef(false);
+  const draggingRef = useRef(false);
 
   const [scroll, setScroll] = useState<ScrollOffset>({ left: 0, top: 0 });
   const [edit, setEdit] = useState<EditState | null>(null);
@@ -201,6 +202,8 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
           } else {
             controller.selection.setActive({ row: hit.row, col: hit.col });
           }
+          // Begin a drag-select from this cell.
+          draggingRef.current = true;
           break;
         case 'colHeader':
           controller.selection.selectColumn(hit.col);
@@ -216,6 +219,35 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     },
     [controller, scroll],
   );
+
+  const onMouseMove = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>) => {
+      if (!draggingRef.current) {
+        return;
+      }
+      const root = rootRef.current;
+      /* v8 ignore next 3 -- root ref is always attached during a drag */
+      if (root === null) {
+        return;
+      }
+      const rect = root.getBoundingClientRect();
+      const hit = hitTest(
+        controller.geometry(),
+        scroll.left,
+        scroll.top,
+        e.clientX - rect.left,
+        e.clientY - rect.top,
+      );
+      if (hit.region === 'cell') {
+        controller.selection.extendTo({ row: hit.row, col: hit.col });
+      }
+    },
+    [controller, scroll],
+  );
+
+  const onMouseUp = useCallback(() => {
+    draggingRef.current = false;
+  }, []);
 
   const onDoubleClick = useCallback(() => {
     const { active } = controller.selection.getState();
@@ -278,6 +310,8 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       }}
       onKeyDown={onKeyDown}
       onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
       onDoubleClick={onDoubleClick}
       onWheel={onWheel}
     >
