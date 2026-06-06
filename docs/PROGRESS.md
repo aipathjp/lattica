@@ -113,3 +113,7 @@
   - React: 列/行リサイズハンドル（ヘッダー境界ドラッグ＋カーソル）を結線。
   - fill-region の縦横で零幅シードの戻りを `[]` に統一（レビュー指摘）。
   - 全体 **1557テスト・100%カバレッジ**。typecheck/lint/build クリーン。
+- 2026-06-06: **Wave 9 完了**（DataView 並列＋フィルハンドル結線）。
+  - `DataView`(data・IndexMapper×ソート×フィルタ合成、フィルタ置換対応)。
+  - `GridController.fillTo`(系列フィルエンジン・主軸判定・トランザクション) ＋ React フィルハンドル（選択右下つまみのドラッグ）。
+  - 全体 **1582テスト・100%カバレッジ**。typecheck/lint/build クリーン。Part A の対話UX（選択/リサイズ/メニュー/フィル）実機化が揃う。残：ソート/フィルタの GridController データビュー結線・結合描画・ネスト行UI・Phase 18。
