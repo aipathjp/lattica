@@ -72,6 +72,18 @@ importers:
         specifier: workspace:*
         version: link:../../packages/react
 
+  packages/ai:
+    dependencies:
+      '@lattica/core':
+        specifier: workspace:*
+        version: link:../core
+      '@lattica/data':
+        specifier: workspace:*
+        version: link:../data
+      '@lattica/formula':
+        specifier: workspace:*
+        version: link:../formula
+
   packages/collab:
     dependencies:
       '@lattica/core':
