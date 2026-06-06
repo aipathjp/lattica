@@ -60,6 +60,8 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
   const composingRef = useRef(false);
   const draggingRef = useRef(false);
+  const fillDraggingRef = useRef(false);
+  const fillTargetRef = useRef<{ row: number; col: number } | null>(null);
   const resizeRef = useRef<{ target: ResizeTarget; start: number; startSize: number } | null>(null);
 
   const [scroll, setScroll] = useState<ScrollOffset>({ left: 0, top: 0 });
@@ -254,6 +256,14 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
+      if (fillDraggingRef.current) {
+        const hit = hitTest(controller.geometry(), scroll.left, scroll.top, x, y);
+        if (hit.region === 'cell') {
+          fillTargetRef.current = { row: hit.row, col: hit.col };
+        }
+        return;
+      }
+
       const resizing = resizeRef.current;
       if (resizing !== null) {
         const delta = (resizing.target.type === 'col' ? x : y) - resizing.start;
@@ -282,9 +292,14 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   );
 
   const onMouseUp = useCallback(() => {
+    if (fillDraggingRef.current && fillTargetRef.current !== null) {
+      controller.fillTo(fillTargetRef.current.row, fillTargetRef.current.col);
+    }
+    fillDraggingRef.current = false;
+    fillTargetRef.current = null;
     draggingRef.current = false;
     resizeRef.current = null;
-  }, []);
+  }, [controller]);
 
   const defaultMenu = useCallback(
     (): MenuItemSpec[] => [
@@ -363,6 +378,13 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
 
   const editRect =
     edit !== null ? cellRect(geom, scroll.left, scroll.top, edit.row, edit.col) : null;
+
+  // Fill handle nub at the bottom-right corner of the selection (hidden while editing).
+  const selBounds = controller.selection.getSelectionBounds();
+  const fillNubRect =
+    edit === null
+      ? cellRect(geom, scroll.left, scroll.top, selBounds.end.row, selBounds.end.col)
+      : null;
 
   return (
     <div
@@ -541,6 +563,30 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
             padding: `0 ${theme.cellPaddingX}px`,
             resize: 'none',
             outline: 'none',
+          }}
+        />
+      )}
+
+      {/* Fill handle nub at the selection's bottom-right corner. */}
+      {fillNubRect !== null && (
+        <div
+          data-testid="lattica-fill-handle"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            fillDraggingRef.current = true;
+            fillTargetRef.current = null;
+          }}
+          style={{
+            position: 'absolute',
+            left: fillNubRect.x + fillNubRect.width - 4,
+            top: fillNubRect.y + fillNubRect.height - 4,
+            width: 7,
+            height: 7,
+            background: theme.activeBorder,
+            border: '1px solid #fff',
+            boxSizing: 'border-box',
+            cursor: 'crosshair',
+            zIndex: 5,
           }}
         />
       )}
