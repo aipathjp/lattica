@@ -18,6 +18,7 @@ import { DependencyGraph, topoSort } from './dependency-graph.js';
 import { FormulaError, CYCLE } from './errors.js';
 import type { CellScalar, FormulaValue } from './values.js';
 import { scalarize } from './evaluator.js';
+import { NameRegistry } from './names.js';
 
 export type CellContent = CellScalar;
 
@@ -55,6 +56,7 @@ export class SheetEngine {
   private readonly graph = new DependencyGraph();
   private readonly functions: FunctionRegistry;
   private readonly maxRangeCells: number;
+  private readonly names = new NameRegistry();
   private readonly evalContext: EvalContext;
 
   constructor(options: SheetEngineOptions = {}) {
@@ -63,7 +65,45 @@ export class SheetEngine {
     this.evalContext = {
       functions: this.functions,
       getCell: (ref) => this.getValue({ row: ref.row, col: ref.col }),
+      getName: (name) => this.resolveName(name),
     };
+  }
+
+  /**
+   * Define (or redefine) a named range / named value. The formula body may be a
+   * range (`A1:B3`), an expression (`=A1*2`), or a bare literal (`3.14`). Names
+   * are case-insensitive. A formula that fails to parse is surfaced as an error
+   * when the name is referenced.
+   */
+  defineName(name: string, formula: string): void {
+    this.names.define(name, formula);
+  }
+
+  /** Remove a defined name. Returns true if it existed, false otherwise. */
+  removeName(name: string): boolean {
+    return this.names.remove(name);
+  }
+
+  /** List all defined names, normalised to upper case. */
+  getNames(): string[] {
+    return this.names.list();
+  }
+
+  /**
+   * Resolve a defined name to a {@link FormulaValue} by evaluating its stored
+   * formula in this engine's context. Ranges yield a {@link Matrix},
+   * expressions yield a scalar, and a stored parse error propagates. Returns
+   * undefined for an unknown name so the evaluator emits `#NAME?`.
+   */
+  private resolveName(name: string): FormulaValue | undefined {
+    const entry = this.names.lookup(name);
+    if (entry === undefined) {
+      return undefined;
+    }
+    if (FormulaError.is(entry)) {
+      return entry;
+    }
+    return evaluate(entry, this.evalContext);
   }
 
   /**
