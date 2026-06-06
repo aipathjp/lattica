@@ -11,8 +11,8 @@
 | 区分 | 状態 |
 |---|---|
 | 基盤 (core/formula/react/io/collab) | ✅ 完了（581テスト・100%） |
-| Part A (Phase 1–18: HoT 超越) | 🚧 進行中（**1171テスト・100%**／モデル層ほぼ完成・React統合残） |
-| Part B (Phase A1–A12: AI ネイティブ) | ⏳ 未着手 |
+| Part A (Phase 1–18: HoT 超越) | 🚧 進行中（モデル層完成＋React統合に着手・**1272テスト・100%**） |
+| Part B (Phase A1–A12: AI ネイティブ) | 🚧 着手（A1/A2/A5/A6 完了・`@lattica/ai`） |
 
 > 🚧「中核」= フレームワーク非依存のモデル/ロジックは完成・100%。React 描画/UI 統合は後続の React 集中 wave で実施。
 > 🚧「関数」= Phase 12 のうち関数ライブラリ拡張（55→97関数）を完了。名前付き範囲/R1C1/配列スピルは後続。
@@ -23,7 +23,7 @@
 |---|---|---|---|---|---|
 | 基盤 | core/formula/react/io/collab | ✅ | 581 | 100% | merged |
 | 1 | @lattica/data: IndexMapper＋データバインド | ✅ | +62 | 100% | wave0 |
-| 2 | セル型システム（レンダラ/エディタ） | ⏳ | - | - | - |
+| 2 | セル型システム（レンダラ/エディタ） | 🚧 描画 | +? | 100% | wave4 |
 | 3 | 検証・read-only・配置・セルメタ | 🚧 中核 | +? | 100% | wave1 |
 | 4 | 対話UX（ドラッグ選択/フィル/リサイズ/移動） | ⏳ | - | - | - |
 | 5 | コンテキスト/ヘッダーメニュー・ショートカット | 🚧 中核 | +47 | 100% | wave3 |
@@ -40,7 +40,11 @@
 | 16 | フルアクセシビリティ | 🚧 ARIA計算 | +? | 100% | wave3 |
 | 17 | フック/永続状態/プラグインAPI | 🚧 中核 | +? | 100% | wave2 |
 | 18 | 性能/ベンチ/E2E/ドキュメント | ⏳ | - | - | - |
-| A1–A12 | AI ネイティブ機能群 | ⏳ | - | - | - |
+| A1 | AI基盤（provider/AIClient/AICommand・provenance） | ✅ | +? | 100% | wave4 |
+| A2 | NL→数式・数式説明/修正 | ✅ | +10 | 100% | wave4 |
+| A5 | スキーマ推論・型判定・正規化・重複検知 | ✅ | +35 | 100% | wave4 |
+| A6 | 意味検索（埋め込み抽象・cosine・索引） | ✅ | +18 | 100% | wave4 |
+| A3/A4/A7–A12 | AI列/スマートフィル/対話/異常検知/MCP 等 | ⏳ | - | - | - |
 
 凡例: ✅完了 / 🚧進行中 / ⏳未着手
 
@@ -71,3 +75,12 @@
   - Phase 16: `gridAria`/`rowAria`/`cellAria`/`columnHeaderAria`/`rowHeaderAria`。
   - 全体 **1171テスト・100%カバレッジ**。typecheck/lint/build クリーン。
   - **Part A のモデル/純粋ロジック層はほぼ完成**。残りは `<LatticaGrid>`/`GridController` への結線（React統合 wave・順次）と Phase 8(隠す/移動/ネストUI)・12c(R1C1/スピル)・18(性能/E2E)。
+- 2026-06-06: **Wave 4 完了**（React統合 + Part B AI を並行）。
+  - React統合 Phase 2: `CellTypeRegistry`（text/number/checkbox＋カスタム登録）を painter に結線、条件付き書式の背景/文字色を描画。既定 type=text で既存挙動不変。
+  - Part B 着手（新規 `@lattica/ai`・provider/embedder 抽象でモック100%）:
+    - A1: `AIProvider`/`MockProvider`/`AIClient`(コール/トークン上限) ＋ `withProvenance`（取り消し可能・来歴付き AICommand）。
+    - A2: `nlToFormula`/`explainFormula`/`fixFormula`（parseFormula で検証）。
+    - A5: `inferCellType`/`inferColumnType`/`normalizeValue`/`detectDuplicateRows`（決定的・全半角正規化・trigram重複検知）。
+    - A6: `cosineSimilarity`/`SemanticIndex`（埋め込み抽象・負topK防御）。
+    - レビュー指摘: A5「区切り無し連結」は非表示文字(U+001F)の誤読でバグ無し→回帰テスト追加。A6 負topK を防御＋テスト。A2 は wave 失敗で欠落→メインで実装。
+  - 全体 **1272テスト・100%カバレッジ**。typecheck/lint/build クリーン。
