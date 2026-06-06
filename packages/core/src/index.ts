@@ -67,3 +67,17 @@ export {
   type SearchMatch,
   type SearchOptions,
 } from './search.js';
+export { validators, ValidationModel, type Validator } from './validation.js';
+export {
+  toNumberOrNull,
+  summarize,
+  summarizeColumn,
+  type SummaryFn,
+} from './summary.js';
+export {
+  ruleMatches,
+  evaluateRules,
+  ConditionalFormatModel,
+  type CfStyle,
+  type CfRule,
+} from './conditional-format.js';
