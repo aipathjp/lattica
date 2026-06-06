@@ -12,7 +12,7 @@
 |---|---|
 | 基盤 (core/formula/react/io/collab) | ✅ 完了（581テスト・100%） |
 | Part A (Phase 1–18: HoT 超越) | 🚧 進行中（モデル層完成＋React統合に着手・**1272テスト・100%**） |
-| Part B (Phase A1–A12: AI ネイティブ) | 🚧 大半完了（A1–A10 実装済・残 A11 MCP / A12 ワークフロー） |
+| Part B (Phase A1–A12: AI ネイティブ) | ✅ **A1–A12 全完了**（@lattica/ai ＋ @lattica/mcp） |
 
 > 🚧「中核」= フレームワーク非依存のモデル/ロジックは完成・100%。React 描画/UI 統合は後続の React 集中 wave で実施。
 > 🚧「関数」= Phase 12 のうち関数ライブラリ拡張（55→97関数）を完了。名前付き範囲/R1C1/配列スピルは後続。
@@ -25,7 +25,7 @@
 | 1 | @lattica/data: IndexMapper＋データバインド | ✅ | +62 | 100% | wave0 |
 | 2 | セル型システム（レンダラ/エディタ） | 🚧 描画 | +? | 100% | wave4 |
 | 3 | 検証・read-only・配置・セルメタ | 🚧 中核 | +? | 100% | wave1 |
-| 4 | 対話UX（ドラッグ選択/フィル/リサイズ/移動） | ⏳ | - | - | - |
+| 4 | 対話UX（ドラッグ選択/フィル/リサイズ/移動） | 🚧 ドラッグ選択 | +2 | 100% | wave6 |
 | 5 | コンテキスト/ヘッダーメニュー・ショートカット | 🚧 中核 | +47 | 100% | wave3 |
 | 6 | 並べ替え（単/複数列） | 🚧 中核 | +34 | 100% | wave1 |
 | 7 | フィルタ | 🚧 中核 | +49 | 100% | wave1 |
@@ -50,7 +50,8 @@
 | A8 | 異常検知（z-score/IQR） | ✅ | +? | 100% | wave5 |
 | A9 | 検証ルール生成（型/正規表現/列挙） | ✅ | +? | 100% | wave5 |
 | A10 | 要約/翻訳/分類 | ✅ | +? | 100% | wave5 |
-| A11/A12 | MCP公開 / エージェントワークフロー | ⏳ | - | - | - |
+| A11 | MCP公開（@lattica/mcp: ツールレジストリ＋ディスパッチャ） | ✅ | +28 | 100% | wave6 |
+| A12 | エージェントワークフロー（計画→HITL承認→監査） | ✅ | +11 | 100% | wave6 |
 
 凡例: ✅完了 / 🚧進行中 / ⏳未着手
 
@@ -94,3 +95,9 @@
   - React統合: `GridController` に列型/配置・条件付き書式(`getCellStyle`)・検索(`runSearch`)を追加し `<LatticaGrid>` へ結線。グリッドがセル型描画・条件付き書式・検索ハイライトを実表示。
   - Part B AI（`@lattica/ai`）: A3 AI列・A4 スマートフィル（規則推論＋AIフォールバック、長さガード）・A7 NL→グリッド操作・A8 異常検知(z-score/IQR)・A9 検証ルール生成・A10 要約/翻訳/分類。全て provider 抽象でモック100%。
   - 全体 **1388テスト・100%カバレッジ**。typecheck/lint/build クリーン。Part B は A11(MCP)/A12(ワークフロー) を残すのみ。
+- 2026-06-06: **Wave 6 完了**（Part B 仕上げ + React対話UX を並行）。**Part B（AI ネイティブ）A1–A12 全完了**。
+  - A11: 新規 `@lattica/mcp` — グリッドのツールレジストリ（get_cell/set_cell/get_range/evaluate/define_name）＋ `ToolDispatcher`（結果エンベロープ）。get_range にセル数上限ガード追加。
+  - A12: `@lattica/ai` ワークフロー — `planWorkflow`（NL→手順・未知ツール除外）＋ `WorkflowRunner`（HITL承認・監査ログ・失敗で停止）。
+  - React対話UX Phase 4: ドラッグ範囲選択（mousedown→move→up）。
+  - 全体 **1429テスト・100%カバレッジ**。typecheck/lint/build クリーン。パッケージ8つ（core/data/formula/react/io/collab/ai/mcp）。
+  - 残：Part A React 統合（フィルハンドル・リサイズ/移動ハンドル・コンテキストメニューUI・ソート/フィルタ結線・結合描画・ネスト行）と Phase 12c(R1C1/スピル)・18(性能/E2E/ベンチ)。
