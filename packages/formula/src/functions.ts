@@ -8,13 +8,15 @@
 import type { AstNode } from './ast.js';
 import type { EvalContext, FunctionImpl, FunctionRegistry } from './evaluator.js';
 import { scalarize } from './evaluator.js';
-import { FormulaError, DIV0, NA, NUM, VALUE } from './errors.js';
+import { FormulaError, DIV0, NA, NUM, REF, VALUE } from './errors.js';
 import {
+  compareScalars,
   toBoolean,
   toNumber,
   toText,
   type CellScalar,
   type FormulaValue,
+  type Matrix,
 } from './values.js';
 
 type Evaluate = (node: AstNode) => FormulaValue;
@@ -644,6 +646,559 @@ function makeCriterion(criterion: CellScalar): (value: CellScalar) => boolean {
         return false;
     }
   };
+}
+
+// ── Range helpers (Phase 12) ─────────────────────────────────────────────────
+/** Evaluate an arg node to a Matrix, wrapping a scalar as a 1x1 grid. */
+function argMatrix(node: AstNode, evaluate: Evaluate): Matrix {
+  const v = evaluate(node);
+  if (Array.isArray(v)) return v;
+  return [[v]];
+}
+
+/** Flatten a Matrix into a row-major list of scalars/errors. */
+function flatten(matrix: Matrix): (CellScalar | FormulaError)[] {
+  const out: (CellScalar | FormulaError)[] = [];
+  for (const row of matrix) {
+    for (const cell of row) {
+      out.push(cell);
+    }
+  }
+  return out;
+}
+
+/**
+ * Collect numbers from a Matrix, skipping non-numeric cells (Excel range
+ * behavior). Errors propagate.
+ */
+function matrixNumbers(matrix: Matrix): number[] | FormulaError {
+  const out: number[] = [];
+  for (const cell of flatten(matrix)) {
+    if (FormulaError.is(cell)) return cell;
+    if (typeof cell === 'number') out.push(cell);
+  }
+  return out;
+}
+
+// ── Lookup / reference (Phase 12) ────────────────────────────────────────────
+def('IFS', (args, evaluate) => {
+  if (args.length < 2 || args.length % 2 !== 0) return VALUE;
+  for (let i = 0; i < args.length; i += 2) {
+    const cond = toBoolean(scalarize(evaluate(args[i]!)));
+    if (FormulaError.is(cond)) return cond;
+    if (cond) return evaluate(args[i + 1]!);
+  }
+  return NA;
+});
+
+def('SWITCH', (args, evaluate) => {
+  if (args.length < 3) return VALUE;
+  const target = scalarize(evaluate(args[0]!));
+  if (FormulaError.is(target)) return target;
+  let i = 1;
+  for (; i + 1 < args.length; i += 2) {
+    const candidate = scalarize(evaluate(args[i]!));
+    if (FormulaError.is(candidate)) return candidate;
+    if (compareScalars(target, candidate) === 0) {
+      return evaluate(args[i + 1]!);
+    }
+  }
+  // Trailing default (one arg left over).
+  if (i < args.length) return evaluate(args[i]!);
+  return NA;
+});
+
+def('CHOOSE', (args, evaluate) => {
+  if (args.length < 2) return VALUE;
+  const idx = argNumber(args[0], evaluate);
+  if (FormulaError.is(idx)) return idx;
+  const i = Math.trunc(idx);
+  if (i < 1 || i > args.length - 1) return VALUE;
+  return evaluate(args[i]!);
+});
+
+def('INDEX', (args, evaluate) => {
+  const err = expectArgs(args, 2, 3);
+  if (err) return err;
+  const matrix = argMatrix(args[0]!, evaluate);
+  const rowArg = argNumber(args[1], evaluate);
+  if (FormulaError.is(rowArg)) return rowArg;
+  const rowNum = Math.trunc(rowArg);
+  const rows = matrix.length;
+  // A resolved range / scalar always yields at least a 1x1 grid.
+  const cols = matrix[0]!.length;
+
+  let colNum: number;
+  if (args.length === 3) {
+    const colArg = argNumber(args[2], evaluate);
+    if (FormulaError.is(colArg)) return colArg;
+    colNum = Math.trunc(colArg);
+  } else {
+    // 2-arg form: a single-row range indexes columns; otherwise rows.
+    if (rows === 1) {
+      colNum = rowNum;
+      return indexCell(matrix, 1, colNum, rows, cols);
+    }
+    colNum = 1;
+  }
+  return indexCell(matrix, rowNum, colNum, rows, cols);
+});
+
+function indexCell(
+  matrix: Matrix,
+  rowNum: number,
+  colNum: number,
+  rows: number,
+  cols: number,
+): CellScalar | FormulaError {
+  if (rowNum < 1 || colNum < 1 || rowNum > rows || colNum > cols) return REF;
+  return matrix[rowNum - 1]![colNum - 1]!;
+}
+
+/**
+ * Locate `lookup` within a flat list. type 1 = largest value <= lookup in an
+ * ascending list; 0 = exact; -1 = smallest value >= lookup in a descending
+ * list. Returns the 1-based position or null when not found.
+ */
+function matchPosition(
+  lookup: CellScalar,
+  values: (CellScalar | FormulaError)[],
+  type: number,
+): number | null {
+  if (type === 0) {
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i]!;
+      if (FormulaError.is(v)) continue;
+      if (compareScalars(lookup, v) === 0) return i + 1;
+    }
+    return null;
+  }
+  let best: number | null = null;
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i]!;
+    if (FormulaError.is(v)) continue;
+    const cmp = compareScalars(v, lookup);
+    if (type === 1) {
+      if (cmp <= 0) best = i + 1;
+    } else {
+      // type === -1
+      if (cmp >= 0) best = i + 1;
+    }
+  }
+  return best;
+}
+
+def('MATCH', (args, evaluate) => {
+  const err = expectArgs(args, 2, 3);
+  if (err) return err;
+  const lookup = scalarize(evaluate(args[0]!));
+  if (FormulaError.is(lookup)) return lookup;
+  const matrix = argMatrix(args[1]!, evaluate);
+  const type = args.length === 3 ? argNumber(args[2], evaluate) : 1;
+  if (FormulaError.is(type)) return type;
+  const t = Math.sign(Math.trunc(type));
+  const pos = matchPosition(lookup, flatten(matrix), t);
+  return pos === null ? NA : pos;
+});
+
+function lookupImpl(orientation: 'v' | 'h'): FunctionImpl {
+  return (args, evaluate) => {
+    const err = expectArgs(args, 3, 4);
+    if (err) return err;
+    const lookup = scalarize(evaluate(args[0]!));
+    if (FormulaError.is(lookup)) return lookup;
+    const matrix = argMatrix(args[1]!, evaluate);
+    const idxArg = argNumber(args[2], evaluate);
+    if (FormulaError.is(idxArg)) return idxArg;
+    const index = Math.trunc(idxArg);
+    if (index < 1) return VALUE;
+    const approx = args.length === 4 ? toBoolean(scalarize(evaluate(args[3]!))) : true;
+    if (FormulaError.is(approx)) return approx;
+
+    // Build the lookup vector: first column (V) or first row (H).
+    const rows = matrix.length;
+    // A resolved range / scalar always yields at least a 1x1 grid.
+    const cols = matrix[0]!.length;
+    const vector: (CellScalar | FormulaError)[] =
+      orientation === 'v' ? matrix.map((row) => row[0]!) : matrix[0]!;
+
+    const pos = matchPosition(lookup, vector, approx ? 1 : 0);
+    if (pos === null) return NA;
+
+    if (orientation === 'v') {
+      if (index > cols) return REF;
+      return matrix[pos - 1]![index - 1]!;
+    }
+    if (index > rows) return REF;
+    return matrix[index - 1]![pos - 1]!;
+  };
+}
+def('VLOOKUP', lookupImpl('v'));
+def('HLOOKUP', lookupImpl('h'));
+
+// ── Math (Phase 12) ──────────────────────────────────────────────────────────
+def('SUMPRODUCT', (args, evaluate) => {
+  if (args.length < 1) return VALUE;
+  const matrices: Matrix[] = [];
+  for (const arg of args) {
+    matrices.push(argMatrix(arg, evaluate));
+  }
+  const first = matrices[0]!;
+  const rows = first.length;
+  // A resolved range / scalar always yields at least a 1x1 grid.
+  const cols = first[0]!.length;
+  for (const m of matrices) {
+    if (m.length !== rows || m[0]!.length !== cols) return VALUE;
+  }
+  let total = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      let prod = 1;
+      for (const m of matrices) {
+        const cell = m[r]![c]!;
+        if (FormulaError.is(cell)) return cell;
+        prod *= typeof cell === 'number' ? cell : typeof cell === 'boolean' ? (cell ? 1 : 0) : 0;
+      }
+      total += prod;
+    }
+  }
+  return total;
+});
+
+function gcd2(a: number, b: number): number {
+  a = Math.abs(a);
+  b = Math.abs(b);
+  while (b) {
+    [a, b] = [b, a % b];
+  }
+  return a;
+}
+
+def('GCD', (args, evaluate) => {
+  if (args.length < 1) return VALUE;
+  const nums = collectNumbers(args, evaluate);
+  if (FormulaError.is(nums)) return nums;
+  let result = 0;
+  for (const n of nums) {
+    const t = Math.trunc(n);
+    if (t < 0) return NUM;
+    result = gcd2(result, t);
+  }
+  return result;
+});
+
+def('LCM', (args, evaluate) => {
+  if (args.length < 1) return VALUE;
+  const nums = collectNumbers(args, evaluate);
+  if (FormulaError.is(nums)) return nums;
+  let result = 1;
+  for (const n of nums) {
+    const t = Math.trunc(n);
+    if (t < 0) return NUM;
+    if (t === 0) return 0;
+    result = (result / gcd2(result, t)) * t;
+  }
+  return result;
+});
+
+def('FACT', (args, evaluate) => {
+  const err = expectArgs(args, 1);
+  if (err) return err;
+  const x = argNumber(args[0], evaluate);
+  if (FormulaError.is(x)) return x;
+  const n = Math.trunc(x);
+  if (n < 0) return NUM;
+  let result = 1;
+  for (let i = 2; i <= n; i++) result *= i;
+  return result;
+});
+
+def('COMBIN', (args, evaluate) => {
+  const err = expectArgs(args, 2);
+  if (err) return err;
+  const nArg = argNumber(args[0], evaluate);
+  if (FormulaError.is(nArg)) return nArg;
+  const kArg = argNumber(args[1], evaluate);
+  if (FormulaError.is(kArg)) return kArg;
+  const n = Math.trunc(nArg);
+  const k = Math.trunc(kArg);
+  if (n < 0 || k < 0 || k > n) return NUM;
+  let result = 1;
+  for (let i = 1; i <= k; i++) {
+    result = (result * (n - k + i)) / i;
+  }
+  return Math.round(result);
+});
+
+def('QUOTIENT', (args, evaluate) => {
+  const err = expectArgs(args, 2);
+  if (err) return err;
+  const a = argNumber(args[0], evaluate);
+  if (FormulaError.is(a)) return a;
+  const b = argNumber(args[1], evaluate);
+  if (FormulaError.is(b)) return b;
+  if (b === 0) return DIV0;
+  return Math.trunc(a / b);
+});
+
+def('PI', (args) => (args.length === 0 ? Math.PI : VALUE));
+def('RADIANS', unaryMath((x) => (x * Math.PI) / 180));
+def('DEGREES', unaryMath((x) => (x * 180) / Math.PI));
+def('SIN', unaryMath((x) => Math.sin(x)));
+def('COS', unaryMath((x) => Math.cos(x)));
+def('TAN', unaryMath((x) => Math.tan(x)));
+def('ATAN', unaryMath((x) => Math.atan(x)));
+
+def('ATAN2', (args, evaluate) => {
+  const err = expectArgs(args, 2);
+  if (err) return err;
+  const x = argNumber(args[0], evaluate);
+  if (FormulaError.is(x)) return x;
+  const y = argNumber(args[1], evaluate);
+  if (FormulaError.is(y)) return y;
+  if (x === 0 && y === 0) return DIV0;
+  // Excel ATAN2(x_num, y_num) = angle of (x, y).
+  return Math.atan2(y, x);
+});
+
+// ── Statistics (Phase 12) ────────────────────────────────────────────────────
+def('STDEV', (args, evaluate) => varStdev(args, evaluate, true));
+def('VAR', (args, evaluate) => varStdev(args, evaluate, false));
+
+function varStdev(args: readonly AstNode[], evaluate: Evaluate, stdev: boolean): FormulaValue {
+  const nums = collectNumbers(args, evaluate);
+  if (FormulaError.is(nums)) return nums;
+  if (nums.length < 2) return DIV0;
+  const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+  const ss = nums.reduce((a, b) => a + (b - mean) ** 2, 0);
+  const variance = ss / (nums.length - 1);
+  return stdev ? Math.sqrt(variance) : variance;
+}
+
+function largeSmall(largest: boolean): FunctionImpl {
+  return (args, evaluate) => {
+    const err = expectArgs(args, 2);
+    if (err) return err;
+    const nums = matrixNumbers(argMatrix(args[0]!, evaluate));
+    if (FormulaError.is(nums)) return nums;
+    const kArg = argNumber(args[1], evaluate);
+    if (FormulaError.is(kArg)) return kArg;
+    const k = Math.trunc(kArg);
+    if (k < 1 || k > nums.length) return NUM;
+    const sorted = [...nums].sort((a, b) => (largest ? b - a : a - b));
+    return sorted[k - 1]!;
+  };
+}
+def('LARGE', largeSmall(true));
+def('SMALL', largeSmall(false));
+
+def('RANK', (args, evaluate) => {
+  const err = expectArgs(args, 2, 3);
+  if (err) return err;
+  const x = argNumber(args[0], evaluate);
+  if (FormulaError.is(x)) return x;
+  const nums = matrixNumbers(argMatrix(args[1]!, evaluate));
+  if (FormulaError.is(nums)) return nums;
+  const order = args.length === 3 ? argNumber(args[2], evaluate) : 0;
+  if (FormulaError.is(order)) return order;
+  const ascending = order !== 0;
+  if (!nums.includes(x)) return NA;
+  let rank = 1;
+  for (const n of nums) {
+    if (ascending ? n < x : n > x) rank++;
+  }
+  return rank;
+});
+
+/**
+ * Evaluate (range, criteria) pairs against a parallel result/count grid.
+ * `args` starts at the first range; pairs are consumed two at a time.
+ */
+function multiCriteria(
+  pairs: readonly AstNode[],
+  evaluate: Evaluate,
+): { matches: boolean[][]; rows: number; cols: number } | FormulaError {
+  const firstRange = argMatrix(pairs[0]!, evaluate);
+  const rows = firstRange.length;
+  // A resolved range / scalar always yields at least a 1x1 grid.
+  const cols = firstRange[0]!.length;
+  const matches: boolean[][] = Array.from({ length: rows }, () => new Array<boolean>(cols).fill(true));
+  for (let p = 0; p < pairs.length; p += 2) {
+    const range = argMatrix(pairs[p]!, evaluate);
+    if (range.length !== rows || range[0]!.length !== cols) return VALUE;
+    const criterion = scalarize(evaluate(pairs[p + 1]!));
+    if (FormulaError.is(criterion)) return criterion;
+    const predicate = makeCriterion(criterion);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const cell = range[r]![c]!;
+        if (FormulaError.is(cell) || !predicate(cell)) matches[r]![c] = false;
+      }
+    }
+  }
+  return { matches, rows, cols };
+}
+
+def('COUNTIFS', (args, evaluate) => {
+  if (args.length < 2 || args.length % 2 !== 0) return VALUE;
+  const res = multiCriteria(args, evaluate);
+  if (FormulaError.is(res)) return res;
+  let count = 0;
+  for (let r = 0; r < res.rows; r++) {
+    for (let c = 0; c < res.cols; c++) {
+      if (res.matches[r]![c]) count++;
+    }
+  }
+  return count;
+});
+
+def('SUMIFS', (args, evaluate) => {
+  // SUMIFS(sum_range, criteria_range1, criteria1, ...)
+  if (args.length < 3 || args.length % 2 !== 1) return VALUE;
+  const sumRange = argMatrix(args[0]!, evaluate);
+  const res = multiCriteria(args.slice(1), evaluate);
+  if (FormulaError.is(res)) return res;
+  if (sumRange.length !== res.rows || (res.rows > 0 && sumRange[0]!.length !== res.cols)) {
+    return VALUE;
+  }
+  let total = 0;
+  for (let r = 0; r < res.rows; r++) {
+    for (let c = 0; c < res.cols; c++) {
+      if (!res.matches[r]![c]) continue;
+      const cell = sumRange[r]![c]!;
+      if (!FormulaError.is(cell) && typeof cell === 'number') total += cell;
+    }
+  }
+  return total;
+});
+
+def('AVERAGEIF', (args, evaluate) => {
+  const err = expectArgs(args, 2, 3);
+  if (err) return err;
+  const range = argMatrix(args[0]!, evaluate);
+  const criterion = scalarize(evaluate(args[1]!));
+  if (FormulaError.is(criterion)) return criterion;
+  const predicate = makeCriterion(criterion);
+  const avgRange = args.length === 3 ? argMatrix(args[2]!, evaluate) : range;
+  let total = 0;
+  let count = 0;
+  for (let r = 0; r < range.length; r++) {
+    const row = range[r]!;
+    for (let c = 0; c < row.length; c++) {
+      const cell = row[c]!;
+      if (FormulaError.is(cell) || !predicate(cell)) continue;
+      const target = avgRange[r]?.[c] ?? null;
+      if (!FormulaError.is(target) && typeof target === 'number') {
+        total += target;
+        count++;
+      }
+    }
+  }
+  if (count === 0) return DIV0;
+  return total / count;
+});
+
+// ── Text (Phase 12) ──────────────────────────────────────────────────────────
+def('CLEAN', (args, evaluate) => {
+  const err = expectArgs(args, 1);
+  if (err) return err;
+  const t = argText(args[0], evaluate);
+  if (FormulaError.is(t)) return t;
+  // Strip ASCII control characters (0x00-0x1F).
+  return t.replace(/[\u0000-\u001F]/g, '');
+});
+
+def('CHAR', (args, evaluate) => {
+  const err = expectArgs(args, 1);
+  if (err) return err;
+  const x = argNumber(args[0], evaluate);
+  if (FormulaError.is(x)) return x;
+  const code = Math.trunc(x);
+  if (code < 1 || code > 255) return VALUE;
+  return String.fromCharCode(code);
+});
+
+def('CODE', (args, evaluate) => {
+  const err = expectArgs(args, 1);
+  if (err) return err;
+  const t = argText(args[0], evaluate);
+  if (FormulaError.is(t)) return t;
+  if (t.length === 0) return VALUE;
+  return t.charCodeAt(0);
+});
+
+def('EXACT', (args, evaluate) => {
+  const err = expectArgs(args, 2);
+  if (err) return err;
+  const a = argText(args[0], evaluate);
+  if (FormulaError.is(a)) return a;
+  const b = argText(args[1], evaluate);
+  if (FormulaError.is(b)) return b;
+  return a === b;
+});
+
+def('SEARCH', (args, evaluate) => {
+  const err = expectArgs(args, 2, 3);
+  if (err) return err;
+  const needle = argText(args[0], evaluate);
+  if (FormulaError.is(needle)) return needle;
+  const hay = argText(args[1], evaluate);
+  if (FormulaError.is(hay)) return hay;
+  const start = args.length === 3 ? argNumber(args[2], evaluate) : 1;
+  if (FormulaError.is(start)) return start;
+  if (start < 1) return VALUE;
+  const idx = hay.toUpperCase().indexOf(needle.toUpperCase(), Math.trunc(start) - 1);
+  return idx === -1 ? VALUE : idx + 1;
+});
+
+def('NUMBERVALUE', (args, evaluate) => {
+  const err = expectArgs(args, 1, 3);
+  if (err) return err;
+  const t = argText(args[0], evaluate);
+  if (FormulaError.is(t)) return t;
+  let decimalSep = '.';
+  if (args.length >= 2) {
+    const d = argText(args[1], evaluate);
+    if (FormulaError.is(d)) return d;
+    if (d.length > 0) decimalSep = d[0]!;
+  }
+  let groupSep = ',';
+  if (args.length === 3) {
+    const g = argText(args[2], evaluate);
+    if (FormulaError.is(g)) return g;
+    if (g.length > 0) groupSep = g[0]!;
+  }
+  let normalized = t.split(groupSep).join('').split(decimalSep).join('.');
+  normalized = normalized.replace(/\s+/g, '');
+  if (normalized === '') return 0;
+  const n = Number(normalized);
+  return Number.isNaN(n) ? VALUE : n;
+});
+
+def('TEXT', (args, evaluate) => {
+  const err = expectArgs(args, 2);
+  if (err) return err;
+  const x = argNumber(args[0], evaluate);
+  if (FormulaError.is(x)) return x;
+  const fmt = argText(args[1], evaluate);
+  if (FormulaError.is(fmt)) return fmt;
+  return formatNumber(x, fmt);
+});
+
+/** Minimal numeric format engine: supports '0', '0.00', '#,##0', '#,##0.00'. */
+function formatNumber(value: number, fmt: string): string {
+  const grouping = fmt.includes(',');
+  const dotIndex = fmt.indexOf('.');
+  const decimals = dotIndex === -1 ? 0 : fmt.length - dotIndex - 1;
+  const fixed = value.toFixed(decimals);
+  if (!grouping) return fixed;
+  const negative = fixed.startsWith('-');
+  const unsigned = negative ? fixed.slice(1) : fixed;
+  const parts = unsigned.split('.');
+  const intPart = parts[0]!;
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const out = parts.length === 2 ? `${grouped}.${parts[1]!}` : grouped;
+  return negative ? `-${out}` : out;
 }
 
 /** Build the default function registry. */
