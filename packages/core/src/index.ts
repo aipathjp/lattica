@@ -81,3 +81,17 @@ export {
   type CfStyle,
   type CfRule,
 } from './conditional-format.js';
+export { CommentModel, type CellComment } from './comments.js';
+export {
+  BorderModel,
+  type BorderSide,
+  type BorderStyle,
+  type CellBorders,
+} from './borders.js';
+export { HookBus, type HookMap, type HookHandler } from './hooks.js';
+export {
+  serializeState,
+  deserializeState,
+  emptyState,
+  type GridStateSnapshot,
+} from './persistent-state.js';
