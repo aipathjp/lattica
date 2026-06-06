@@ -60,3 +60,10 @@ export {
   type ShowWhen,
 } from './headers.js';
 export { Emitter, type EventMap, type Handler } from './emitter.js';
+export { MergeModel, type MergeArea } from './merge.js';
+export {
+  searchGrid,
+  SearchState,
+  type SearchMatch,
+  type SearchOptions,
+} from './search.js';
