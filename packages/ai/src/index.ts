@@ -32,3 +32,38 @@ export {
   type Embedder,
   type SearchHit,
 } from './semantic-search.js';
+export {
+  renderTemplate,
+  generateColumn,
+  type AiColumnCell,
+  type AiColumnOptions,
+} from './ai-column.js';
+export {
+  inferRule,
+  applyRule,
+  smartFill,
+  type FillRule,
+  type FillExample,
+} from './smart-fill.js';
+export { isValidOperation, nlToOperation, type GridOperation } from './nl-transform.js';
+export {
+  mean,
+  stddev,
+  zScoreOutliers,
+  iqrOutliers,
+  detectColumnOutliers,
+  type Outlier,
+} from './anomaly.js';
+export {
+  matchesSpec,
+  fitRate,
+  suggestRule,
+  type RuleSpec,
+  type SuggestRuleOptions,
+} from './rule-gen.js';
+export {
+  summarizeValues,
+  translateValues,
+  classifyValues,
+  type SummarizeOptions,
+} from './text-ops.js';
