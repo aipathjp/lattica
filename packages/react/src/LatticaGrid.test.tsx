@@ -414,3 +414,49 @@ describe('LatticaGrid context-menu actions', () => {
     expect(c.getDisplay(0, 0)).toBe('v1');
   });
 });
+
+describe('LatticaGrid resize handles', () => {
+  it('resizes a column by dragging its header border', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    // col 0 right border at rowHeaderWidth(48)+colWidth(100)=148, within the header band (y<24)
+    fireEvent.mouseDown(grid, { clientX: 148, clientY: 10 });
+    fireEvent.mouseMove(grid, { clientX: 180, clientY: 10 });
+    fireEvent.mouseUp(grid);
+    expect(c.colSizes.getSize(0)).toBe(132);
+  });
+
+  it('resizes a row by dragging its gutter border', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    // row 0 bottom border at colHeaderHeight(24)+rowHeight(24)=48, within the gutter (x<48)
+    fireEvent.mouseDown(grid, { clientX: 10, clientY: 48 });
+    fireEvent.mouseMove(grid, { clientX: 10, clientY: 70 });
+    fireEvent.mouseUp(grid);
+    expect(c.rowSizes.getSize(0)).toBe(46);
+  });
+
+  it('clamps a column to a minimum width', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.mouseDown(grid, { clientX: 148, clientY: 10 });
+    fireEvent.mouseMove(grid, { clientX: 0, clientY: 10 });
+    fireEvent.mouseUp(grid);
+    expect(c.colSizes.getSize(0)).toBe(8);
+  });
+
+  it('shows a resize cursor when hovering a border and clears it otherwise', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid') as HTMLElement;
+    fireEvent.mouseMove(grid, { clientX: 148, clientY: 10 });
+    expect(grid.style.cursor).toBe('col-resize');
+    fireEvent.mouseMove(grid, { clientX: 10, clientY: 48 });
+    expect(grid.style.cursor).toBe('row-resize');
+    fireEvent.mouseMove(grid, { clientX: 200, clientY: 120 });
+    expect(grid.style.cursor).toBe('');
+  });
+});
