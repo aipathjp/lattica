@@ -21,3 +21,5 @@ export {
   type XlsxSheet,
   type XlsxWorkbook,
 } from './xlsx.js';
+export { inflateRaw } from './inflate.js';
+export { readXlsx, type ReadSheet, type ReadWorkbook } from './xlsx-read.js';
