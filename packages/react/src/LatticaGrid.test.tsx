@@ -76,6 +76,32 @@ describe('LatticaGrid interaction', () => {
     expect(range.start.col).toBe(range.end.col);
   });
 
+  it('drag-selects a range with mousedown → mousemove → mouseup', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.mouseDown(grid, { clientX: 60, clientY: 40 });
+    fireEvent.mouseMove(grid, { clientX: 260, clientY: 120 });
+    fireEvent.mouseUp(grid);
+    const range = c.selection.getState().ranges[0]!;
+    expect(range.end.row).toBeGreaterThan(range.start.row);
+    expect(range.end.col).toBeGreaterThan(range.start.col);
+    // After release, moving no longer extends the selection.
+    const before = JSON.stringify(c.selection.getState());
+    fireEvent.mouseMove(grid, { clientX: 300, clientY: 160 });
+    expect(JSON.stringify(c.selection.getState())).toBe(before);
+  });
+
+  it('ignores mousemove when not dragging', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 0, col: 0 });
+    const before = JSON.stringify(c.selection.getState());
+    fireEvent.mouseMove(grid, { clientX: 200, clientY: 120 });
+    expect(JSON.stringify(c.selection.getState())).toBe(before);
+  });
+
   it('selects everything from the corner', () => {
     const c = new GridController({ rowCount: 20, colCount: 10 });
     renderGrid(c);
