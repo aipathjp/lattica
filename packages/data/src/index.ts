@@ -17,3 +17,4 @@ export {
   type FilterCondition,
   type ColumnFilter,
 } from './filter.js';
+export { NestedRowModel, type NestedRowNode } from './nested-rows.js';
