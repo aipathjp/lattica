@@ -15,6 +15,14 @@ export interface CellPaint {
   text: string;
   selected: boolean;
   active: boolean;
+  /** Cell-type name (resolved by the painter's registry); text when omitted. */
+  type?: string;
+  /** Horizontal alignment for the cell content. */
+  align?: 'left' | 'center' | 'right';
+  /** Raw value (for renderers like checkbox that read the value, not text). */
+  value?: unknown;
+  /** Conditional-format style for this cell, if any. */
+  cfStyle?: { background?: string; color?: string };
 }
 
 export interface Scene {
@@ -33,6 +41,14 @@ export interface BuildSceneParams {
   selection: SelectionModel;
   getDisplay: (row: number, col: number) => string;
   overscan?: number;
+  /** Resolve a cell-type name for a cell (optional). */
+  getType?: (row: number, col: number) => string | undefined;
+  /** Resolve alignment for a cell (optional). */
+  getAlign?: (row: number, col: number) => 'left' | 'center' | 'right' | undefined;
+  /** Raw value accessor (optional; used by value-based renderers). */
+  getValue?: (row: number, col: number) => unknown;
+  /** Conditional-format style accessor (optional). */
+  getCfStyle?: (row: number, col: number) => { background?: string; color?: string } | null;
 }
 
 /** The visible index list along one axis: frozen leading indices + the window. */
@@ -88,6 +104,10 @@ export function buildScene(params: BuildSceneParams): Scene {
         text: getDisplay(row, col),
         selected: selection.isSelected({ row, col }),
         active,
+        type: params.getType?.(row, col),
+        align: params.getAlign?.(row, col),
+        value: params.getValue?.(row, col),
+        cfStyle: params.getCfStyle?.(row, col) ?? undefined,
       };
       cells.push(cell);
       if (active && state.active.row === row && state.active.col === col) {
