@@ -108,3 +108,8 @@
   - React: コンテキストメニューUI（右クリック→Copy/Paste/Clear/Undo/Redo、カスタム可）を結線。
   - ネット断で fill-series エージェントは StructuredOutput 未到達だったが成果物は完全（38テスト）→採用。resize の凍結ペイン制限は非凍結軸向けと明記。
   - 全体 **1528テスト・100%カバレッジ**。typecheck/lint/build クリーン。
+- 2026-06-06: **Wave 8 完了**（追加的モデル並列＋React対話UX結線）。
+  - `NestedRowModel`(data・ネスト行/折りたたみ→非表示行)、`fillRegion`(core・2Dフィル適用)。
+  - React: 列/行リサイズハンドル（ヘッダー境界ドラッグ＋カーソル）を結線。
+  - fill-region の縦横で零幅シードの戻りを `[]` に統一（レビュー指摘）。
+  - 全体 **1557テスト・100%カバレッジ**。typecheck/lint/build クリーン。
