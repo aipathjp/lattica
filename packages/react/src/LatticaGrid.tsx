@@ -30,6 +30,7 @@ import { interpretKey, type KeyInput } from './keyboard.js';
 import { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
 import { columnHeaderCells, rowHeaderCells } from './headers.js';
 import { buildMenu, type MenuItem, type MenuItemSpec } from './menu.js';
+import { hitResizeHandle, type ResizeTarget } from './resize.js';
 
 export interface LatticaGridProps {
   controller: GridController;
@@ -59,6 +60,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
   const composingRef = useRef(false);
   const draggingRef = useRef(false);
+  const resizeRef = useRef<{ target: ResizeTarget; start: number; startSize: number } | null>(null);
 
   const [scroll, setScroll] = useState<ScrollOffset>({ left: 0, top: 0 });
   const [edit, setEdit] = useState<EditState | null>(null);
@@ -204,6 +206,17 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       const rect = root.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
+      // A drag starting on a header border resizes that column/row instead of selecting.
+      const border = hitResizeHandle(controller.geometry(), scroll.left, scroll.top, x, y);
+      if (border !== null) {
+        const startSize =
+          border.type === 'col'
+            ? controller.colSizes.getSize(border.index)
+            : controller.rowSizes.getSize(border.index);
+        resizeRef.current = { target: border, start: border.type === 'col' ? x : y, startSize };
+        root.focus();
+        return;
+      }
       const hit = hitTest(controller.geometry(), scroll.left, scroll.top, x, y);
       switch (hit.region) {
         case 'cell':
@@ -232,31 +245,45 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
 
   const onMouseMove = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
-      if (!draggingRef.current) {
-        return;
-      }
       const root = rootRef.current;
       /* v8 ignore next 3 -- root ref is always attached during a drag */
       if (root === null) {
         return;
       }
       const rect = root.getBoundingClientRect();
-      const hit = hitTest(
-        controller.geometry(),
-        scroll.left,
-        scroll.top,
-        e.clientX - rect.left,
-        e.clientY - rect.top,
-      );
-      if (hit.region === 'cell') {
-        controller.selection.extendTo({ row: hit.row, col: hit.col });
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const resizing = resizeRef.current;
+      if (resizing !== null) {
+        const delta = (resizing.target.type === 'col' ? x : y) - resizing.start;
+        const next = Math.max(8, resizing.startSize + delta);
+        if (resizing.target.type === 'col') {
+          controller.resizeCol(resizing.target.index, next);
+        } else {
+          controller.resizeRow(resizing.target.index, next);
+        }
+        return;
       }
+
+      if (draggingRef.current) {
+        const hit = hitTest(controller.geometry(), scroll.left, scroll.top, x, y);
+        if (hit.region === 'cell') {
+          controller.selection.extendTo({ row: hit.row, col: hit.col });
+        }
+        return;
+      }
+
+      // Idle hover: show a resize cursor when over a header border.
+      const border = hitResizeHandle(controller.geometry(), scroll.left, scroll.top, x, y);
+      root.style.cursor = border === null ? '' : border.type === 'col' ? 'col-resize' : 'row-resize';
     },
     [controller, scroll],
   );
 
   const onMouseUp = useCallback(() => {
     draggingRef.current = false;
+    resizeRef.current = null;
   }, []);
 
   const defaultMenu = useCallback(
