@@ -24,6 +24,13 @@ import {
   normalizeRange,
   fillRegion,
 } from '@lattica/core';
+import {
+  DataView,
+  SortModel,
+  FilterModel,
+  type SortDirection,
+  type FilterCondition,
+} from '@lattica/data';
 import { SheetEngine, FormulaError, type CellContent } from '@lattica/formula';
 import type { GridGeometry } from './geometry.js';
 import type { CellAlign } from './cell-types.js';
@@ -66,6 +73,7 @@ export function formatValue(value: ReturnType<SheetEngine['getValue']>): string 
 
 export class GridController {
   readonly engine = new SheetEngine();
+  /** Physical-indexed sizes (resize edits these by physical row/col). */
   readonly rowSizes: SizeManager;
   readonly colSizes: SizeManager;
   readonly selection: SelectionModel;
@@ -74,6 +82,10 @@ export class GridController {
   readonly conditionalFormat = new ConditionalFormatModel();
   /** Current search matches/navigation state. */
   readonly search = new SearchState();
+  /** View transform (sort/filter) mapping visual↔physical indices. */
+  readonly view: DataView;
+  private readonly sortModel = new SortModel();
+  private readonly filterModel = new FilterModel();
   private readonly columnTypes = new Map<number, string>();
   private readonly columnAligns = new Map<number, CellAlign>();
   private readonly searchKeys = new Set<string>();
@@ -81,6 +93,11 @@ export class GridController {
 
   private rowCount: number;
   private colCount: number;
+  private readonly defaultRowHeight: number;
+  private readonly defaultColWidth: number;
+  /** Visible-indexed sizes derived from the view; consumed by geometry(). */
+  private viewRowSizes: SizeManager;
+  private viewColSizes: SizeManager;
   readonly rowHeaderWidth: number;
   readonly colHeaderHeight: number;
   frozenRows: number;
@@ -91,14 +108,13 @@ export class GridController {
   constructor(options: GridControllerOptions) {
     this.rowCount = options.rowCount;
     this.colCount = options.colCount;
-    this.rowSizes = new SizeManager({
-      count: options.rowCount,
-      defaultSize: options.defaultRowHeight ?? 24,
-    });
-    this.colSizes = new SizeManager({
-      count: options.colCount,
-      defaultSize: options.defaultColWidth ?? 100,
-    });
+    this.defaultRowHeight = options.defaultRowHeight ?? 24;
+    this.defaultColWidth = options.defaultColWidth ?? 100;
+    this.rowSizes = new SizeManager({ count: options.rowCount, defaultSize: this.defaultRowHeight });
+    this.colSizes = new SizeManager({ count: options.colCount, defaultSize: this.defaultColWidth });
+    this.view = new DataView(options.rowCount, options.colCount);
+    this.viewRowSizes = this.rowSizes;
+    this.viewColSizes = this.colSizes;
     this.selection = new SelectionModel({
       rowCount: options.rowCount,
       colCount: options.colCount,
@@ -111,17 +127,94 @@ export class GridController {
   }
 
   getRowCount(): number {
-    return this.rowCount;
+    return this.view.getRowCount();
   }
   getColCount(): number {
-    return this.colCount;
+    return this.view.getColCount();
   }
 
-  /** Geometry snapshot for the renderer. */
+  /** Map a visual cell to its physical address in the engine. */
+  private toPhysical(row: number, col: number): { row: number; col: number } {
+    return this.view.toPhysical(row, col);
+  }
+
+  /**
+   * Rebuild the visible-indexed size managers from the view + physical sizes.
+   * When the view is the identity (no sort/filter), this mirrors the physical
+   * managers exactly, so behavior is unchanged.
+   */
+  private rebuildViewSizes(): void {
+    const rows = this.view.getRowCount();
+    const cols = this.view.getColCount();
+    const vr = new SizeManager({ count: rows, defaultSize: this.defaultRowHeight });
+    for (let v = 0; v < rows; v++) {
+      const size = this.rowSizes.getSize(this.view.rows.getPhysicalIndex(v));
+      if (size !== this.defaultRowHeight) {
+        vr.setSize(v, size);
+      }
+    }
+    const vc = new SizeManager({ count: cols, defaultSize: this.defaultColWidth });
+    for (let v = 0; v < cols; v++) {
+      const size = this.colSizes.getSize(this.view.cols.getPhysicalIndex(v));
+      if (size !== this.defaultColWidth) {
+        vc.setSize(v, size);
+      }
+    }
+    this.viewRowSizes = vr;
+    this.viewColSizes = vc;
+  }
+
+  /** A read-only accessor over the engine in physical coordinates. */
+  private engineGet = (row: number, col: number): unknown => {
+    const v = this.engine.getValue({ row, col });
+    return FormulaError.is(v) ? v.type : v;
+  };
+
+  /** Re-apply the current sort + filter, refresh sizes/selection, and emit. */
+  private refreshView(): void {
+    this.view.applyFilter(this.engineGet, this.filterModel.getFilters());
+    this.view.applySort(this.engineGet, this.sortModel.getConfigs());
+    this.rebuildViewSizes();
+    this.selection.setDimensions(this.view.getRowCount(), this.view.getColCount());
+    this.emitter.emit('change', undefined);
+  }
+
+  /** Toggle the sort on a (visual) column: none→asc→desc→none. */
+  toggleSort(visualCol: number, additive = false): void {
+    this.sortModel.toggle(this.view.cols.getPhysicalIndex(visualCol), additive);
+    this.refreshView();
+  }
+
+  /** Replace the filter on a (visual) column. Empty conditions clear it. */
+  setColumnFilter(visualCol: number, conditions: FilterCondition[], conjunction?: 'and' | 'or'): void {
+    const col = this.view.cols.getPhysicalIndex(visualCol);
+    if (conditions.length === 0) {
+      this.filterModel.remove(col);
+    } else {
+      this.filterModel.set({ col, conditions, ...(conjunction ? { conjunction } : {}) });
+    }
+    this.refreshView();
+  }
+
+  /** Clear all sort and filter, returning to the identity view. */
+  clearView(): void {
+    this.sortModel.clear();
+    this.filterModel.clear();
+    this.refreshView();
+  }
+
+  /** Current sort direction for a (visual) column, or null. */
+  getSortDirection(visualCol: number): SortDirection | null {
+    const col = this.view.cols.getPhysicalIndex(visualCol);
+    const config = this.sortModel.getConfigs().find((c) => c.col === col);
+    return config ? config.direction : null;
+  }
+
+  /** Geometry snapshot for the renderer (visible-indexed). */
   geometry(): GridGeometry {
     return {
-      rowSizes: this.rowSizes,
-      colSizes: this.colSizes,
+      rowSizes: this.viewRowSizes,
+      colSizes: this.viewColSizes,
       frozenRows: this.frozenRows,
       frozenCols: this.frozenCols,
       rowHeaderWidth: this.rowHeaderWidth,
@@ -131,42 +224,43 @@ export class GridController {
 
   /** Display text of a cell (computed value, formatted). */
   getDisplay(row: number, col: number): string {
-    return formatValue(this.engine.getValue({ row, col }));
+    const p = this.toPhysical(row, col);
+    return formatValue(this.engine.getValue(p));
   }
 
   /** Raw computed value of a cell (for value-based renderers / formatting). */
   getValue(row: number, col: number): unknown {
-    const v = this.engine.getValue({ row, col });
+    const v = this.engine.getValue(this.toPhysical(row, col));
     return FormulaError.is(v) ? v.type : v;
   }
 
   /** Raw editable text of a cell (`=formula` or literal). */
   getEditText(row: number, col: number): string {
-    const content = this.engine.getContent({ row, col });
+    const content = this.engine.getContent(this.toPhysical(row, col));
     return content === null ? '' : String(content);
   }
 
-  // ── Column type & alignment ────────────────────────────────────────────────
+  // ── Column type & alignment (keyed by physical column) ─────────────────────
   setColumnType(col: number, type: string): void {
     this.columnTypes.set(col, type);
     this.emitter.emit('change', undefined);
   }
-  getColumnType(col: number): string | undefined {
-    return this.columnTypes.get(col);
+  getColumnType(visualCol: number): string | undefined {
+    return this.columnTypes.get(this.view.cols.getPhysicalIndex(visualCol));
   }
   setColumnAlign(col: number, align: CellAlign): void {
     this.columnAligns.set(col, align);
     this.emitter.emit('change', undefined);
   }
-  getColumnAlign(col: number): CellAlign | undefined {
-    return this.columnAligns.get(col);
+  getColumnAlign(visualCol: number): CellAlign | undefined {
+    return this.columnAligns.get(this.view.cols.getPhysicalIndex(visualCol));
   }
 
   // ── Conditional formatting & search styling ────────────────────────────────
   /** Combined per-cell style: conditional-format rule, overlaid by a search-hit tint. */
   getCellStyle(row: number, col: number): CfStyle | null {
     const base = this.conditionalFormat.styleFor(
-      this.engine.getValue({ row, col }) as never,
+      this.engine.getValue(this.toPhysical(row, col)) as never,
     );
     if (this.searchKeys.has(`${row},${col}`)) {
       return { ...(base ?? {}), background: '#fff3a3' };
@@ -177,8 +271,8 @@ export class GridController {
   /** Run a search over displayed cell text, updating match state. Returns hit count. */
   runSearch(query: string, options?: SearchOptions): number {
     const matches = searchGrid(
-      this.rowCount,
-      this.colCount,
+      this.getRowCount(),
+      this.getColCount(),
       (r, c) => this.getDisplay(r, c),
       query,
       options,
@@ -233,7 +327,7 @@ export class GridController {
 
   /** Set a single cell's content (undoable) and emit a change. */
   setCellText(row: number, col: number, raw: string): void {
-    this.undo.execute(this.setContentCommand({ row, col }, raw));
+    this.undo.execute(this.setContentCommand(this.toPhysical(row, col), raw));
     this.emitter.emit('change', undefined);
   }
 
@@ -243,8 +337,9 @@ export class GridController {
     this.undo.transaction(() => {
       for (const range of ranges) {
         forEachCell(range, (addr) => {
-          if (this.engine.getContent(addr) !== null) {
-            this.undo.execute(this.setContentCommand(addr, ''));
+          const p = this.toPhysical(addr.row, addr.col);
+          if (this.engine.getContent(p) !== null) {
+            this.undo.execute(this.setContentCommand(p, ''));
           }
         });
       }
@@ -260,8 +355,8 @@ export class GridController {
         line.forEach((text, c) => {
           const row = active.row + r;
           const col = active.col + c;
-          if (row < this.rowCount && col < this.colCount) {
-            this.undo.execute(this.setContentCommand({ row, col }, text));
+          if (row < this.getRowCount() && col < this.getColCount()) {
+            this.undo.execute(this.setContentCommand(this.toPhysical(row, col), text));
           }
         });
       });
@@ -343,8 +438,8 @@ export class GridController {
           const col = baseCol + c;
           // fillTo only ever produces non-negative bases, so only the upper
           // grid bound can be exceeded.
-          if (row < this.rowCount && col < this.colCount) {
-            this.undo.execute(this.setContentCommand({ row, col }, toRaw(value)));
+          if (row < this.getRowCount() && col < this.getColCount()) {
+            this.undo.execute(this.setContentCommand(this.toPhysical(row, col), toRaw(value)));
           }
         });
       });
@@ -414,13 +509,15 @@ export class GridController {
     this.emitter.emit('edit', null);
   }
 
-  // ── Sizing ────────────────────────────────────────────────────────────────
+  // ── Sizing (visual index → physical, then refresh visible sizes) ───────────
   resizeRow(row: number, height: number): void {
-    this.rowSizes.setSize(row, height);
+    this.rowSizes.setSize(this.view.rows.getPhysicalIndex(row), height);
+    this.rebuildViewSizes();
     this.emitter.emit('change', undefined);
   }
   resizeCol(col: number, width: number): void {
-    this.colSizes.setSize(col, width);
+    this.colSizes.setSize(this.view.cols.getPhysicalIndex(col), width);
+    this.rebuildViewSizes();
     this.emitter.emit('change', undefined);
   }
 }
