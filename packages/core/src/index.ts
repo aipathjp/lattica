@@ -96,3 +96,4 @@ export {
   type GridStateSnapshot,
 } from './persistent-state.js';
 export { detectSeries, extendSeries, type SeriesKind } from './fill-series.js';
+export { fillRegion, type FillDirection } from './fill-region.js';
