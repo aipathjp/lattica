@@ -117,3 +117,7 @@
   - `DataView`(data・IndexMapper×ソート×フィルタ合成、フィルタ置換対応)。
   - `GridController.fillTo`(系列フィルエンジン・主軸判定・トランザクション) ＋ React フィルハンドル（選択右下つまみのドラッグ）。
   - 全体 **1582テスト・100%カバレッジ**。typecheck/lint/build クリーン。Part A の対話UX（選択/リサイズ/メニュー/フィル）実機化が揃う。残：ソート/フィルタの GridController データビュー結線・結合描画・ネスト行UI・Phase 18。
+- 2026-06-06: **Wave 10 完了**（DataView を GridController に統合＝可視ソート/フィルタ）。
+  - 全データアクセス/サイズを visual↔physical 写像経由に（既定アイデンティティで既存挙動不変）。`toggleSort`/`setColumnFilter`/`clearView`/`getSortDirection` 追加。ソート時に行高が物理行へ追従、編集は正しい物理セルへ書込み。
+  - Phase 6/7 が可視反映まで到達（モデル→GridController 結線）。
+  - 全体 **1590テスト・100%カバレッジ**。typecheck/lint/build クリーン。
