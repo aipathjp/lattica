@@ -183,6 +183,33 @@ describe('value-equality short-circuiting', () => {
     expect(e.getValue(A(0, 1))).toBe(5);
     expect(changed.has('0,1')).toBe(true);
   });
+
+  it('detects a change from a number to an error (one side error)', () => {
+    const e = new SheetEngine();
+    e.setContent(A(0, 0), 5);
+    e.setContent(A(0, 1), '=10/A1'); // 2
+    expect(e.getValue(A(0, 1))).toBe(2);
+    const changed = e.setContent(A(0, 0), 0); // -> #DIV/0!
+    expect(changed.has('0,1')).toBe(true);
+  });
+
+  it('detects a change between two different error types', () => {
+    const e = new SheetEngine();
+    e.setContent(A(0, 0), 0);
+    e.setContent(A(0, 1), '=10/A1'); // #DIV/0!
+    const changed = e.setContent(A(0, 0), 'x'); // 10/"x" -> #VALUE!
+    expect(e.getValue(A(0, 1))).toMatchObject({ type: '#VALUE!' });
+    expect(changed.has('0,1')).toBe(true);
+  });
+
+  it('reports no change when a cell stays the same error type', () => {
+    const e = new SheetEngine();
+    e.setContent(A(0, 0), 1);
+    e.setContent(A(0, 1), '=A1/0'); // always #DIV/0! regardless of A1
+    const changed = e.setContent(A(0, 0), 2); // A1 changes but B1 stays #DIV/0!
+    expect(e.getValue(A(0, 1))).toMatchObject({ type: '#DIV/0!' });
+    expect(changed.has('0,1')).toBe(false);
+  });
 });
 
 describe('custom function registry', () => {

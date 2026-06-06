@@ -187,6 +187,8 @@ describe('text', () => {
   it('VALUE/T/N', () => {
     expect(evalFormula('VALUE("3.5")')).toBe(3.5);
     expect(evalFormula('VALUE("x")')).toMatchObject({ type: '#VALUE!' });
+    expect(evalFormula('VALUE()')).toMatchObject({ type: '#VALUE!' }); // arity
+    expect(evalFormula('VALUE(1,2)')).toMatchObject({ type: '#VALUE!' });
     expect(evalFormula('T("hi")')).toBe('hi');
     expect(evalFormula('T(5)')).toBe('');
     expect(evalFormula('N(5)')).toBe(5);

@@ -10,7 +10,7 @@
 ## 0. 設計原則
 
 1. **コアはフレームワーク非依存・ランタイム依存ゼロ**。React は薄いバインディング層に閉じる。
-2. **重いロジックは純粋関数／純粋クラスに寄せる**（座標・仮想化・選択・コマンド・数式）。→ DOM/Canvas を持ち込まずに単体テストで 98% を達成する。
+2. **重いロジックは純粋関数／純粋クラスに寄せる**（座標・仮想化・選択・コマンド・数式）。→ DOM/Canvas を持ち込まずに単体テストで **100%** を達成する（ライブラリとして他プロジェクトで利用するため 100% を基準とする。到達不能な防御コードのみ `/* v8 ignore */` で明示除外）。
 3. **描画はハイブリッド**：セルは Canvas、編集・ヘッダー・ARIA ミラーは DOM。
 4. **クリーンルーム**：Handsontable / AG Grid / HyperFormula のソースは参照せず、公開仕様・関数仕様のみから独立実装する（§7）。
 5. **コピーレフト依存ゼロ**：GPL の HyperFormula は不採用。ランタイム依存は原則ゼロ、devDependencies のみ。
@@ -123,7 +123,7 @@ ColumnDef      = { field, headerName, width?, ... }
 
 - **アクセシビリティ**：Canvas と並走する不可視 DOM の ARIA ミラー（`role="grid"` / `row` / `gridcell` / `aria-rowindex` / `aria-colindex`）。可視範囲のみミラー。
 - **IME/日本語入力**：編集は DOM `<input>` オーバーレイで行い、`compositionstart`/`compositionend` を監視して変換確定まで commit を保留。
-- **テスト**：core/formula/io は Vitest（純粋ロジック、98%）。react は happy-dom + Canvas 2D モックで描画命令を検証。E2E は将来 Playwright。
+- **テスト**：core/formula/io は Vitest（純粋ロジック、**100%**）。react は happy-dom + Canvas 2D モックで描画命令を検証。E2E は将来 Playwright。
 - **TypeScript**：`strict` + `noUncheckedIndexedAccess`。公開型は最小限・安定。
 - **プラグイン**：セル型・関数・トランスポートは登録式（レジストリ）。
 - **バンドル**：tsup で ESM+CJS、tree-shakable、`sideEffects:false`。

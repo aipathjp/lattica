@@ -44,6 +44,29 @@ describe('LatticaGrid interaction', () => {
     expect(c.selection.getState().ranges[0]).toBeDefined();
   });
 
+  it('selects a whole row from the row-number gutter', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    // x < rowHeaderWidth(48), y > colHeaderHeight(24) -> row header
+    fireEvent.mouseDown(grid, { clientX: 10, clientY: 60 });
+    const range = c.selection.getState().ranges[0]!;
+    expect(range.start.row).toBe(range.end.row);
+    expect(range.start.col).toBe(0);
+  });
+
+  it('extends the selection with shift+arrow keys', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 0, col: 0 });
+    fireEvent.keyDown(grid, { key: 'ArrowDown', shiftKey: true });
+    fireEvent.keyDown(grid, { key: 'ArrowRight', shiftKey: true });
+    const range = c.selection.getState().ranges[0]!;
+    expect(range.end).toEqual({ row: 1, col: 1 });
+    expect(range.start).toEqual({ row: 0, col: 0 });
+  });
+
   it('selects a whole column from the header', () => {
     const c = new GridController({ rowCount: 20, colCount: 10 });
     renderGrid(c);

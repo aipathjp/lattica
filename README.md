@@ -107,7 +107,7 @@ b.doc.get('r1'); // 'hello'
 
 ```bash
 pnpm install
-pnpm test            # vitest, 98% coverage thresholds enforced
+pnpm test            # vitest, 100% coverage thresholds enforced (lines/branches/functions/statements)
 pnpm coverage
 pnpm build           # tsup → ESM + CJS + d.ts for every package
 pnpm typecheck

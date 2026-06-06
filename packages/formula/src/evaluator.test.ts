@@ -58,6 +58,17 @@ describe('error propagation', () => {
     expect(evalFormula('#N/A')).toMatchObject({ type: '#N/A' });
     expect(evalFormula('#REF!')).toMatchObject({ type: '#REF!' });
   });
+
+  it.each(['#DIV/0!', '#VALUE!', '#REF!', '#NAME?', '#N/A', '#NUM!', '#CYCLE!'])(
+    'maps the %s literal to its error type',
+    (literal) => {
+      expect(evalFormula(literal)).toMatchObject({ type: literal });
+    },
+  );
+
+  it('maps an unknown #... literal (e.g. #NULL!) to #ERROR!', () => {
+    expect(evalFormula('#NULL!')).toMatchObject({ type: '#ERROR!' });
+  });
 });
 
 describe('references and ranges', () => {

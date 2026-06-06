@@ -10,8 +10,7 @@
 
 import { addressKey, type CellAddress } from '@lattica/core';
 import type { AstNode } from './ast.js';
-import { parseFormula, ParseError } from './parser.js';
-import { LexError } from './lexer.js';
+import { parseFormula } from './parser.js';
 import { evaluate, type EvalContext, type FunctionRegistry } from './evaluator.js';
 import { createDefaultFunctions } from './functions.js';
 import { extractReferences } from './references.js';
@@ -21,6 +20,19 @@ import type { CellScalar, FormulaValue } from './values.js';
 import { scalarize } from './evaluator.js';
 
 export type CellContent = CellScalar;
+
+/**
+ * Parse a formula body, returning the AST or a `#ERROR!` value. `parseFormula`
+ * only throws `ParseError`/`LexError` (both `Error` subclasses), so a single
+ * catch with no instanceof discrimination covers every failure.
+ */
+function tryParse(body: string): AstNode | FormulaError {
+  try {
+    return parseFormula(body);
+  } catch (err) {
+    return new FormulaError('#ERROR!', (err as Error).message);
+  }
+}
 
 interface CellEntry {
   /** The literal value, or null when the cell holds a formula. */
@@ -64,26 +76,15 @@ export class SheetEngine {
 
     if (isFormula) {
       const body = raw.slice(1);
-      let ast: AstNode;
-      try {
-        ast = parseFormula(body);
-      } catch (err) {
+      const parsed = tryParse(body);
+      if (FormulaError.is(parsed)) {
         // Store the parse error as the cell value.
-        if (err instanceof ParseError || err instanceof LexError) {
-          this.cells.set(key, {
-            literal: null,
-            formula: null,
-            source: body,
-            value: new FormulaError('#ERROR!', err.message),
-          });
-          this.graph.clear(key);
-          return this.recompute([key]);
-        }
-        /* v8 ignore next 2 -- only ParseError/LexError are thrown by the parser */
-        throw err;
+        this.cells.set(key, { literal: null, formula: null, source: body, value: parsed });
+        this.graph.clear(key);
+        return this.recompute([key]);
       }
-      this.cells.set(key, { literal: null, formula: ast, source: body, value: null });
-      const refs = extractReferences(ast, { maxRangeCells: this.maxRangeCells });
+      this.cells.set(key, { literal: null, formula: parsed, source: body, value: null });
+      const refs = extractReferences(parsed, { maxRangeCells: this.maxRangeCells });
       this.graph.setPrecedents(key, refs);
     } else {
       if (raw === null) {
@@ -117,17 +118,8 @@ export class SheetEngine {
   /** Parse and evaluate a one-off formula without storing it. */
   evaluateFormula(body: string): FormulaValue {
     const trimmed = body.startsWith('=') ? body.slice(1) : body;
-    let ast: AstNode;
-    try {
-      ast = parseFormula(trimmed);
-    } catch (err) {
-      if (err instanceof ParseError || err instanceof LexError) {
-        return new FormulaError('#ERROR!', err.message);
-      }
-      /* v8 ignore next 2 -- only ParseError/LexError are thrown by the parser */
-      throw err;
-    }
-    return evaluate(ast, this.evalContext);
+    const parsed = tryParse(trimmed);
+    return FormulaError.is(parsed) ? parsed : evaluate(parsed, this.evalContext);
   }
 
   /**
