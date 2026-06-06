@@ -18,8 +18,11 @@ import {
   type CellAddress,
   type CfStyle,
   type SearchOptions,
+  type CellValue,
+  type FillDirection,
   forEachCell,
   normalizeRange,
+  fillRegion,
 } from '@lattica/core';
 import { SheetEngine, FormulaError, type CellContent } from '@lattica/formula';
 import type { GridGeometry } from './geometry.js';
@@ -264,6 +267,88 @@ export class GridController {
       });
     }, 'paste');
     this.emitter.emit('change', undefined);
+  }
+
+  /**
+   * Fill-handle: extend the current selection's values to the cell at
+   * `(targetRow, targetCol)` using series detection. The dominant axis (the
+   * larger drag extent) wins; the produced values are written as one undoable
+   * batch and the selection grows to cover them. A target inside the selection
+   * is a no-op.
+   */
+  fillTo(targetRow: number, targetCol: number): void {
+    const b = normalizeRange(this.selection.getSelectionBounds());
+    const down = targetRow - b.bottom;
+    const up = b.top - targetRow;
+    const right = targetCol - b.right;
+    const left = b.left - targetCol;
+    const vertical = Math.max(down, up);
+    const horizontal = Math.max(right, left);
+
+    if (vertical <= 0 && horizontal <= 0) {
+      return; // target within (or above-left of nothing) the selection
+    }
+
+    if (vertical >= horizontal) {
+      const direction: FillDirection = down >= up ? 'down' : 'up';
+      const count = direction === 'down' ? down : up;
+      const seed = this.readBlock(b.top, b.left, b.bottom, b.right);
+      const produced = fillRegion(seed, direction, count);
+      const baseRow = direction === 'down' ? b.bottom + 1 : b.top - count;
+      this.writeBlock(produced, baseRow, b.left);
+      if (direction === 'down') {
+        this.selection.setActive({ row: b.top, col: b.left });
+        this.selection.extendTo({ row: b.bottom + count, col: b.right });
+      } else {
+        this.selection.setActive({ row: b.bottom, col: b.right });
+        this.selection.extendTo({ row: b.top - count, col: b.left });
+      }
+    } else {
+      const direction: FillDirection = right >= left ? 'right' : 'left';
+      const count = direction === 'right' ? right : left;
+      const seed = this.readBlock(b.top, b.left, b.bottom, b.right);
+      const produced = fillRegion(seed, direction, count);
+      const baseCol = direction === 'right' ? b.right + 1 : b.left - count;
+      this.writeBlock(produced, b.top, baseCol);
+      if (direction === 'right') {
+        this.selection.setActive({ row: b.top, col: b.left });
+        this.selection.extendTo({ row: b.bottom, col: b.right + count });
+      } else {
+        this.selection.setActive({ row: b.bottom, col: b.right });
+        this.selection.extendTo({ row: b.top, col: b.left - count });
+      }
+    }
+    this.emitter.emit('change', undefined);
+  }
+
+  private readBlock(top: number, left: number, bottom: number, right: number): CellValue[][] {
+    const out: CellValue[][] = [];
+    for (let row = top; row <= bottom; row++) {
+      const line: CellValue[] = [];
+      for (let col = left; col <= right; col++) {
+        line.push(this.getValue(row, col) as CellValue);
+      }
+      out.push(line);
+    }
+    return out;
+  }
+
+  private writeBlock(block: readonly (readonly CellValue[])[], baseRow: number, baseCol: number): void {
+    const toRaw = (v: CellValue): string =>
+      v === null ? '' : typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v);
+    this.undo.transaction(() => {
+      block.forEach((line, r) => {
+        line.forEach((value, c) => {
+          const row = baseRow + r;
+          const col = baseCol + c;
+          // fillTo only ever produces non-negative bases, so only the upper
+          // grid bound can be exceeded.
+          if (row < this.rowCount && col < this.colCount) {
+            this.undo.execute(this.setContentCommand({ row, col }, toRaw(value)));
+          }
+        });
+      });
+    }, 'fill');
   }
 
   /** Extract the selection bounding box as a matrix of edit text (for copy). */
