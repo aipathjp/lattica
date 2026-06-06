@@ -110,6 +110,12 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/mcp:
+    dependencies:
+      '@lattica/formula':
+        specifier: workspace:*
+        version: link:../formula
+
   packages/react:
     dependencies:
       '@lattica/core':
