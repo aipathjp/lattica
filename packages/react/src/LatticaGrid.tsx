@@ -102,6 +102,10 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       clientHeight: height,
       selection: controller.selection,
       getDisplay: (r, c) => controller.getDisplay(r, c),
+      getType: (_r, c) => controller.getColumnType(c),
+      getAlign: (_r, c) => controller.getColumnAlign(c),
+      getValue: (r, c) => controller.getValue(r, c),
+      getCfStyle: (r, c) => controller.getCellStyle(r, c),
     });
     paintScene(ctx, scene, theme, { width, height, dpr });
   });
@@ -242,6 +246,10 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     clientHeight: height,
     selection: controller.selection,
     getDisplay: (r, c) => controller.getDisplay(r, c),
+    getType: (_r, c) => controller.getColumnType(c),
+    getAlign: (_r, c) => controller.getColumnAlign(c),
+    getValue: (r, c) => controller.getValue(r, c),
+    getCfStyle: (r, c) => controller.getCellStyle(r, c),
   });
   const colHeaders = columnHeaderCells(geom, scroll.left, scene.visibleCols, layout);
   const rowHeaders = rowHeaderCells(geom, scroll.top, scene.visibleRows);
