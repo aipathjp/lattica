@@ -67,3 +67,11 @@ export {
   classifyValues,
   type SummarizeOptions,
 } from './text-ops.js';
+export {
+  planWorkflow,
+  WorkflowRunner,
+  type WorkflowStep,
+  type AuditEntry,
+  type StepExecutor,
+  type PlanResult,
+} from './workflow.js';
