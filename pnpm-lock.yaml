@@ -121,6 +121,9 @@ importers:
       '@lattica/core':
         specifier: workspace:*
         version: link:../core
+      '@lattica/data':
+        specifier: workspace:*
+        version: link:../data
       '@lattica/formula':
         specifier: workspace:*
         version: link:../formula

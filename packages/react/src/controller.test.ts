@@ -365,3 +365,86 @@ describe('fillTo value formatting', () => {
     expect(c.getDisplay(1, 2)).toBe('');
   });
 });
+
+describe('DataView integration (sort / filter)', () => {
+  const seeded = () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setCellText(0, 0, '3');
+    c.setCellText(1, 0, '1');
+    c.setCellText(2, 0, '2');
+    return c;
+  };
+
+  it('sorts rows ascending/descending and cycles back to none', () => {
+    const c = seeded();
+    expect(c.getSortDirection(0)).toBeNull();
+    c.toggleSort(0); // asc
+    expect(c.getSortDirection(0)).toBe('asc');
+    expect([c.getDisplay(0, 0), c.getDisplay(1, 0), c.getDisplay(2, 0)]).toEqual(['1', '2', '3']);
+    c.toggleSort(0); // desc
+    expect(c.getSortDirection(0)).toBe('desc');
+    expect([c.getDisplay(0, 0), c.getDisplay(1, 0), c.getDisplay(2, 0)]).toEqual(['3', '2', '1']);
+    c.toggleSort(0); // none
+    expect(c.getSortDirection(0)).toBeNull();
+    expect([c.getDisplay(0, 0), c.getDisplay(1, 0), c.getDisplay(2, 0)]).toEqual(['3', '1', '2']);
+  });
+
+  it('additive sort keeps prior columns', () => {
+    const c = seeded();
+    c.toggleSort(0);
+    c.toggleSort(1, true);
+    expect(c.getSortDirection(0)).toBe('asc');
+    expect(c.getSortDirection(1)).toBe('asc');
+  });
+
+  it('filters rows out and reports the reduced row count', () => {
+    const c = seeded();
+    c.setColumnFilter(0, [{ kind: 'gt', value: 1 }]);
+    expect(c.getRowCount()).toBe(2);
+    expect([c.getDisplay(0, 0), c.getDisplay(1, 0)]).toEqual(['3', '2']);
+    c.setColumnFilter(0, []); // clear
+    expect(c.getRowCount()).toBe(3);
+  });
+
+  it('filters with an explicit conjunction', () => {
+    const c = seeded();
+    c.setColumnFilter(0, [{ kind: 'gte', value: 2 }, { kind: 'lte', value: 3 }], 'and');
+    expect(c.getRowCount()).toBe(2); // 3 and 2
+  });
+
+  it('clearView resets sort and filter', () => {
+    const c = seeded();
+    c.toggleSort(0);
+    c.setColumnFilter(0, [{ kind: 'gt', value: 1 }]);
+    c.clearView();
+    expect(c.getSortDirection(0)).toBeNull();
+    expect(c.getRowCount()).toBe(3);
+    expect(c.getDisplay(1, 0)).toBe('1');
+  });
+
+  it('a custom row height follows its row when sorted', () => {
+    const c = seeded();
+    c.resizeRow(2, 40); // physical row 2 (value "2")
+    c.toggleSort(0); // asc -> value 2 (physical row 2) is at visual index 1
+    expect(c.geometry().rowSizes.getSize(1)).toBe(40);
+  });
+
+  it('editing a sorted cell writes to the correct physical row', () => {
+    const c = seeded();
+    c.toggleSort(0); // asc: visual 0 -> physical row 1
+    c.setCellText(0, 0, '9'); // edit the top visible cell
+    c.clearView();
+    expect(c.getDisplay(1, 0)).toBe('9'); // physical row 1 changed
+  });
+});
+
+describe('DataView with error cells', () => {
+  it('sorts a column containing an error value without throwing', () => {
+    const c = new GridController({ rowCount: 3, colCount: 1 });
+    c.setCellText(0, 0, '=1/0');
+    c.setCellText(1, 0, '1');
+    c.setCellText(2, 0, '2');
+    expect(() => c.toggleSort(0)).not.toThrow();
+    expect(c.getRowCount()).toBe(3);
+  });
+});
