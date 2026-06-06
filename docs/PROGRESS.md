@@ -11,7 +11,7 @@
 | 区分 | 状態 |
 |---|---|
 | 基盤 (core/formula/react/io/collab) | ✅ 完了（581テスト・100%） |
-| Part A (Phase 1–18: HoT 超越) | 🚧 進行中（**940テスト・100%**） |
+| Part A (Phase 1–18: HoT 超越) | 🚧 進行中（**1070テスト・100%**） |
 | Part B (Phase A1–A12: AI ネイティブ) | ⏳ 未着手 |
 
 > 🚧「中核」= フレームワーク非依存のモデル/ロジックは完成・100%。React 描画/UI 統合は後続の React 集中 wave で実施。
@@ -31,14 +31,14 @@
 | 7 | フィルタ | 🚧 中核 | +49 | 100% | wave1 |
 | 8 | 隠す/トリム/移動/ネスト行 | ⏳ | - | - | - |
 | 9 | 結合セル | 🚧 中核 | +20 | 100% | wave0 |
-| 10 | コメント/条件付き書式/枠線/列サマリ | 🚧 サマリ+書式 | +? | 100% | wave1 |
+| 10 | コメント/条件付き書式/枠線/列サマリ | 🚧 中核 | +? | 100% | wave1/2 |
 | 11 | 検索・ハイライト | 🚧 中核 | +18 | 100% | wave0 |
-| 12 | 数式エンジン拡張（関数/名前付き範囲/R1C1/スピル） | 🚧 関数 | +77 | 100% | wave0 |
-| 13 | XLSX インポート＋スタイル往復＋JSON | ⏳ | - | - | - |
+| 12 | 数式エンジン拡張（関数/名前付き範囲/R1C1/スピル） | 🚧 関数+名前 | +? | 100% | wave0/2 |
+| 13 | XLSX インポート＋スタイル往復＋JSON | 🚧 import | +40 | 100% | wave2 |
 | 14 | 自動サイズ/ストレッチ/折返し可変行高 | ⏳ | - | - | - |
 | 15 | i18n/RTL/テーマ | ⏳ | - | - | - |
 | 16 | フルアクセシビリティ | ⏳ | - | - | - |
-| 17 | フック/永続状態/プラグインAPI | ⏳ | - | - | - |
+| 17 | フック/永続状態/プラグインAPI | 🚧 中核 | +? | 100% | wave2 |
 | 18 | 性能/ベンチ/E2E/ドキュメント | ⏳ | - | - | - |
 | A1–A12 | AI ネイティブ機能群 | ⏳ | - | - | - |
 
@@ -58,3 +58,9 @@
   - Phase 3 中核: `ValidationModel`/`validators`（非同期対応・不正セル追跡）。
   - Phase 10 中核: `summarize`/`summarizeColumn`（列サマリ）＋ `ConditionalFormatModel`（条件付き書式ルールエンジン）。
   - 全体 **940テスト・100%カバレッジ**。typecheck/lint/build クリーン。レビュー検出の sort bigint 精度バグを統合時に修正＋テスト追加。
+- 2026-06-06: **Wave 2 完了**（マルチエージェント: 実装6＋レビュー6 = 12エージェント）。
+  - Phase 13 import: `inflateRaw`（RFC1951 DEFLATE 展開・依存ゼロ）＋ `readXlsx`（ZIP解析＋SpreadsheetML→matrix、共有文字列/inlineStr/型対応）。XLSX 往復確認済。
+  - Phase 12 名前: 数式エンジンに名前付き範囲（`defineName`/`getNames`/`removeName`、`=SUM(Sales)` 動作確認）。
+  - Phase 10c: `CommentModel`・`BorderModel`。
+  - Phase 17: `HookBus`（キャンセル可能フック）・永続状態シリアライザ（`serializeState`/`deserializeState`/`emptyState`）。
+  - 全体 **1070テスト・100%カバレッジ**。typecheck/lint/build クリーン。
