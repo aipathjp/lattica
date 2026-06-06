@@ -460,3 +460,42 @@ describe('LatticaGrid resize handles', () => {
     expect(grid.style.cursor).toBe('');
   });
 });
+
+describe('LatticaGrid fill handle', () => {
+  it('renders a fill handle and fills by dragging it', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    c.setCellText(0, 0, '1');
+    c.setCellText(1, 0, '2');
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    // select A1:A2 via drag
+    c.selection.setActive({ row: 0, col: 0 });
+    c.selection.extendTo({ row: 1, col: 0 });
+    const nub = screen.getByTestId('lattica-fill-handle');
+    fireEvent.mouseDown(nub);
+    // drag down to row 4 (y within row 4: colHeaderHeight 24 + 4*24=120 .. +24)
+    fireEvent.mouseMove(grid, { clientX: 60, clientY: 130 });
+    fireEvent.mouseUp(grid);
+    expect(c.getDisplay(2, 0)).toBe('3');
+    expect(c.getDisplay(4, 0)).toBe('5');
+  });
+
+  it('mouseup without a fill target does nothing', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    c.setCellText(0, 0, '1');
+    renderGrid(c);
+    const nub = screen.getByTestId('lattica-fill-handle');
+    fireEvent.mouseDown(nub); // start fill but never move
+    fireEvent.mouseUp(screen.getByTestId('lattica-grid'));
+    expect(c.getDisplay(1, 0)).toBe('');
+  });
+
+  it('hides the fill handle while editing', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 0, col: 0 });
+    fireEvent.keyDown(grid, { key: 'F2' });
+    expect(screen.queryByTestId('lattica-fill-handle')).toBeNull();
+  });
+});
