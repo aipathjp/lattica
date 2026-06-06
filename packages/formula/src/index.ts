@@ -42,3 +42,4 @@ export {
   type SheetEngineOptions,
   type CellContent,
 } from './engine.js';
+export { a1ToR1C1, r1c1ToA1, isR1C1 } from './r1c1.js';
