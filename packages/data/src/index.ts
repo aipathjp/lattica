@@ -18,3 +18,4 @@ export {
   type ColumnFilter,
 } from './filter.js';
 export { NestedRowModel, type NestedRowNode } from './nested-rows.js';
+export { DataView, type PhysicalCell } from './data-view.js';
