@@ -195,3 +195,6 @@
   - core `chart.ts`: `layoutChart(spec)`（純粋）— プロット矩形・**nice 軸目盛**（`niceScale`）・系列の描画プリミティブ（折れ線点/棒/円グラフ扇形）・凡例を算出。`line`/`bar`（グループ化・ゼロ基準）/`pie`（割合扇形）。
   - react `chart-painter.ts` `paintChart`＋ **`<LatticaChart>`** コンポーネント（canvas、`role=img`）。Canvas2D に `arc`/`closePath`/`fill` を追加。
   - 全体 **1870テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E-5（PDF/印刷出力）。
+- 2026-06-07: **Phase E-5 完了**（PDF 出力）。
+  - `@lattica/io` `pdf.ts`: `tableToPdf(rows, options)` — 依存ゼロの PDF 1.4 ライタ。Helvetica（WinAnsi）・罫線グリッド・**自動ページ分割**・タイトル・列幅指定。バイト精度の xref/trailer を手組み。非 Latin-1 は `?` に畳む（フォント埋め込みは対象外）。
+  - 全体 **1877テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E-6（数式 LAMBDA／構造化参照）。
