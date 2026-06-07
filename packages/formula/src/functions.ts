@@ -1201,6 +1201,315 @@ function formatNumber(value: number, fmt: string): string {
   return negative ? `-${out}` : out;
 }
 
+// ── Date (Phase 13) ──────────────────────────────────────────────────────────
+/**
+ * Excel serial date epoch. Excel day 1 is 1900-01-01; serial 0 corresponds to
+ * 1899-12-31. We use a UTC anchor and pure integer day arithmetic so results
+ * are timezone-independent. Note: this clean-room implementation does NOT
+ * reproduce Excel's fictitious 1900-02-29 leap-day bug.
+ */
+const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 31);
+const MS_PER_DAY = 86_400_000;
+
+/** Convert a (year, month, day) triple to an Excel serial number. */
+function serialFromYMD(year: number, month: number, day: number): number {
+  // Normalize month overflow/underflow into the year via UTC arithmetic.
+  const ms = Date.UTC(year, month - 1, day);
+  return Math.round((ms - EXCEL_EPOCH_UTC) / MS_PER_DAY);
+}
+
+/** Decompose an Excel serial number into UTC year/month/day parts. */
+function ymdFromSerial(serial: number): { year: number; month: number; day: number } {
+  const ms = EXCEL_EPOCH_UTC + Math.trunc(serial) * MS_PER_DAY;
+  const d = new Date(ms);
+  return {
+    year: d.getUTCFullYear(),
+    month: d.getUTCMonth() + 1,
+    day: d.getUTCDate(),
+  };
+}
+
+def('DATE', (args, evaluate) => {
+  const err = expectArgs(args, 3);
+  if (err) return err;
+  const year = argNumber(args[0], evaluate);
+  if (FormulaError.is(year)) return year;
+  const month = argNumber(args[1], evaluate);
+  if (FormulaError.is(month)) return month;
+  const day = argNumber(args[2], evaluate);
+  if (FormulaError.is(day)) return day;
+  const serial = serialFromYMD(Math.trunc(year), Math.trunc(month), Math.trunc(day));
+  if (serial < 0) return NUM;
+  return serial;
+});
+
+function datePartImpl(part: 'year' | 'month' | 'day'): FunctionImpl {
+  return (args, evaluate) => {
+    const err = expectArgs(args, 1);
+    if (err) return err;
+    const serial = argNumber(args[0], evaluate);
+    if (FormulaError.is(serial)) return serial;
+    if (serial < 0) return NUM;
+    const ymd = ymdFromSerial(serial);
+    return ymd[part];
+  };
+}
+def('YEAR', datePartImpl('year'));
+def('MONTH', datePartImpl('month'));
+def('DAY', datePartImpl('day'));
+
+def('EDATE', (args, evaluate) => {
+  const err = expectArgs(args, 2);
+  if (err) return err;
+  const serial = argNumber(args[0], evaluate);
+  if (FormulaError.is(serial)) return serial;
+  if (serial < 0) return NUM;
+  const months = argNumber(args[1], evaluate);
+  if (FormulaError.is(months)) return months;
+  const { year, month, day } = ymdFromSerial(serial);
+  const targetMonth = month + Math.trunc(months);
+  // Excel clamps to the last day of the target month (e.g. Jan 31 +1 -> Feb 28).
+  const lastDay = serialFromYMD(year, targetMonth + 1, 0);
+  const wanted = serialFromYMD(year, targetMonth, day);
+  const result = Math.min(wanted, lastDay);
+  if (result < 0) return NUM;
+  return result;
+});
+
+def('EOMONTH', (args, evaluate) => {
+  const err = expectArgs(args, 2);
+  if (err) return err;
+  const serial = argNumber(args[0], evaluate);
+  if (FormulaError.is(serial)) return serial;
+  if (serial < 0) return NUM;
+  const months = argNumber(args[1], evaluate);
+  if (FormulaError.is(months)) return months;
+  const { year, month } = ymdFromSerial(serial);
+  // Day 0 of the next month is the last day of the target month.
+  const result = serialFromYMD(year, month + Math.trunc(months) + 1, 0);
+  if (result < 0) return NUM;
+  return result;
+});
+
+def('WEEKDAY', (args, evaluate) => {
+  const err = expectArgs(args, 1, 2);
+  if (err) return err;
+  const serial = argNumber(args[0], evaluate);
+  if (FormulaError.is(serial)) return serial;
+  if (serial < 0) return NUM;
+  const type = args.length === 2 ? argNumber(args[1], evaluate) : 1;
+  if (FormulaError.is(type)) return type;
+  const ms = EXCEL_EPOCH_UTC + Math.trunc(serial) * MS_PER_DAY;
+  // getUTCDay(): Sun=0 .. Sat=6.
+  const dow = new Date(ms).getUTCDay();
+  switch (Math.trunc(type)) {
+    case 1:
+      // Sun=1 .. Sat=7
+      return dow + 1;
+    case 2:
+      // Mon=1 .. Sun=7
+      return ((dow + 6) % 7) + 1;
+    case 3:
+      // Mon=0 .. Sun=6
+      return (dow + 6) % 7;
+    default:
+      return NUM;
+  }
+});
+
+def('DATEDIF', (args, evaluate) => {
+  const err = expectArgs(args, 3);
+  if (err) return err;
+  const startN = argNumber(args[0], evaluate);
+  if (FormulaError.is(startN)) return startN;
+  const endN = argNumber(args[1], evaluate);
+  if (FormulaError.is(endN)) return endN;
+  const unit = argText(args[2], evaluate);
+  if (FormulaError.is(unit)) return unit;
+  const start = Math.trunc(startN);
+  const end = Math.trunc(endN);
+  if (start < 0 || end < 0 || end < start) return NUM;
+  const s = ymdFromSerial(start);
+  const e = ymdFromSerial(end);
+  switch (unit.toUpperCase()) {
+    case 'D':
+      return end - start;
+    case 'Y': {
+      let years = e.year - s.year;
+      // Subtract a year if the end has not yet reached the anniversary.
+      if (e.month < s.month || (e.month === s.month && e.day < s.day)) years--;
+      return years;
+    }
+    case 'M': {
+      let months = (e.year - s.year) * 12 + (e.month - s.month);
+      if (e.day < s.day) months--;
+      return months;
+    }
+    default:
+      return NUM;
+  }
+});
+
+def('DATEVALUE', (args, evaluate) => {
+  const err = expectArgs(args, 1);
+  if (err) return err;
+  const t = argText(args[0], evaluate);
+  if (FormulaError.is(t)) return t;
+  // Strict ISO yyyy-mm-dd parsing to stay deterministic & timezone-safe.
+  const m = /^\s*(\d{4})-(\d{1,2})-(\d{1,2})\s*$/.exec(t);
+  if (m === null) return VALUE;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return VALUE;
+  const serial = serialFromYMD(year, month, day);
+  // Reject overflow dates that rolled into another month (e.g. 2021-02-30).
+  const back = ymdFromSerial(serial);
+  if (back.year !== year || back.month !== month || back.day !== day) return VALUE;
+  if (serial < 0) return VALUE;
+  return serial;
+});
+
+// ── Financial (Phase 13) ─────────────────────────────────────────────────────
+/** Read an optional numeric arg at index `i`, defaulting when absent. */
+function optNumber(
+  args: readonly AstNode[],
+  i: number,
+  evaluate: Evaluate,
+  fallback: number,
+): number | FormulaError {
+  if (args.length <= i) return fallback;
+  return argNumber(args[i], evaluate);
+}
+
+/** Future value of pmt + pv over nper periods at a fixed rate. */
+function fvFormula(rate: number, nper: number, pmt: number, pv: number, type: number): number {
+  if (rate === 0) {
+    return -(pv + pmt * nper);
+  }
+  const factor = Math.pow(1 + rate, nper);
+  return -(pv * factor + pmt * (1 + rate * type) * ((factor - 1) / rate));
+}
+
+def('PMT', (args, evaluate) => {
+  const err = expectArgs(args, 3, 5);
+  if (err) return err;
+  const rate = argNumber(args[0], evaluate);
+  if (FormulaError.is(rate)) return rate;
+  const nper = argNumber(args[1], evaluate);
+  if (FormulaError.is(nper)) return nper;
+  const pv = argNumber(args[2], evaluate);
+  if (FormulaError.is(pv)) return pv;
+  const fv = optNumber(args, 3, evaluate, 0);
+  if (FormulaError.is(fv)) return fv;
+  const type = optNumber(args, 4, evaluate, 0);
+  if (FormulaError.is(type)) return type;
+  if (nper === 0) return NUM;
+  if (rate === 0) {
+    return -(pv + fv) / nper;
+  }
+  const factor = Math.pow(1 + rate, nper);
+  return -(rate * (pv * factor + fv)) / ((1 + rate * type) * (factor - 1));
+});
+
+def('FV', (args, evaluate) => {
+  const err = expectArgs(args, 3, 5);
+  if (err) return err;
+  const rate = argNumber(args[0], evaluate);
+  if (FormulaError.is(rate)) return rate;
+  const nper = argNumber(args[1], evaluate);
+  if (FormulaError.is(nper)) return nper;
+  const pmt = argNumber(args[2], evaluate);
+  if (FormulaError.is(pmt)) return pmt;
+  const pv = optNumber(args, 3, evaluate, 0);
+  if (FormulaError.is(pv)) return pv;
+  const type = optNumber(args, 4, evaluate, 0);
+  if (FormulaError.is(type)) return type;
+  return fvFormula(rate, nper, pmt, pv, type);
+});
+
+def('PV', (args, evaluate) => {
+  const err = expectArgs(args, 3, 5);
+  if (err) return err;
+  const rate = argNumber(args[0], evaluate);
+  if (FormulaError.is(rate)) return rate;
+  const nper = argNumber(args[1], evaluate);
+  if (FormulaError.is(nper)) return nper;
+  const pmt = argNumber(args[2], evaluate);
+  if (FormulaError.is(pmt)) return pmt;
+  const fv = optNumber(args, 3, evaluate, 0);
+  if (FormulaError.is(fv)) return fv;
+  const type = optNumber(args, 4, evaluate, 0);
+  if (FormulaError.is(type)) return type;
+  if (rate === 0) {
+    return -(fv + pmt * nper);
+  }
+  const factor = Math.pow(1 + rate, nper);
+  return -(fv + pmt * (1 + rate * type) * ((factor - 1) / rate)) / factor;
+});
+
+def('NPV', (args, evaluate) => {
+  if (args.length < 2) return VALUE;
+  const rate = argNumber(args[0], evaluate);
+  if (FormulaError.is(rate)) return rate;
+  if (rate === -1) return DIV0;
+  const nums = collectNumbers(args.slice(1), evaluate);
+  if (FormulaError.is(nums)) return nums;
+  let total = 0;
+  for (let i = 0; i < nums.length; i++) {
+    total += nums[i]! / Math.pow(1 + rate, i + 1);
+  }
+  return total;
+});
+
+// ── Math / info (Phase 13) ───────────────────────────────────────────────────
+def('MROUND', (args, evaluate) => {
+  const err = expectArgs(args, 2);
+  if (err) return err;
+  const x = argNumber(args[0], evaluate);
+  if (FormulaError.is(x)) return x;
+  const multiple = argNumber(args[1], evaluate);
+  if (FormulaError.is(multiple)) return multiple;
+  if (multiple === 0) return 0;
+  // Excel: x and multiple must share the same sign.
+  if (Math.sign(x) !== Math.sign(multiple) && x !== 0) return NUM;
+  return Math.round(x / multiple) * multiple;
+});
+
+def('EVEN', (args, evaluate) => {
+  const err = expectArgs(args, 1);
+  if (err) return err;
+  const x = argNumber(args[0], evaluate);
+  if (FormulaError.is(x)) return x;
+  const sign = x < 0 ? -1 : 1;
+  return sign * Math.ceil(Math.abs(x) / 2) * 2;
+});
+
+def('ODD', (args, evaluate) => {
+  const err = expectArgs(args, 1);
+  if (err) return err;
+  const x = argNumber(args[0], evaluate);
+  if (FormulaError.is(x)) return x;
+  if (x === 0) return 1;
+  const sign = x < 0 ? -1 : 1;
+  const m = Math.ceil(Math.abs(x));
+  const rounded = m % 2 === 0 ? m + 1 : m;
+  return sign * rounded;
+});
+
+function parityImpl(wantEven: boolean): FunctionImpl {
+  return (args, evaluate) => {
+    const err = expectArgs(args, 1);
+    if (err) return err;
+    const x = argNumber(args[0], evaluate);
+    if (FormulaError.is(x)) return x;
+    const isEven = Math.trunc(Math.abs(x)) % 2 === 0;
+    return wantEven ? isEven : !isEven;
+  };
+}
+def('ISEVEN', parityImpl(true));
+def('ISODD', parityImpl(false));
+
 /** Build the default function registry. */
 export function createDefaultFunctions(): FunctionRegistry {
   return new Map(registry);
