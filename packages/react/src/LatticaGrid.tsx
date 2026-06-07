@@ -127,6 +127,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       getValue: (r, c) => controller.getValue(r, c),
       getCfStyle: (r, c) => controller.getCellStyle(r, c),
       getVisual: (r, c) => controller.getCellVisual(r, c),
+      getSparkline: (r, c, w, h) => controller.getCellSparkline(r, c, w, h),
       getMerge: (r, c) => controller.getMerge(r, c),
     });
     paintScene(ctx, scene, theme, { width, height, dpr });

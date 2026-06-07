@@ -190,3 +190,56 @@ describe('paintScene visual conditional formatting', () => {
     expect(icon).toBeTruthy();
   });
 });
+
+describe('paintScene sparklines', () => {
+  it('strokes a line sparkline through its points', () => {
+    const ctx = createMockContext();
+    paintScene(
+      ctx,
+      scene({
+        cells: [
+          {
+            row: 0, col: 0, rect: { x: 0, y: 0, width: 50, height: 20 },
+            text: '', selected: false, active: false,
+            sparkline: { kind: 'line', points: [{ x: 2, y: 18 }, { x: 48, y: 2 }] },
+          },
+        ],
+        activeRect: null,
+      }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    const m = methods(ctx);
+    expect(m).toContain('moveTo');
+    expect(m).toContain('lineTo');
+    expect(m).toContain('stroke');
+  });
+
+  it('fills bar/winloss sparkline bars (positive and negative colors)', () => {
+    const ctx = createMockContext();
+    paintScene(
+      ctx,
+      scene({
+        cells: [
+          {
+            row: 0, col: 0, rect: { x: 0, y: 0, width: 50, height: 20 },
+            text: '', selected: false, active: false,
+            sparkline: {
+              kind: 'winloss',
+              bars: [
+                { x: 2, y: 2, width: 4, height: 8, positive: true },
+                { x: 8, y: 10, width: 4, height: 8, positive: false },
+              ],
+            },
+          },
+        ],
+        activeRect: null,
+      }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    // Two bar fillRects translated by the cell origin (x=0,y=0).
+    const fills = ctx.calls.filter((c) => c.method === 'fillRect' && c.args[2] === 4 && c.args[3] === 8);
+    expect(fills.length).toBe(2);
+  });
+});

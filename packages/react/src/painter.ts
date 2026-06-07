@@ -92,6 +92,29 @@ export function paintScene(
     ctx.lineTo(rect.x + rect.width, rect.y + rect.height);
     ctx.stroke();
 
+    // In-cell sparkline (cell-local coords translated by the cell origin).
+    if (cell.sparkline !== undefined) {
+      const sk = cell.sparkline;
+      if (sk.points !== undefined && sk.points.length > 0) {
+        ctx.strokeStyle = theme.activeBorder;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        sk.points.forEach((p, i) => {
+          const x = rect.x + p.x;
+          const y = rect.y + p.y;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+      if (sk.bars !== undefined) {
+        for (const b of sk.bars) {
+          ctx.fillStyle = b.positive ? theme.activeBorder : '#c0392b';
+          ctx.fillRect(rect.x + b.x, rect.y + b.y, b.width, b.height);
+        }
+      }
+    }
+
     // Icon-set glyph at the cell's left edge (drawn before the text).
     if (cell.icon !== undefined) {
       ctx.fillStyle = theme.textColor;

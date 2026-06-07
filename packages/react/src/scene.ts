@@ -5,7 +5,13 @@
  * consumes a Scene; tests assert on the Scene directly.
  */
 
-import { computeVisibleWindow, type SelectionModel, type MergeArea, type CellVisual } from '@lattica/core';
+import {
+  computeVisibleWindow,
+  type SelectionModel,
+  type MergeArea,
+  type CellVisual,
+  type SparklineShape,
+} from '@lattica/core';
 import { cellRect, type GridGeometry, type Rect } from './geometry.js';
 
 export interface CellPaint {
@@ -27,6 +33,8 @@ export interface CellPaint {
   bar?: { ratio: number; color: string };
   /** Icon-set glyph to draw at the cell's left, if any. */
   icon?: string;
+  /** In-cell sparkline shape (cell-local coordinates), if any. */
+  sparkline?: SparklineShape;
 }
 
 export interface Scene {
@@ -55,6 +63,8 @@ export interface BuildSceneParams {
   getCfStyle?: (row: number, col: number) => { background?: string; color?: string } | null;
   /** Visual conditional-format accessor (color scale / data bar / icon set). */
   getVisual?: (row: number, col: number) => CellVisual | null;
+  /** Sparkline accessor; receives the cell size for layout. */
+  getSparkline?: (row: number, col: number, width: number, height: number) => SparklineShape | null;
   /** Merge-area accessor (optional); covered cells are skipped, anchors span. */
   getMerge?: (row: number, col: number) => MergeArea | null;
 }
@@ -143,6 +153,7 @@ export function buildScene(params: BuildSceneParams): Scene {
         cfStyle,
         bar: visual?.bar,
         icon: visual?.icon,
+        sparkline: params.getSparkline?.(row, col, rect.width, rect.height) ?? undefined,
       };
       cells.push(cell);
       if (active && state.active.row === row && state.active.col === col) {
