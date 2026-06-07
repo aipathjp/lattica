@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@lattica/ai": "workspace:*",
     "@lattica/core": "workspace:*",
     "@lattica/formula": "workspace:*",
     "@lattica/io": "workspace:*",
