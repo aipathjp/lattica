@@ -162,3 +162,9 @@
   - 列ヘッダーに**フィルタボタン（▽, `lattica-filter-<col>`）**。クリックで**ファセット・チェックリストのフィルタパネル**（`columnFacets` の一意値、空セルは `(blank)`）。Apply で `setColumnSetFilter`（全チェック時はクリア）、Clear でフィルタ解除、バックドロップで閉じる。
   - 列ヘッダーの**コンテキストメニューに「Hide column」「Show all columns」**を追加（`hideColumn`/`showAllColumns` 結線）。
   - 全体 **1731テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase C（数値書式・条件付き書式ビジュアル・ステータスバー）。
+- 2026-06-07: **Phase C-1 完了**（数値書式 + ステータスバー）。
+  - core `number-format.ts`: Excel 風書式文字列の実用サブセット `formatNumber(value, pattern)`/`parseFormat`（桁プレースホルダ `0`/`#`・桁区切り `,`・小数点・通貨等の前置/後置リテラル・`%` で 100 倍・引用符リテラル）。例 `#,##0.00`→`1,234.50`、`0.0%`→`12.3%`、`$#,##0`→`-$5`。
+  - `GridController`: `setColumnFormat`/`getColumnFormat`。`getDisplay` は数値セルに列書式を適用。
+  - 選択範囲集計 `aggregateSelection`/`selectionSummary`（count/sum/avg/min/max）。
+  - 新コンポーネント **`<LatticaStatusBar>`**：選択範囲の集計をライブ表示（Excel/Sheets 風フッター）。
+  - 全体 **1751テスト・100%カバレッジ**。typecheck/lint/build クリーン。残: Phase C-2（条件付き書式ビジュアル＝カラースケール/データバー/アイコンセット）。

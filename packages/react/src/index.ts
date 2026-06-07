@@ -1,6 +1,7 @@
 /** @lattica/react — canvas-rendered, virtualized React data grid. */
 
 export { LatticaGrid, type LatticaGridProps } from './LatticaGrid.js';
+export { LatticaStatusBar, type LatticaStatusBarProps } from './StatusBar.js';
 export { useGridController } from './useGridController.js';
 export {
   GridController,
