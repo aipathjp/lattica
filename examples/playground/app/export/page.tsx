@@ -80,7 +80,7 @@ export default function ExportPage(): React.ReactElement {
         <button style={btn} onClick={() => download(tableToPdf(matrix(), { title: 'Sales Report' }) as unknown as BlobPart, 'sales.pdf', 'application/pdf')}>Export PDF</button>
       </div>
       <div style={{ border: '1px solid #cbd2d9', borderRadius: 6, width: 'fit-content' }}>
-        <LatticaGrid controller={controller} columns={columns} width={420} height={220} />
+        <LatticaGrid controller={controller} columns={columns} width={420} height={216} />
       </div>
     </main>
   );

@@ -63,7 +63,7 @@ export default function FormattingPage(): React.ReactElement {
         triangles, and graduated rating bars.
       </p>
       <div style={{ border: '1px solid #cbd2d9', borderRadius: 6, width: 'fit-content' }}>
-        <LatticaGrid controller={icons} columns={iconColumns} width={650} height={290} />
+        <LatticaGrid controller={icons} columns={iconColumns} width={648} height={290} />
       </div>
     </main>
   );

@@ -158,7 +158,7 @@ export default function KitchenSinkPage(): React.ReactElement {
 
       <div style={{ border: '1px solid #cbd2d9', borderRadius: 6, width: 'fit-content', overflow: 'hidden' }}>
         <LatticaFormulaBar controller={controller} />
-        <LatticaGrid controller={controller} columns={columns} width={640} height={360} />
+        <LatticaGrid controller={controller} columns={columns} width={448} height={360} />
       </div>
 
       <section
