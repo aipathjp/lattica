@@ -619,3 +619,92 @@ describe('LatticaGrid rich editors (Phase A)', () => {
     expect(select).toBeTruthy();
   });
 });
+
+describe('LatticaGrid filter UI & column menu (Phase B-UI)', () => {
+  const seed = (c: GridController) => {
+    ['x', 'y', 'x', 'z'].forEach((v, r) => c.setCellText(r, 0, v));
+  };
+
+  it('opens a faceted filter panel and applies a set filter', () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    seed(c);
+    renderGrid(c);
+    fireEvent.click(screen.getByTestId('lattica-filter-0'));
+    const panel = screen.getByTestId('lattica-filter-panel');
+    expect(panel).toBeTruthy();
+    // distinct values x,y,z all checked initially -> uncheck y and z, keep x
+    fireEvent.click(screen.getByTestId('lattica-filter-opt-y'));
+    fireEvent.click(screen.getByTestId('lattica-filter-opt-z'));
+    fireEvent.click(screen.getByTestId('lattica-filter-apply'));
+    expect(screen.queryByTestId('lattica-filter-panel')).toBeNull();
+    expect(c.getRowCount()).toBe(2); // only the two 'x' rows
+  });
+
+  it('all-checked apply clears the filter', () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    seed(c);
+    renderGrid(c);
+    fireEvent.click(screen.getByTestId('lattica-filter-0'));
+    // leave all checked -> apply -> no filter
+    fireEvent.click(screen.getByTestId('lattica-filter-apply'));
+    expect(c.getRowCount()).toBe(4);
+  });
+
+  it('toggling a checkbox back on re-includes the value', () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    seed(c);
+    renderGrid(c);
+    fireEvent.click(screen.getByTestId('lattica-filter-0'));
+    const optY = screen.getByTestId('lattica-filter-opt-y') as HTMLInputElement;
+    fireEvent.click(optY); // uncheck
+    expect(optY.checked).toBe(false);
+    fireEvent.click(optY); // re-check
+    expect(optY.checked).toBe(true);
+  });
+
+  it('Clear button removes the filter and closes the panel', () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    seed(c);
+    c.setColumnSetFilter(0, ['x']);
+    expect(c.getRowCount()).toBe(2);
+    renderGrid(c);
+    fireEvent.click(screen.getByTestId('lattica-filter-0'));
+    fireEvent.click(screen.getByTestId('lattica-filter-clear'));
+    expect(screen.queryByTestId('lattica-filter-panel')).toBeNull();
+    expect(c.getRowCount()).toBe(4);
+  });
+
+  it('closes the filter panel on backdrop click', () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    seed(c);
+    renderGrid(c);
+    fireEvent.click(screen.getByTestId('lattica-filter-0'));
+    fireEvent.mouseDown(screen.getByTestId('lattica-filter-backdrop'));
+    expect(screen.queryByTestId('lattica-filter-panel')).toBeNull();
+  });
+
+  it('renders a (blank) facet label for empty cells', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setCellText(0, 0, 'a'); // rows 1,2 empty
+    renderGrid(c);
+    fireEvent.click(screen.getByTestId('lattica-filter-0'));
+    expect(screen.getByText('(blank)')).toBeTruthy();
+  });
+
+  it('context menu on a column header hides the column and reveals all', () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    seed(c);
+    c.setCellText(0, 1, 'B0');
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    // Right-click within the column header band (y < colHeaderHeight=24).
+    fireEvent.contextMenu(grid, { clientX: 80, clientY: 8 });
+    const hide = screen.getByText('Hide column');
+    fireEvent.mouseDown(hide);
+    expect(c.getColCount()).toBe(2);
+    // Reveal all via a fresh menu.
+    fireEvent.contextMenu(grid, { clientX: 80, clientY: 8 });
+    fireEvent.mouseDown(screen.getByText('Show all columns'));
+    expect(c.getColCount()).toBe(3);
+  });
+});

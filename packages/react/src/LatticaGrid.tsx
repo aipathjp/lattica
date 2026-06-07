@@ -67,6 +67,8 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   const [scroll, setScroll] = useState<ScrollOffset>({ left: 0, top: 0 });
   const [edit, setEdit] = useState<EditState | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [filterPanel, setFilterPanel] = useState<{ col: number; x: number; y: number } | null>(null);
+  const [filterChecked, setFilterChecked] = useState<Set<string>>(new Set());
   const [, force] = useReducer((n: number) => n + 1, 0);
 
   const headerModelRef = useRef<HeaderModel | null>(null);
@@ -306,14 +308,26 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   }, [controller]);
 
   const defaultMenu = useCallback(
-    (): MenuItemSpec[] => [
-      { id: 'copy', label: 'Copy', action: () => void writeClipboard(controller.copySelection()) },
-      { id: 'paste', label: 'Paste', action: () => void readClipboardInto(controller) },
-      { id: 'clear', label: 'Clear contents', action: () => controller.deleteSelection() },
-      { id: 'sep1', separator: true },
-      { id: 'undo', label: 'Undo', disabled: !controller.undo.canUndo(), action: () => controller.undoLast() },
-      { id: 'redo', label: 'Redo', disabled: !controller.undo.canRedo(), action: () => controller.redoLast() },
-    ],
+    (hit: HitResult): MenuItemSpec[] => {
+      const items: MenuItemSpec[] = [
+        { id: 'copy', label: 'Copy', action: () => void writeClipboard(controller.copySelection()) },
+        { id: 'paste', label: 'Paste', action: () => void readClipboardInto(controller) },
+        { id: 'clear', label: 'Clear contents', action: () => controller.deleteSelection() },
+        { id: 'sep1', separator: true },
+        { id: 'undo', label: 'Undo', disabled: !controller.undo.canUndo(), action: () => controller.undoLast() },
+        { id: 'redo', label: 'Redo', disabled: !controller.undo.canRedo(), action: () => controller.redoLast() },
+      ];
+      // Column-header actions: hide the clicked column / reveal all.
+      if (hit.region === 'colHeader' && hit.col >= 0) {
+        const col = hit.col;
+        items.push(
+          { id: 'sep2', separator: true },
+          { id: 'hide-col', label: 'Hide column', action: () => controller.hideColumn(col) },
+          { id: 'show-all-cols', label: 'Show all columns', action: () => controller.showAllColumns() },
+        );
+      }
+      return items;
+    },
     [controller],
   );
 
@@ -329,7 +343,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       const hit = hitTest(controller.geometry(), scroll.left, scroll.top, x, y);
-      const items = buildMenu(props.contextMenu ? props.contextMenu(hit) : defaultMenu());
+      const items = buildMenu(props.contextMenu ? props.contextMenu(hit) : defaultMenu(hit));
       setMenu({ x, y, items });
     },
     [controller, scroll, props, defaultMenu],
@@ -610,23 +624,43 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
             {h.collapsible ? (h.collapsed ? '▸ ' : '▾ ') : ''}
             {h.label}
             {!h.isGroup && h.col !== undefined && (
-              <span
-                role="button"
-                aria-label={`sort column ${h.col}`}
-                data-testid={`lattica-sort-${h.col}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  controller.toggleSort(h.col!, e.shiftKey);
-                  force();
-                }}
-                style={{ marginLeft: 'auto', paddingRight: 4, cursor: 'pointer', userSelect: 'none' }}
-              >
-                {controller.getSortDirection(h.col) === 'asc'
-                  ? '▲'
-                  : controller.getSortDirection(h.col) === 'desc'
-                    ? '▼'
-                    : '⇅'}
-              </span>
+              <>
+                <span
+                  role="button"
+                  aria-label={`filter column ${h.col}`}
+                  data-testid={`lattica-filter-${h.col}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const facets = controller.columnFacets(h.col!);
+                    setFilterChecked(new Set(facets.map((f) => f.label)));
+                    setFilterPanel({
+                      col: h.col!,
+                      x: h.x - geom.rowHeaderWidth,
+                      y: geom.colHeaderHeight,
+                    });
+                  }}
+                  style={{ marginLeft: 'auto', paddingRight: 2, cursor: 'pointer', userSelect: 'none' }}
+                >
+                  ▽
+                </span>
+                <span
+                  role="button"
+                  aria-label={`sort column ${h.col}`}
+                  data-testid={`lattica-sort-${h.col}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    controller.toggleSort(h.col!, e.shiftKey);
+                    force();
+                  }}
+                  style={{ paddingRight: 4, cursor: 'pointer', userSelect: 'none' }}
+                >
+                  {controller.getSortDirection(h.col) === 'asc'
+                    ? '▲'
+                    : controller.getSortDirection(h.col) === 'desc'
+                      ? '▼'
+                      : '⇅'}
+                </span>
+              </>
             )}
           </div>
         ))}
@@ -781,6 +815,88 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
                 </div>
               ),
             )}
+          </div>
+        </>
+      )}
+
+      {/* Faceted (set) filter panel for a column. */}
+      {filterPanel !== null && (
+        <>
+          <div
+            data-testid="lattica-filter-backdrop"
+            onMouseDown={() => setFilterPanel(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 10 }}
+          />
+          <div
+            data-testid="lattica-filter-panel"
+            style={{
+              position: 'absolute',
+              left: filterPanel.x,
+              top: filterPanel.y,
+              zIndex: 11,
+              minWidth: 160,
+              maxHeight: 240,
+              overflow: 'auto',
+              background: '#fff',
+              border: `1px solid ${theme.headerGridLineColor}`,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              padding: 6,
+              fontFamily: theme.fontFamily,
+              fontSize: theme.fontSize,
+            }}
+          >
+            {controller.columnFacets(filterPanel.col).map((f) => (
+              <label
+                key={f.label}
+                style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '2px 0', cursor: 'pointer' }}
+              >
+                <input
+                  type="checkbox"
+                  data-testid={`lattica-filter-opt-${f.label}`}
+                  checked={filterChecked.has(f.label)}
+                  onChange={() => {
+                    setFilterChecked((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(f.label)) {
+                        next.delete(f.label);
+                      } else {
+                        next.add(f.label);
+                      }
+                      return next;
+                    });
+                  }}
+                />
+                {f.label === '' ? '(blank)' : f.label}
+              </label>
+            ))}
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              <button
+                type="button"
+                data-testid="lattica-filter-apply"
+                onClick={() => {
+                  const facets = controller.columnFacets(filterPanel.col);
+                  if (filterChecked.size === facets.length) {
+                    controller.setColumnSetFilter(filterPanel.col, []); // all → no filter
+                  } else {
+                    const values = facets.filter((f) => filterChecked.has(f.label)).map((f) => f.value);
+                    controller.setColumnSetFilter(filterPanel.col, values);
+                  }
+                  setFilterPanel(null);
+                }}
+              >
+                Apply
+              </button>
+              <button
+                type="button"
+                data-testid="lattica-filter-clear"
+                onClick={() => {
+                  controller.setColumnSetFilter(filterPanel.col, []);
+                  setFilterPanel(null);
+                }}
+              >
+                Clear
+              </button>
+            </div>
           </div>
         </>
       )}
