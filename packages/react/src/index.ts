@@ -38,11 +38,13 @@ export {
   densityPresets,
   getDensity,
   scaleDensity,
+  densityOptions,
   compactDensity,
   comfortableDensity,
   spaciousDensity,
   type Density,
   type DensityTokens,
+  type DensitySizing,
 } from './density.js';
 export {
   hitTest,

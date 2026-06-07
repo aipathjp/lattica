@@ -216,3 +216,7 @@
   - `theme.ts`: **`buildTheme({palette, density, fontFamily, overrides})`** で「パレット × 密度 × フォント」を合成。`comfortable` は従来既定と一致。
   - `theme-presets.ts`: 全プリセットを `buildTheme` で再構成（light/dark/highContrast に加え midnight/sepia/solarized 追加）。
   - 全体 **1923テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase F-2（StatusBar のテーマ対応・密度連動）。
+- 2026-06-07: **Phase F-2 完了**（UI/UX：テーマ連動）。
+  - `<LatticaStatusBar theme={...}>`：グリッドと同じ surface/text/border 色・フォントに連動（ハードコード色を撤廃）。
+  - `density.ts` `densityOptions(density)`：密度から `useGridController` 用の既定サイズ（行高/列幅/ヘッダ）を生成し spread で適用。
+  - 全体 **1927テスト・100%カバレッジ**。typecheck/lint/build クリーン。**デザインシステム（Phase F）完了**：7 パレット × 3 密度（＋無段階調整）＋ `buildTheme` 合成＋テーマ連動 UI。

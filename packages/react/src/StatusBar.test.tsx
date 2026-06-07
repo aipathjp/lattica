@@ -38,6 +38,20 @@ describe('LatticaStatusBar', () => {
     expect(bar.className).toBe('sb');
   });
 
+  it('applies theme colors to the status bar surface', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    render(
+      <LatticaStatusBar
+        controller={c}
+        theme={{ headerBackground: '#101010', headerTextColor: '#abcabc' }}
+      />,
+    );
+    const bar = screen.getByTestId('lattica-statusbar');
+    expect(bar.style.background).toBe('#101010');
+    expect(bar.style.color).toBe('#abcabc');
+    expect(bar.style.borderTop).toContain('1px solid');
+  });
+
   it('formats fractional averages to two decimals', () => {
     const c = new GridController({ rowCount: 5, colCount: 5 });
     c.setCellText(0, 0, '1');

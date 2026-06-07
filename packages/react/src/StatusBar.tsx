@@ -7,9 +7,12 @@
 
 import { useEffect, useReducer, type CSSProperties, type ReactElement } from 'react';
 import type { GridController } from './controller.js';
+import { resolveTheme, type GridTheme } from './theme.js';
 
 export interface LatticaStatusBarProps {
   controller: GridController;
+  /** Theme; the status bar matches the grid's surface/text/border colors. */
+  theme?: Partial<GridTheme>;
   className?: string;
   style?: CSSProperties;
 }
@@ -22,9 +25,15 @@ function fmt(n: number | null): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
 }
 
-export function LatticaStatusBar({ controller, className, style }: LatticaStatusBarProps): ReactElement {
+export function LatticaStatusBar({
+  controller,
+  theme: themeProp,
+  className,
+  style,
+}: LatticaStatusBarProps): ReactElement {
   const [, force] = useReducer((n: number) => n + 1, 0);
   useEffect(() => controller.on('change', () => force()), [controller]);
+  const theme = resolveTheme(themeProp);
 
   const s = controller.selectionSummary();
   return (
@@ -36,9 +45,11 @@ export function LatticaStatusBar({ controller, className, style }: LatticaStatus
         display: 'flex',
         gap: 16,
         padding: '4px 10px',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: 12,
-        color: '#52606d',
+        fontFamily: theme.fontFamily,
+        fontSize: Math.max(11, theme.fontSize - 1),
+        color: theme.headerTextColor,
+        background: theme.headerBackground,
+        borderTop: `1px solid ${theme.headerGridLineColor}`,
         ...style,
       }}
     >
