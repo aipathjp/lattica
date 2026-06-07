@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
     "@lattica/ai": "workspace:*",
     "@lattica/core": "workspace:*",
     "@lattica/formula": "workspace:*",
