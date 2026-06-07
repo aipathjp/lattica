@@ -176,3 +176,7 @@
 - 2026-06-07: **Phase D-1 完了**（モダン数式関数 135→**144**）。
   - **XLOOKUP**/**XMATCH**（match_mode 0/-1/1・if_not_found）、**SORTBY**（キー配列でソート、スピル）、**TEXTSPLIT**/**TEXTBEFORE**/**TEXTAFTER**（n 番目の区切り）、**VSTACK**/**HSTACK**（配列の縦横結合、欠損は null パディング）、**LET**（名前束縛＋スコープ。evaluator にローカルスコープ getName を注入）。
   - 全体 **1803テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase D-2（スタイル付き XLSX 出力）。
+- 2026-06-07: **Phase D-2 完了**（スタイル付き XLSX 出力）。**Phase D 完了**。
+  - `@lattica/io` `xlsx-style.ts`: `writeStyledXlsx(workbook)`。`styles.xml`（numFmts/fonts/fills/cellXfs を重複排除）を生成し、各セルが `s` インデックスでスタイル参照。**数値書式・太字/斜体・文字色・背景色・水平整列・結合セル（mergeCells）**に対応。依存ゼロ（自前 ZIP）。
+  - 既存 `writeXlsx`（値のみ）は維持。`readXlsx` で値の往復を検証。
+  - 全体 **1819テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E（ピボット/チャート/サーバモデル）。
