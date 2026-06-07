@@ -5,7 +5,7 @@
  * consumes a Scene; tests assert on the Scene directly.
  */
 
-import { computeVisibleWindow, type SelectionModel, type MergeArea } from '@lattica/core';
+import { computeVisibleWindow, type SelectionModel, type MergeArea, type CellVisual } from '@lattica/core';
 import { cellRect, type GridGeometry, type Rect } from './geometry.js';
 
 export interface CellPaint {
@@ -23,6 +23,10 @@ export interface CellPaint {
   value?: unknown;
   /** Conditional-format style for this cell, if any. */
   cfStyle?: { background?: string; color?: string };
+  /** In-cell data bar (ratio 0..1 + color), if any. */
+  bar?: { ratio: number; color: string };
+  /** Icon-set glyph to draw at the cell's left, if any. */
+  icon?: string;
 }
 
 export interface Scene {
@@ -49,6 +53,8 @@ export interface BuildSceneParams {
   getValue?: (row: number, col: number) => unknown;
   /** Conditional-format style accessor (optional). */
   getCfStyle?: (row: number, col: number) => { background?: string; color?: string } | null;
+  /** Visual conditional-format accessor (color scale / data bar / icon set). */
+  getVisual?: (row: number, col: number) => CellVisual | null;
   /** Merge-area accessor (optional); covered cells are skipped, anchors span. */
   getMerge?: (row: number, col: number) => MergeArea | null;
 }
@@ -117,6 +123,13 @@ export function buildScene(params: BuildSceneParams): Scene {
         rect.height = spanSize(geom.rowSizes, merge.row, merge.rowspan);
       }
       const active = selection.isActive({ row, col });
+      const visual = params.getVisual?.(row, col) ?? null;
+      let cfStyle = params.getCfStyle?.(row, col) ?? undefined;
+      // A color-scale background applies only when no explicit cf/search/invalid
+      // background already claimed the cell.
+      if (visual?.background !== undefined) {
+        cfStyle = { ...(cfStyle ?? {}), background: cfStyle?.background ?? visual.background };
+      }
       const cell: CellPaint = {
         row,
         col,
@@ -127,7 +140,9 @@ export function buildScene(params: BuildSceneParams): Scene {
         type: params.getType?.(row, col),
         align: params.getAlign?.(row, col),
         value: params.getValue?.(row, col),
-        cfStyle: params.getCfStyle?.(row, col) ?? undefined,
+        cfStyle,
+        bar: visual?.bar,
+        icon: visual?.icon,
       };
       cells.push(cell);
       if (active && state.active.row === row && state.active.col === col) {

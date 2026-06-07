@@ -729,3 +729,53 @@ describe('Phase C — number format & selection summary', () => {
     expect(s).toEqual({ count: 0, sum: null, avg: null, min: null, max: null });
   });
 });
+
+describe('Phase C-2 — visual conditional formatting', () => {
+  const seed = (c: GridController) => {
+    [0, 5, 10].forEach((v, r) => c.setCellText(r, 0, String(v)));
+  };
+
+  it('color scale produces a per-cell background', () => {
+    const c = make();
+    seed(c);
+    c.setColorScale(0, ['#000000', '#ffffff']);
+    expect(c.getCellVisual(0, 0)).toEqual({ background: '#000000' });
+    expect(c.getCellVisual(1, 0)).toEqual({ background: '#808080' });
+    expect(c.getCellVisual(2, 0)).toEqual({ background: '#ffffff' });
+  });
+
+  it('data bar produces a ratio + color', () => {
+    const c = make();
+    seed(c);
+    c.setDataBar(0, '#39f');
+    expect(c.getCellVisual(1, 0)).toEqual({ bar: { ratio: 0.5, color: '#39f' } });
+  });
+
+  it('icon set picks an icon by bucket', () => {
+    const c = make();
+    seed(c);
+    c.setIconSet(0, ['🔴', '🟡', '🟢']);
+    expect(c.getCellVisual(0, 0)?.icon).toBe('🔴');
+    expect(c.getCellVisual(2, 0)?.icon).toBe('🟢');
+  });
+
+  it('returns null without a rule, for non-numeric values, or an all-empty column', () => {
+    const c = make();
+    expect(c.getCellVisual(0, 0)).toBeNull(); // no rule
+    c.setDataBar(0, '#39f');
+    expect(c.getCellVisual(0, 0)).toBeNull(); // rule set but column empty
+    c.setCellText(0, 0, 'text');
+    expect(c.getCellVisual(0, 0)).toBeNull(); // non-numeric value
+  });
+
+  it('clears a visual rule', () => {
+    const c = make();
+    seed(c);
+    c.setDataBar(0, '#39f');
+    expect(c.getCellVisual(1, 0)).not.toBeNull();
+    c.clearColumnVisual(0);
+    expect(c.getCellVisual(1, 0)).toBeNull();
+    // Clearing an absent rule is a no-op (no throw).
+    expect(() => c.clearColumnVisual(0)).not.toThrow();
+  });
+});

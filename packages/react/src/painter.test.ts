@@ -135,3 +135,58 @@ describe('paintScene', () => {
     expect(methods(ctx)).not.toContain('scale');
   });
 });
+
+describe('paintScene visual conditional formatting', () => {
+  it('draws an in-cell data bar (fillRect with the ratio width)', () => {
+    const ctx = createMockContext();
+    paintScene(
+      ctx,
+      scene({
+        cells: [
+          {
+            row: 0,
+            col: 0,
+            rect: { x: 0, y: 0, width: 50, height: 20 },
+            text: '5',
+            selected: false,
+            active: false,
+            bar: { ratio: 0.5, color: '#39f' },
+          },
+        ],
+        activeRect: null,
+      }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    // A bar fillRect of width (50-4)*0.5 = 23 at x=2,y=2 is recorded.
+    const bar = ctx.calls.find(
+      (c) => c.method === 'fillRect' && c.args[0] === 2 && c.args[1] === 2 && c.args[2] === 23,
+    );
+    expect(bar).toBeTruthy();
+  });
+
+  it('draws an icon-set glyph via fillText', () => {
+    const ctx = createMockContext();
+    paintScene(
+      ctx,
+      scene({
+        cells: [
+          {
+            row: 0,
+            col: 0,
+            rect: { x: 0, y: 0, width: 50, height: 20 },
+            text: '9',
+            selected: false,
+            active: false,
+            icon: '🟢',
+          },
+        ],
+        activeRect: null,
+      }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    const icon = ctx.calls.find((c) => c.method === 'fillText' && c.args[0] === '🟢');
+    expect(icon).toBeTruthy();
+  });
+});

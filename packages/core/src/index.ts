@@ -71,6 +71,14 @@ export { validators, ValidationModel, type Validator } from './validation.js';
 export { aggregate, distinctValues, type AggregateFn } from './aggregate.js';
 export { formatNumber, parseFormat, type ParsedFormat } from './number-format.js';
 export {
+  computeCellVisual,
+  colorScaleAt,
+  lerpColor,
+  normalize,
+  type CfVisualRule,
+  type CellVisual,
+} from './cf-visual.js';
+export {
   toNumberOrNull,
   summarize,
   summarizeColumn,

@@ -168,3 +168,8 @@
   - 選択範囲集計 `aggregateSelection`/`selectionSummary`（count/sum/avg/min/max）。
   - 新コンポーネント **`<LatticaStatusBar>`**：選択範囲の集計をライブ表示（Excel/Sheets 風フッター）。
   - 全体 **1751テスト・100%カバレッジ**。typecheck/lint/build クリーン。残: Phase C-2（条件付き書式ビジュアル＝カラースケール/データバー/アイコンセット）。
+- 2026-06-07: **Phase C-2 完了**（条件付き書式ビジュアル）。
+  - core `cf-visual.ts`: `computeCellVisual(value, min, max, rule)`（純粋）＋ `colorScaleAt`/`lerpColor`/`normalize`。**カラースケール**（2/3色補間）・**データバー**（比率）・**アイコンセット**（バケット）に対応。
+  - `GridController`: `setColorScale`/`setDataBar`/`setIconSet`/`clearColumnVisual`・`getCellVisual`（列の数値 min/max を全行から算出）。
+  - `scene.ts`/`painter.ts`: `CellPaint.bar`/`icon` を追加。**データバーを canvas 描画**（テキスト背後）、**アイコングリフを左端に描画**。カラースケール背景は明示 cf/検索/不正背景に劣後。
+  - 全体 **1773テスト・100%カバレッジ**。typecheck/lint/build クリーン。**Phase C 完了**。次は Phase D（数式拡張＋スタイル付き XLSX）。

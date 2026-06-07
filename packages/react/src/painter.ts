@@ -74,6 +74,14 @@ export function paintScene(
       ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
     }
 
+    // In-cell data bar (drawn behind the text).
+    if (cell.bar !== undefined) {
+      const inset = 2;
+      const barWidth = Math.max(0, (rect.width - inset * 2) * cell.bar.ratio);
+      ctx.fillStyle = cell.bar.color;
+      ctx.fillRect(rect.x + inset, rect.y + inset, barWidth, rect.height - inset * 2);
+    }
+
     // Gridlines (right + bottom edge).
     ctx.strokeStyle = theme.gridLineColor;
     ctx.lineWidth = 1;
@@ -83,6 +91,13 @@ export function paintScene(
     ctx.moveTo(rect.x + rect.width, rect.y);
     ctx.lineTo(rect.x + rect.width, rect.y + rect.height);
     ctx.stroke();
+
+    // Icon-set glyph at the cell's left edge (drawn before the text).
+    if (cell.icon !== undefined) {
+      ctx.fillStyle = theme.textColor;
+      ctx.textAlign = 'left';
+      ctx.fillText(cell.icon, rect.x + theme.cellPaddingX, rect.y + rect.height / 2);
+    }
 
     registry.resolve(cell.type)({
       ctx,
