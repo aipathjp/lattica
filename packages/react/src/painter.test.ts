@@ -25,6 +25,29 @@ describe('paintScene', () => {
     expect(methods(ctx)).toContain('fillRect');
   });
 
+  it('paints frozen cells last over an opaque base', () => {
+    const ctx = createMockContext();
+    paintScene(
+      ctx,
+      scene({
+        cells: [
+          { row: 5, col: 1, rect: { x: 10, y: 40, width: 50, height: 20 }, text: 'scroll', selected: false, active: false },
+          { row: 0, col: 0, rect: { x: 0, y: 0, width: 50, height: 20 }, text: 'frozen', selected: false, active: false, frozen: true },
+        ],
+        activeRect: null,
+      }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    // The frozen cell's opaque base fillRect at its rect is recorded.
+    const base = ctx.calls.find((c) => c.method === 'fillRect' && c.args[0] === 0 && c.args[1] === 0 && c.args[2] === 50 && c.args[3] === 20);
+    expect(base).toBeTruthy();
+    // Both cells' text drawn.
+    const texts = ctx.calls.filter((c) => c.method === 'fillText').map((c) => c.args[0]);
+    expect(texts).toContain('frozen');
+    expect(texts).toContain('scroll');
+  });
+
   it('draws gridlines via stroke', () => {
     const ctx = createMockContext();
     paintScene(ctx, scene(), defaultTheme, { width: 200, height: 100 });

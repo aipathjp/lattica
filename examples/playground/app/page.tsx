@@ -9,6 +9,7 @@ const FEATURES: { href: string; title: string; desc: string }[] = [
   { href: '/pivot', title: 'Pivot Table', desc: 'Cross-tabulate records by row/column fields with aggregates and totals.' },
   { href: '/charts', title: 'Charts & Sparklines', desc: 'Line / bar / pie charts and in-cell sparklines.' },
   { href: '/master-detail', title: 'Master / Detail', desc: 'Expandable detail panels under master rows.' },
+  { href: '/freeze', title: 'Freeze & Resize', desc: 'Freeze the title row & column while data scrolls; drag header borders to resize columns/rows.' },
   { href: '/themes', title: 'Themes & Density', desc: '7 palettes × 3 densities composed with buildTheme; live light/dark switcher.' },
   { href: '/export', title: 'Export', desc: 'CSV, plain & styled XLSX, and dependency-free PDF — all client-side.' },
   { href: '/async', title: 'Async Rows', desc: 'Server-side / lazy block-loaded row model with a mock fetcher.' },

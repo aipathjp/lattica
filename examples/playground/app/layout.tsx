@@ -15,6 +15,7 @@ const NAV: { href: string; label: string }[] = [
   { href: '/pivot', label: 'Pivot Table' },
   { href: '/charts', label: 'Charts & Sparklines' },
   { href: '/master-detail', label: 'Master / Detail' },
+  { href: '/freeze', label: 'Freeze & Resize' },
   { href: '/themes', label: 'Themes & Density' },
   { href: '/export', label: 'Export (CSV/XLSX/PDF)' },
   { href: '/async', label: 'Async Rows' },

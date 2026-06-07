@@ -36,6 +36,8 @@ export interface CellPaint {
   icon?: IconMark;
   /** In-cell sparkline shape (cell-local coordinates), if any. */
   sparkline?: SparklineShape;
+  /** True for pinned (frozen) rows/columns — painted last, over scrolled cells. */
+  frozen?: boolean;
 }
 
 export interface Scene {
@@ -155,6 +157,7 @@ export function buildScene(params: BuildSceneParams): Scene {
         bar: visual?.bar,
         icon: visual?.icon,
         sparkline: params.getSparkline?.(row, col, rect.width, rect.height) ?? undefined,
+        frozen: row < geom.frozenRows || col < geom.frozenCols,
       };
       cells.push(cell);
       if (active && state.active.row === row && state.active.col === col) {
