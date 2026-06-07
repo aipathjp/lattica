@@ -151,3 +151,10 @@
   - `<LatticaGrid>` がアクティブセルのエディタを列型で出し分け: **ドロップダウン(`<select>`)・日付(`<input type=date>`)・オートコンプリート(`<input list>`+`<datalist>`、IME 対応)**、既定は従来の textarea。
   - `GridController`: `setColumnOptions`/`getColumnOptions`（ドロップダウン候補）・`setColumnValidator`・`getEditorKind`・`isInvalid`。ドロップダウン列には list バリデータを自動付与。コミット時に `ValidationModel` で検証し、**不正セルを赤くティント**（`getCellStyle` に重畳、cf/検索より優先）。
   - 全体 **1701テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase B（フィルタ UI / 列操作 / 検索置換 / グループ集計）。
+- 2026-06-07: **Phase B（データ操作の headless 層）完了**。
+  - core `aggregate.ts`: `aggregate(values, fn)`（sum/avg/count/min/max/median・数値強制・空セル除外）と `distinctValues`（set フィルタ用の一意値＋ラベル）。
+  - `GridController` 列操作: `hideColumn`/`showColumn`/`isColumnHidden`・`moveColumn`（列マッパー経由、型/整列/候補は物理列キーで保持）。
+  - **ファセット（set）フィルタ**: `columnFacets`（全行の一意値＋ラベル）＋ `setColumnSetFilter`（`in` フィルタ、空でクリア）。
+  - **列集計**: `aggregateColumn`（可視行のみ対象）。
+  - **検索＆置換**: `replaceAll(query, replacement, options)`（マッチセルの編集テキストを undo 一括置換）＋ 純関数 `replaceInText`（literal/regex/wholeCell/caseSensitive、無効 regex は無変更）。
+  - 全体 **1724テスト・100%カバレッジ**。typecheck/lint/build クリーン。UI 結線（フィルタドロップダウン/列非表示メニュー/ステータスバー）は Phase B-UI / C で実施。

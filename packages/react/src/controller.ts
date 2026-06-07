@@ -17,6 +17,9 @@ import {
   MergeModel,
   ValidationModel,
   validators,
+  aggregate,
+  distinctValues,
+  type AggregateFn,
   type Validator,
   type MergeArea,
   type Command,
@@ -78,6 +81,36 @@ export function formatValue(value: ReturnType<SheetEngine['getValue']>): string 
     return value ? 'TRUE' : 'FALSE';
   }
   return String(value);
+}
+
+/** Escape a string for use as a literal inside a RegExp. */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Replace occurrences of `query` in `text` honoring the search options used to
+ * find it. `wholeCell` replaces the entire text when it matches; `regex` treats
+ * `query` as a pattern; otherwise a literal global replace is performed. An
+ * invalid regex leaves the text unchanged.
+ */
+export function replaceInText(
+  text: string,
+  query: string,
+  replacement: string,
+  options?: SearchOptions,
+): string {
+  const caseSensitive = options?.caseSensitive ?? false;
+  const wholeCell = options?.wholeCell ?? false;
+  const useRegex = options?.regex ?? false;
+  const flags = caseSensitive ? 'g' : 'gi';
+  try {
+    const body = useRegex ? query : escapeRegExp(query);
+    const re = new RegExp(wholeCell ? `^(?:${body})$` : body, flags);
+    return text.replace(re, replacement);
+  } catch {
+    return text;
+  }
 }
 
 export class GridController {
@@ -237,6 +270,102 @@ export class GridController {
     const col = this.view.cols.getPhysicalIndex(visualCol);
     const config = this.sortModel.getConfigs().find((c) => c.col === col);
     return config ? config.direction : null;
+  }
+
+  // ── Column hide / move (visual ops over the column mapper) ──────────────────
+  /** Rebuild sizes + selection dims after a column-mapper change, then emit. */
+  private refreshColumns(): void {
+    this.rebuildViewSizes();
+    this.selection.setDimensions(this.view.getRowCount(), this.view.getColCount());
+    this.emitter.emit('change', undefined);
+  }
+
+  /** Hide a (visual) column. */
+  hideColumn(visualCol: number): void {
+    this.view.cols.setHidden([this.view.cols.getPhysicalIndex(visualCol)], true);
+    this.refreshColumns();
+  }
+
+  /** Show a previously-hidden (physical) column. */
+  showColumn(physicalCol: number): void {
+    this.view.cols.setHidden([physicalCol], false);
+    this.refreshColumns();
+  }
+
+  /** Is the given physical column currently hidden? */
+  isColumnHidden(physicalCol: number): boolean {
+    return this.view.cols.isHidden(physicalCol);
+  }
+
+  /** Move `count` columns from one visual position to another. */
+  moveColumn(fromVisual: number, toVisual: number, count = 1): void {
+    this.view.cols.move(fromVisual, count, toVisual);
+    this.refreshColumns();
+  }
+
+  // ── Faceted (set) filter & aggregation ─────────────────────────────────────
+  /** Distinct values of a (visual) column across all physical rows, with labels. */
+  columnFacets(visualCol: number): { value: CellValue; label: string }[] {
+    const col = this.view.cols.getPhysicalIndex(visualCol);
+    const values: CellValue[] = [];
+    for (let r = 0; r < this.view.rows.length; r++) {
+      values.push(this.engine.getValue({ row: r, col }) as CellValue);
+    }
+    return distinctValues(values, (v) => formatValue(v as never));
+  }
+
+  /** Apply a set (`in`) filter to a column; an empty list clears it. */
+  setColumnSetFilter(visualCol: number, values: readonly CellValue[]): void {
+    if (values.length === 0) {
+      this.setColumnFilter(visualCol, []);
+    } else {
+      this.setColumnFilter(visualCol, [{ kind: 'in', values: [...values] }]);
+    }
+  }
+
+  /** Aggregate a (visual) column over the currently visible rows. */
+  aggregateColumn(visualCol: number, fn: AggregateFn): number | null {
+    const rows = this.getRowCount();
+    const values: CellValue[] = [];
+    for (let r = 0; r < rows; r++) {
+      const p = this.toPhysical(r, visualCol);
+      values.push(this.engine.getValue(p) as CellValue);
+    }
+    return aggregate(values, fn);
+  }
+
+  // ── Find & replace ─────────────────────────────────────────────────────────
+  /**
+   * Replace `query` with `replacement` in every matching cell's editable text
+   * (undoable, single transaction). Honors the same options as search. Returns
+   * the number of cells changed.
+   */
+  replaceAll(query: string, replacement: string, options?: SearchOptions): number {
+    if (query === '') {
+      return 0;
+    }
+    const matches = searchGrid(
+      this.getRowCount(),
+      this.getColCount(),
+      (r, c) => this.getDisplay(r, c),
+      query,
+      options,
+    );
+    let changed = 0;
+    this.undo.transaction(() => {
+      for (const m of matches) {
+        const before = this.getEditText(m.row, m.col);
+        const after = replaceInText(before, query, replacement, options);
+        if (after !== before) {
+          this.undo.execute(this.setContentCommand(this.toPhysical(m.row, m.col), after));
+          changed++;
+        }
+      }
+    });
+    if (changed > 0) {
+      this.emitter.emit('change', undefined);
+    }
+    return changed;
   }
 
   // ── Merged cells (visual coordinates) ──────────────────────────────────────

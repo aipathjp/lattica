@@ -68,6 +68,7 @@ export {
   type SearchOptions,
 } from './search.js';
 export { validators, ValidationModel, type Validator } from './validation.js';
+export { aggregate, distinctValues, type AggregateFn } from './aggregate.js';
 export {
   toNumberOrNull,
   summarize,
