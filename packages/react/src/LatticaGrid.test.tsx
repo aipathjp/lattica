@@ -773,3 +773,75 @@ describe('LatticaGrid fill (auto-size to container)', () => {
     }
   });
 });
+
+describe('LatticaGrid content edge (area past the last column/row)', () => {
+  // A 2×2 grid in a 400×200 container: content ends at x = 48 + 2×100 = 248
+  // and y = 24 + 2×24 = 72, leaving empty space to the right and below.
+  const smallGrid = () => {
+    const c = new GridController({ rowCount: 2, colCount: 2 });
+    renderGrid(c);
+    return c;
+  };
+
+  it('stops the header band at the last column and the gutter at the last row', () => {
+    smallGrid();
+    const band = screen.getAllByRole('columnheader')[0]!.parentElement!;
+    expect(band.style.width).toBe('200px'); // 248 - rowHeaderWidth(48)
+    const gutter = screen.getAllByRole('rowheader')[0]!.parentElement!;
+    expect(gutter.style.height).toBe('48px'); // 72 - colHeaderHeight(24)
+  });
+
+  it('keeps the chrome full-size while the content overflows the container', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    renderGrid(c);
+    const band = screen.getAllByRole('columnheader')[0]!.parentElement!;
+    expect(band.style.width).toBe('352px'); // 400 - rowHeaderWidth(48)
+    const gutter = screen.getAllByRole('rowheader')[0]!.parentElement!;
+    expect(gutter.style.height).toBe('176px'); // 200 - colHeaderHeight(24)
+  });
+
+  it('ignores mouse down past the last column and past the last row', () => {
+    const c = smallGrid();
+    c.selection.setActive({ row: 0, col: 0 });
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.mouseDown(grid, { clientX: 300, clientY: 40 }); // right of content
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 0 });
+    fireEvent.mouseDown(grid, { clientX: 60, clientY: 150 }); // below content
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 0 });
+  });
+
+  it('does not open a context menu past the last column/row', () => {
+    smallGrid();
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.contextMenu(grid, { clientX: 300, clientY: 40 });
+    expect(screen.queryByTestId('lattica-menu')).toBeNull();
+    fireEvent.contextMenu(grid, { clientX: 60, clientY: 150 });
+    expect(screen.queryByTestId('lattica-menu')).toBeNull();
+  });
+
+  it('does not begin an edit on double-click past the last column/row', () => {
+    const c = smallGrid();
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.doubleClick(grid, { clientX: 300, clientY: 40 });
+    expect(c.getEdit()).toBeNull();
+    fireEvent.doubleClick(grid, { clientX: 60, clientY: 150 });
+    expect(c.getEdit()).toBeNull();
+  });
+});
+
+describe('LatticaGrid frozen header z-order', () => {
+  it('renders frozen col/row headers last (opaque) so scrolled ones slide beneath', () => {
+    const c = new GridController({ rowCount: 50, colCount: 20, frozenRows: 1, frozenCols: 1 });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.wheel(grid, { deltaX: 150, deltaY: 150 });
+    const colHeaders = screen.getAllByRole('columnheader');
+    const lastCol = colHeaders[colHeaders.length - 1]!;
+    expect(lastCol.textContent).toContain('A'); // frozen column A paints on top
+    expect(lastCol.style.background).not.toBe('');
+    const rowHeaders = screen.getAllByRole('rowheader');
+    const lastRow = rowHeaders[rowHeaders.length - 1]!;
+    expect(lastRow.textContent).toBe('1'); // frozen row 1 paints on top
+    expect(lastRow.style.background).not.toBe('');
+  });
+});

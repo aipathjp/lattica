@@ -103,6 +103,27 @@ describe('buildScene', () => {
     });
     expect(scene.activeRect).toBeNull();
   });
+
+  it('flags frozen cells and the both-axis frozen corner', () => {
+    const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
+    const scene = buildScene({
+      geom: geom({ frozenRows: 1, frozenCols: 1 }),
+      scrollLeft: 0,
+      scrollTop: 0,
+      clientWidth: 240,
+      clientHeight: 120,
+      selection: sel,
+      getDisplay: () => '',
+    });
+    const corner = scene.cells.find((c) => c.row === 0 && c.col === 0)!;
+    expect(corner).toMatchObject({ frozen: true, frozenCorner: true });
+    const pinnedRow = scene.cells.find((c) => c.row === 0 && c.col === 1)!;
+    expect(pinnedRow).toMatchObject({ frozen: true, frozenCorner: false });
+    const pinnedCol = scene.cells.find((c) => c.row === 1 && c.col === 0)!;
+    expect(pinnedCol).toMatchObject({ frozen: true, frozenCorner: false });
+    const plain = scene.cells.find((c) => c.row === 1 && c.col === 1)!;
+    expect(plain).toMatchObject({ frozen: false, frozenCorner: false });
+  });
 });
 
 describe('buildScene merges', () => {
