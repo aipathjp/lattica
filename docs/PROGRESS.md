@@ -136,3 +136,8 @@
   - examples/playground に kitchen-sink デモ（ソート/フィルタ/結合/検索/CSV・XLSX/AI を一画面）。
   - React: ネスト行（折りたたみ）をグリッド統合（行ガター ▾/▸ トグル、列フィルタと hidden 合成）。
   - 全体 **1643テスト・100%カバレッジ**。typecheck/lint/build クリーン。
+- 2026-06-07: **Wave 14 完了**（配列スピル＝Phase 12c＋E2E雛形＋ドキュメントサイト）。
+  - **配列スピル（動的配列）**: 複数セルを返す数式がアンカーから隣接セルへスピル。`SheetEngine` が spillMap（仮想セル→アンカーのスロット）を保持し `getValue` が透過解決。占有時は `#SPILL!`（ブロックされたアンカーは意図領域を監視し、障害物除去で再スピル）。スピルセルは依存グラフでアンカーに依存し、再計算は不動点反復するため「直前にスピル対象になった/外れたセル」を参照する数式も追従。縮小/スカラー化/クリア/循環で撤回。`#SPILL!` エラー型追加。
+  - 数式関数 130→**135**（動的配列 TRANSPOSE/SEQUENCE/UNIQUE/SORT/FILTER）。
+  - インフラ: Playwright E2E 雛形（`playwright.config.ts`＋`e2e/grid.spec.ts`・実 testid 利用、`*.spec.ts` はカバレッジ対象外）＋ VitePress ドキュメントサイト（`docs/.vitepress/`・各パッケージ頁・`docs:dev`/`docs:build`）。ブラウザ E2E/サイトビルドは未実行（アプリ dev サーバ未結線）。
+  - 全体 **1687テスト・100%カバレッジ**。typecheck/lint/build クリーン。**Part A の WORKPLAN 主要 Phase（1–18, R1C1/スピル含む）と Part B（AI A1–A12）が完了**。残るオプションはブラウザ実機 E2E の結線とサイト公開のみ。
