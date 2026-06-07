@@ -69,6 +69,7 @@ export {
 } from './search.js';
 export { validators, ValidationModel, type Validator } from './validation.js';
 export { aggregate, distinctValues, type AggregateFn } from './aggregate.js';
+export { formatNumber, parseFormat, type ParsedFormat } from './number-format.js';
 export {
   toNumberOrNull,
   summarize,

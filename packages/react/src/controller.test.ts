@@ -691,3 +691,41 @@ describe('replaceInText', () => {
     expect(replaceInText('abc', '(', 'X', { regex: true })).toBe('abc');
   });
 });
+
+describe('Phase C — number format & selection summary', () => {
+  it('formats numeric cells with a column number format', () => {
+    const c = make();
+    c.setCellText(0, 0, '1234.5');
+    c.setCellText(1, 0, 'text'); // non-numeric stays literal
+    c.setColumnFormat(0, '#,##0.00');
+    expect(c.getDisplay(0, 0)).toBe('1,234.50');
+    expect(c.getDisplay(1, 0)).toBe('text');
+    expect(c.getColumnFormat(0)).toBe('#,##0.00');
+  });
+
+  it('leaves cells unformatted when no column format is set', () => {
+    const c = make();
+    c.setCellText(0, 0, '5');
+    expect(c.getDisplay(0, 0)).toBe('5');
+    expect(c.getColumnFormat(0)).toBeUndefined();
+  });
+
+  it('aggregates the current selection', () => {
+    const c = make();
+    c.setCellText(0, 0, '10');
+    c.setCellText(1, 0, '20');
+    c.setCellText(2, 0, '30');
+    c.selection.setActive({ row: 0, col: 0 });
+    c.selection.extendTo({ row: 2, col: 0 });
+    expect(c.aggregateSelection('sum')).toBe(60);
+    const s = c.selectionSummary();
+    expect(s).toEqual({ count: 3, sum: 60, avg: 20, min: 10, max: 30 });
+  });
+
+  it('selection summary over empty cells reports null aggregates', () => {
+    const c = make();
+    c.selection.setActive({ row: 5, col: 5 });
+    const s = c.selectionSummary();
+    expect(s).toEqual({ count: 0, sum: null, avg: null, min: null, max: null });
+  });
+});

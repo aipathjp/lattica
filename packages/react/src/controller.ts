@@ -19,6 +19,7 @@ import {
   validators,
   aggregate,
   distinctValues,
+  formatNumber,
   type AggregateFn,
   type Validator,
   type MergeArea,
@@ -130,6 +131,8 @@ export class GridController {
   readonly validation = new ValidationModel();
   /** Allowed option lists for dropdown/autocomplete columns (physical col). */
   private readonly columnOptions = new Map<number, readonly string[]>();
+  /** Excel-style number format patterns per physical column. */
+  private readonly columnFormats = new Map<number, string>();
   /** View transform (sort/filter) mapping visual↔physical indices. */
   readonly view: DataView;
   private readonly sortModel = new SortModel();
@@ -340,6 +343,36 @@ export class GridController {
     return aggregate(values, fn);
   }
 
+  /** Collect the raw values inside the current selection bounding box. */
+  private selectionValues(): CellValue[] {
+    const b = normalizeRange(this.selection.getSelectionBounds());
+    const values: CellValue[] = [];
+    for (let r = b.top; r <= b.bottom; r++) {
+      for (let c = b.left; c <= b.right; c++) {
+        values.push(this.engine.getValue(this.toPhysical(r, c)) as CellValue);
+      }
+    }
+    return values;
+  }
+
+  /** Aggregate over the current selection bounding box. */
+  aggregateSelection(fn: AggregateFn): number | null {
+    return aggregate(this.selectionValues(), fn);
+  }
+
+  /** Summary of the current selection for a status bar (count/sum/avg/min/max). */
+  selectionSummary(): { count: number; sum: number | null; avg: number | null; min: number | null; max: number | null } {
+    const values = this.selectionValues();
+    return {
+      // `count` never returns null (it tallies non-empty cells, always a number).
+      count: aggregate(values, 'count')!,
+      sum: aggregate(values, 'sum'),
+      avg: aggregate(values, 'avg'),
+      min: aggregate(values, 'min'),
+      max: aggregate(values, 'max'),
+    };
+  }
+
   // ── Find & replace ─────────────────────────────────────────────────────────
   /**
    * Replace `query` with `replacement` in every matching cell's editable text
@@ -444,7 +477,12 @@ export class GridController {
   /** Display text of a cell (computed value, formatted). */
   getDisplay(row: number, col: number): string {
     const p = this.toPhysical(row, col);
-    return formatValue(this.engine.getValue(p));
+    const value = this.engine.getValue(p);
+    const fmt = this.columnFormats.get(p.col);
+    if (fmt !== undefined && typeof value === 'number') {
+      return formatNumber(value, fmt);
+    }
+    return formatValue(value);
   }
 
   /** Raw computed value of a cell (for value-based renderers / formatting). */
@@ -500,6 +538,17 @@ export class GridController {
   /** Which DOM editor a column should use, derived from its cell type. */
   getEditorKind(visualCol: number): EditorKind {
     return editorKindForType(this.getColumnType(visualCol));
+  }
+
+  /** Set an Excel-style number format pattern for a (physical) column. */
+  setColumnFormat(col: number, pattern: string): void {
+    this.columnFormats.set(col, pattern);
+    this.emitter.emit('change', undefined);
+  }
+
+  /** Number format pattern for a (visual) column, or undefined. */
+  getColumnFormat(visualCol: number): string | undefined {
+    return this.columnFormats.get(this.view.cols.getPhysicalIndex(visualCol));
   }
 
   /** Is the cell (visual coords) currently flagged invalid by validation? */
