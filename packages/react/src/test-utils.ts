@@ -38,6 +38,9 @@ export function createMockContext(): MockContext {
     moveTo: record('moveTo'),
     lineTo: record('lineTo'),
     stroke: record('stroke'),
+    arc: record('arc'),
+    closePath: record('closePath'),
+    fill: record('fill'),
     scale: record('scale'),
   };
 }

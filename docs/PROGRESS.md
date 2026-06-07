@@ -191,3 +191,7 @@
 - 2026-06-07: **Phase E-3 完了**（非同期/サーバサイド行モデル）。
   - `@lattica/data` `async-rows.ts`: `AsyncRowModel<R>` — 固定ブロック単位の遅延ロード。`ensureRange(start,end)` で可視範囲を覆うブロックを `RowFetcher` 経由で取得（**in-flight 重複排除**・ブロックキャッシュ）、`getRow`/`isLoaded`/`getTotal`/`isTotalKnown`、`invalidate`（ソート/フィルタ後の再取得）、`subscribe`（到着通知）。汎用 `R`・DOM 非依存。
   - 全体 **1847テスト・100%カバレッジ**。typecheck/lint/build クリーン。残: チャート（フル描画）・PDF/印刷・LAMBDA/構造化参照は大型のため必要に応じ別途。
+- 2026-06-07: **Phase E-4 完了**（チャート：line/bar/pie）。
+  - core `chart.ts`: `layoutChart(spec)`（純粋）— プロット矩形・**nice 軸目盛**（`niceScale`）・系列の描画プリミティブ（折れ線点/棒/円グラフ扇形）・凡例を算出。`line`/`bar`（グループ化・ゼロ基準）/`pie`（割合扇形）。
+  - react `chart-painter.ts` `paintChart`＋ **`<LatticaChart>`** コンポーネント（canvas、`role=img`）。Canvas2D に `arc`/`closePath`/`fill` を追加。
+  - 全体 **1870テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E-5（PDF/印刷出力）。
