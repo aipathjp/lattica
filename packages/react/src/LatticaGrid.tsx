@@ -16,6 +16,7 @@ import {
   useState,
   type CSSProperties,
   type ReactElement,
+  type ReactNode,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type WheelEvent as ReactWheelEvent,
@@ -43,6 +44,8 @@ export interface LatticaGridProps {
   style?: CSSProperties;
   /** Build the right-click context menu for a hit target; defaults to the built-in menu. */
   contextMenu?: (target: HitResult) => MenuItemSpec[];
+  /** Render the detail panel for an expanded master row (by physical row index). */
+  renderDetail?: (physicalRow: number) => ReactNode;
 }
 
 interface MenuState {
@@ -739,6 +742,36 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
           borderBottom: `1px solid ${theme.headerGridLineColor}`,
         }}
       />
+
+      {/* Master/detail panels for expanded, visible rows. */}
+      {props.renderDetail !== undefined &&
+        scene.visibleRows
+          .filter((row) => controller.isDetailExpanded(row))
+          .map((row) => {
+            // Only the row's y/height matter here, so column 0 is sufficient.
+            const rect = cellRect(geom, scroll.left, scroll.top, row, 0);
+            const dh = controller.getDetailHeight();
+            const top = rect.y + rect.height - dh;
+            return (
+              <div
+                key={`detail-${row}`}
+                data-testid={`lattica-detail-${controller.getPhysicalRow(row)}`}
+                style={{
+                  position: 'absolute',
+                  left: geom.rowHeaderWidth,
+                  top,
+                  width: width - geom.rowHeaderWidth,
+                  height: dh,
+                  boxSizing: 'border-box',
+                  background: theme.background,
+                  borderTop: `1px solid ${theme.headerGridLineColor}`,
+                  overflow: 'auto',
+                }}
+              >
+                {props.renderDetail!(controller.getPhysicalRow(row))}
+              </div>
+            );
+          })}
 
       {/* Active-cell editor overlay (kind depends on the column's cell type). */}
       {edit !== null && editRect !== null && renderEditor(edit, editRect)}

@@ -201,3 +201,8 @@
 - 2026-06-07: **Phase E-6 完了**（LAMBDA ファミリ）。数式 144→**150**。
   - **LAMBDA / MAP / REDUCE / SCAN / BYROW / BYCOL**。LAMBDA は高階関数の最終引数の **AST を直接解釈**する方式（`asLambda`/`invokeLambda` で仮引数を子スコープに束縛）。値型・パーサ変更なしで安全に実装。LET 束縛名もラムダ本体から解決。
   - 全体 **1891テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E-7（マスターディテール UI）。
+- 2026-06-07: **Phase E-7 完了**（マスターディテール）。
+  - core `DetailModel`: 展開中マスター行（物理キー）を追跡（toggle/expand/collapse/expandedRows/clear/subscribe）。
+  - `GridController`: `details`・`toggleDetail`/`isDetailExpanded`/`getPhysicalRow`・`setDetailHeight`/`getDetailHeight`。展開行は `rebuildViewSizes` で detailHeight 分だけ高くなる（ソート/フィルタを跨いで物理キーで保持）。
+  - `<LatticaGrid renderDetail={...}>`：展開中の可視行の下部に DOM ディテールパネルをオーバーレイ（`lattica-detail-<physicalRow>`）。
+  - 全体 **1900テスト・100%カバレッジ**。typecheck/lint/build クリーン。**Phase E 完了（E-1〜E-7）**。残るは構造化参照（Table[Col]・lexer/parser 拡張）のみ。
