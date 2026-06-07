@@ -6,6 +6,17 @@
  * parses formulas, registers their precedents, and recomputes exactly the set
  * of cells transitively affected by the change — in topological order — marking
  * any cell caught in a circular reference as `#CYCLE!`.
+ *
+ * ## Dynamic arrays (spill)
+ *
+ * When a formula evaluates to a multi-cell array (a {@link Matrix} larger than
+ * 1×1) the anchor cell displays the top-left value and the remaining values
+ * "spill" into the adjacent cells below/right. Spilled cells are not real
+ * entries; reads resolve them through a {@link spillMap} pointing back at the
+ * owning anchor. If any spill target already holds its own content, the anchor
+ * instead reports `#SPILL!` and nothing spills. Spilled cells depend on their
+ * anchor in the dependency graph, so formulas referencing a spilled cell
+ * recalculate when the anchor's array changes.
  */
 
 import { addressKey, type CellAddress } from '@lattica/core';
@@ -15,8 +26,8 @@ import { evaluate, type EvalContext, type FunctionRegistry } from './evaluator.j
 import { createDefaultFunctions } from './functions.js';
 import { extractReferences } from './references.js';
 import { DependencyGraph, topoSort } from './dependency-graph.js';
-import { FormulaError, CYCLE } from './errors.js';
-import type { CellScalar, FormulaValue } from './values.js';
+import { FormulaError, CYCLE, SPILL } from './errors.js';
+import type { CellScalar, FormulaValue, Matrix } from './values.js';
 import { scalarize } from './evaluator.js';
 import { NameRegistry } from './names.js';
 
@@ -42,13 +53,38 @@ interface CellEntry {
   formula: AstNode | null;
   /** Original formula source (without `=`), for round-tripping. */
   source: string | null;
-  /** Last computed value. */
+  /** Last computed value (the anchor/top-left value for a spilling array). */
   value: CellScalar | FormulaError;
+  /** The spilled array when this cell anchors a multi-cell result, else null. */
+  spill: Matrix | null;
+  /** Keys this cell currently spills into (excludes the anchor itself). */
+  spillKeys: string[];
+}
+
+/** Where a spilled (non-anchor) cell gets its value from. */
+interface SpillTarget {
+  /** Key of the anchor cell whose array produced this value. */
+  anchor: string;
+  /** Row offset within the anchor's array. */
+  r: number;
+  /** Column offset within the anchor's array. */
+  c: number;
 }
 
 export interface SheetEngineOptions {
   functions?: FunctionRegistry;
   maxRangeCells?: number;
+}
+
+/** Parse a `"row,col"` cell key back into numeric coordinates. */
+function parseKey(key: string): { row: number; col: number } {
+  const comma = key.indexOf(',');
+  return { row: Number(key.slice(0, comma)), col: Number(key.slice(comma + 1)) };
+}
+
+/** Is `value` a multi-cell array (larger than a single 1×1 matrix)? */
+function isSpillingArray(value: FormulaValue): value is Matrix {
+  return Array.isArray(value) && (value.length > 1 || (value[0]?.length ?? 0) > 1);
 }
 
 export class SheetEngine {
@@ -58,6 +94,8 @@ export class SheetEngine {
   private readonly maxRangeCells: number;
   private readonly names = new NameRegistry();
   private readonly evalContext: EvalContext;
+  /** Maps each spilled (non-anchor) cell key to its source array slot. */
+  private readonly spillMap = new Map<string, SpillTarget>();
 
   constructor(options: SheetEngineOptions = {}) {
     this.functions = options.functions ?? createDefaultFunctions();
@@ -114,23 +152,29 @@ export class SheetEngine {
     const key = addressKey(address);
     const isFormula = typeof raw === 'string' && raw.startsWith('=') && raw.length > 1;
 
+    // Writing real content into a cell removes any previous formula's spill.
+    const existing = this.cells.get(key);
+    if (existing !== undefined) {
+      this.clearSpill(existing);
+    }
+
     if (isFormula) {
       const body = raw.slice(1);
       const parsed = tryParse(body);
       if (FormulaError.is(parsed)) {
         // Store the parse error as the cell value.
-        this.cells.set(key, { literal: null, formula: null, source: body, value: parsed });
+        this.cells.set(key, this.makeEntry({ source: body, value: parsed }));
         this.graph.clear(key);
         return this.recompute([key]);
       }
-      this.cells.set(key, { literal: null, formula: parsed, source: body, value: null });
+      this.cells.set(key, this.makeEntry({ formula: parsed, source: body }));
       const refs = extractReferences(parsed, { maxRangeCells: this.maxRangeCells });
       this.graph.setPrecedents(key, refs);
     } else {
       if (raw === null) {
         this.cells.delete(key);
       } else {
-        this.cells.set(key, { literal: raw, formula: null, source: null, value: raw });
+        this.cells.set(key, this.makeEntry({ literal: raw, value: raw }));
       }
       this.graph.clear(key);
     }
@@ -138,9 +182,32 @@ export class SheetEngine {
     return this.recompute([key]);
   }
 
-  /** Read the current computed value of a cell. */
+  /** Build a CellEntry, filling spill bookkeeping defaults. */
+  private makeEntry(partial: Partial<CellEntry>): CellEntry {
+    return {
+      literal: partial.literal ?? null,
+      formula: partial.formula ?? null,
+      source: partial.source ?? null,
+      value: partial.value ?? null,
+      spill: null,
+      spillKeys: [],
+    };
+  }
+
+  /** Read the current computed value of a cell (resolving spilled cells). */
   getValue(address: CellAddress): CellScalar | FormulaError {
-    return this.cells.get(addressKey(address))?.value ?? null;
+    const key = addressKey(address);
+    const entry = this.cells.get(key);
+    if (entry !== undefined) {
+      return entry.value;
+    }
+    const target = this.spillMap.get(key);
+    if (target !== undefined) {
+      // Invariant: a spillMap entry always points at a live anchor whose
+      // `spill` matrix holds the indexed slot (set/cleared in lockstep).
+      return this.cells.get(target.anchor)!.spill![target.r]![target.c]!;
+    }
+    return null;
   }
 
   /** Read the original input of a cell: `=formula` or its literal. */
@@ -163,52 +230,190 @@ export class SheetEngine {
   }
 
   /**
+   * Remove an anchor's spill registrations (spillMap entries + the anchor→cell
+   * graph edges), recording each freed key into `removed` when provided.
+   */
+  private clearSpill(entry: CellEntry, removed?: Set<string>): void {
+    for (const k of entry.spillKeys) {
+      this.spillMap.delete(k);
+      this.graph.clear(k);
+      removed?.add(k);
+    }
+    entry.spillKeys = [];
+    entry.spill = null;
+  }
+
+  /**
    * Recompute the cells affected by changes to `seeds`, returning the keys
-   * whose value actually changed.
+   * whose value actually changed. The computation iterates to a fixpoint: each
+   * round re-seeds with cells whose spill membership changed, so formulas that
+   * reference a cell which only just became (or stopped being) spilled-into are
+   * picked up. A guard bounds the loop against pathological cascades.
    */
   private recompute(seeds: string[]): Set<string> {
-    const affected = this.graph.collectAffected(seeds);
-    // Only formula cells need evaluation; literal cells already have a value.
-    const formulaCells = [...affected].filter((k) => (this.cells.get(k)?.formula ?? null) !== null);
-
-    const { order, cyclic } = topoSort(formulaCells, (k) => this.graph.getPrecedents(k));
-
     const changed = new Set<string>();
-
-    // Seeds that are literal/cleared cells: their value already set; record change.
-    for (const seed of seeds) {
-      changed.add(seed);
-    }
-
-    for (const key of order) {
-      if (this.evaluateCell(key)) {
-        changed.add(key);
-      }
-    }
-    for (const key of cyclic) {
-      const entry = this.cells.get(key);
-      if (entry !== undefined && !(FormulaError.is(entry.value) && entry.value.type === '#CYCLE!')) {
-        entry.value = CYCLE;
-        changed.add(key);
-      }
+    let frontier = seeds;
+    let guard = 0;
+    const maxRounds = this.cells.size + seeds.length + 2;
+    while (frontier.length > 0 && guard <= maxRounds) {
+      guard++;
+      frontier = this.recomputeRound(frontier, changed);
     }
     return changed;
   }
 
-  /** Evaluate one formula cell; returns true if its value changed. */
-  private evaluateCell(key: string): boolean {
+  /**
+   * One recompute pass. Evaluates all affected formula cells in topological
+   * order and returns the spilled-cell keys whose membership or value changed
+   * (the seeds for the next round).
+   */
+  private recomputeRound(seeds: string[], changed: Set<string>): string[] {
+    // A write to a spilled cell must re-run its anchor to detect (un)blocking.
+    const expanded = new Set<string>(seeds);
+    for (const s of seeds) {
+      const target = this.spillMap.get(s);
+      if (target !== undefined) {
+        expanded.add(target.anchor);
+      }
+    }
+
+    const affected = this.graph.collectAffected(expanded);
+    // Order formula cells; spilled-cell placeholders are included so a
+    // dependent of a spilled cell is sequenced after that cell's anchor.
+    const nodes = [...affected].filter(
+      (k) => (this.cells.get(k)?.formula ?? null) !== null || this.spillMap.has(k),
+    );
+    const { order, cyclic } = topoSort(nodes, (k) => this.graph.getPrecedents(k));
+
+    for (const seed of seeds) {
+      changed.add(seed);
+    }
+
+    const spillDelta: string[] = [];
+    for (const key of order) {
+      this.evaluateCell(key, changed, spillDelta);
+    }
+    for (const key of cyclic) {
+      const entry = this.cells.get(key);
+      if (entry !== undefined && !(FormulaError.is(entry.value) && entry.value.type === '#CYCLE!')) {
+        this.clearSpill(entry, changed);
+        entry.value = CYCLE;
+        changed.add(key);
+      }
+    }
+    return spillDelta;
+  }
+
+  /**
+   * Evaluate one formula cell, applying or clearing its spill and recording
+   * value changes into `changed` and spill-membership changes into `spillDelta`.
+   * Non-formula keys (literal cells and spilled placeholders) are skipped.
+   */
+  private evaluateCell(key: string, changed: Set<string>, spillDelta: string[]): void {
     const entry = this.cells.get(key);
-    /* v8 ignore next 3 -- defensive: `order` only ever contains formula cells */
     if (entry === undefined || entry.formula === null) {
-      return false;
+      return;
     }
-    const result = scalarize(evaluate(entry.formula, this.evalContext));
+
+    // Reset to the formula's pure precedents, dropping any watch edges added by
+    // a prior blocked spill so a successful re-spill cannot form a false cycle
+    // with its own (target → anchor) edges.
+    const refs = extractReferences(entry.formula, { maxRangeCells: this.maxRangeCells });
+    this.graph.setPrecedents(key, refs);
+
+    const raw = evaluate(entry.formula, this.evalContext);
+
+    // Snapshot the previous spill so we can diff membership and values. A
+    // non-empty spillKeys list implies entry.spill is the matrix it indexes.
+    const oldKeys = new Set(entry.spillKeys);
+    const oldValues = new Map<string, CellScalar | FormulaError>();
+    for (const k of entry.spillKeys) {
+      const t = this.spillMap.get(k)!;
+      oldValues.set(k, entry.spill![t.r]![t.c]!);
+    }
+
+    this.clearSpill(entry);
+
+    const newValue = isSpillingArray(raw) ? this.applySpill(key, entry, raw, refs) : scalarize(raw);
     const previous = entry.value;
-    if (valuesEqual(previous, result)) {
-      return false;
+    entry.value = newValue;
+    if (!valuesEqual(previous, newValue)) {
+      changed.add(key);
     }
-    entry.value = result;
-    return true;
+
+    // Diff the spill region: removals, additions, and value changes all need
+    // their dependents revisited on the next round.
+    const newKeys = new Set(entry.spillKeys);
+    for (const k of oldKeys) {
+      if (!newKeys.has(k)) {
+        changed.add(k);
+        spillDelta.push(k);
+      }
+    }
+    for (const k of newKeys) {
+      const t = this.spillMap.get(k)!;
+      const current = entry.spill![t.r]![t.c]!;
+      if (!oldKeys.has(k)) {
+        changed.add(k);
+        spillDelta.push(k);
+      } else if (!valuesEqual(oldValues.get(k)!, current)) {
+        changed.add(k);
+        spillDelta.push(k);
+      }
+    }
+  }
+
+  /**
+   * Spill `matrix` from the anchor at `key`. Returns the top-left value on
+   * success, or `#SPILL!` (leaving `entry.spill` null) when any target cell is
+   * already occupied by its own content or another anchor's spill. On a block,
+   * the anchor is made to depend on the obstructed region (in addition to its
+   * formula `refs`) so that clearing the obstruction re-triggers the spill.
+   */
+  private applySpill(
+    key: string,
+    entry: CellEntry,
+    matrix: Matrix,
+    refs: Iterable<string>,
+  ): CellScalar | FormulaError {
+    const { row, col } = parseKey(key);
+    const rows = matrix.length;
+    // isSpillingArray guarantees a non-empty first row.
+    const cols = matrix[0]!.length;
+
+    // Enumerate the intended target region (everything but the anchor itself).
+    const region: { key: string; r: number; c: number }[] = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (r === 0 && c === 0) {
+          continue;
+        }
+        region.push({ key: `${row + r},${col + c}`, r, c });
+      }
+    }
+
+    // Blockage: any target already holding its own content or owned by another
+    // anchor's spill. Own old spill was cleared, so it does not self-block.
+    const blocked = region.some(({ key: tkey }) => {
+      const owner = this.spillMap.get(tkey);
+      return this.cells.has(tkey) || (owner !== undefined && owner.anchor !== key);
+    });
+    if (blocked) {
+      // Watch the whole intended region so clearing the obstruction re-spills.
+      this.graph.setPrecedents(key, [...refs, ...region.map((t) => t.key)]);
+      return SPILL;
+    }
+
+    // Register the spill: each target reads from (depends on) the anchor.
+    entry.spill = matrix;
+    for (const { key: tkey, r, c } of region) {
+      this.spillMap.set(tkey, { anchor: key, r, c });
+      this.graph.setPrecedents(tkey, [key]);
+      entry.spillKeys.push(tkey);
+    }
+
+    // Anchor displays the top-left value (defined whenever the array spills).
+    return matrix[0]![0]!;
   }
 
   /** Number of stored (non-empty) cells. */
