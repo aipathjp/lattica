@@ -499,3 +499,29 @@ describe('LatticaGrid fill handle', () => {
     expect(screen.queryByTestId('lattica-fill-handle')).toBeNull();
   });
 });
+
+describe('LatticaGrid header sort', () => {
+  it('sorts a column by clicking its header sort control', () => {
+    const c = new GridController({ rowCount: 3, colCount: 3 });
+    c.setCellText(0, 0, '3');
+    c.setCellText(1, 0, '1');
+    c.setCellText(2, 0, '2');
+    renderGrid(c);
+    const sortBtn = screen.getByTestId('lattica-sort-0');
+    fireEvent.click(sortBtn); // asc
+    expect(c.getSortDirection(0)).toBe('asc');
+    expect([c.getDisplay(0, 0), c.getDisplay(1, 0), c.getDisplay(2, 0)]).toEqual(['1', '2', '3']);
+    fireEvent.click(screen.getByTestId('lattica-sort-0')); // desc
+    expect(c.getSortDirection(0)).toBe('desc');
+  });
+
+  it('supports additive sort via shift-click', () => {
+    const c = new GridController({ rowCount: 3, colCount: 3 });
+    c.setCellText(0, 0, '1');
+    renderGrid(c);
+    fireEvent.click(screen.getByTestId('lattica-sort-0'));
+    fireEvent.click(screen.getByTestId('lattica-sort-1'), { shiftKey: true });
+    expect(c.getSortDirection(0)).toBe('asc');
+    expect(c.getSortDirection(1)).toBe('asc');
+  });
+});

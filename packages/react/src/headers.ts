@@ -19,6 +19,8 @@ export interface PositionedHeader {
   isGroup: boolean;
   collapsible: boolean;
   collapsed: boolean;
+  /** Leaf column index for non-group headers (undefined for group headers). */
+  col?: number;
 }
 
 export interface PositionedRowHeader {
@@ -61,6 +63,7 @@ export function columnHeaderCells(
       isGroup: false,
       collapsible: false,
       collapsed: false,
+      col,
     }));
   }
 
@@ -83,6 +86,7 @@ export function columnHeaderCells(
         isGroup: cell.isGroup,
         collapsible: cell.collapsible,
         collapsed: cell.collapsed,
+        ...(cell.isGroup ? {} : { col: cell.startLeaf }),
       });
     }
   }

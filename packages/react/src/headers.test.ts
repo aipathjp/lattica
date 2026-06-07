@@ -17,7 +17,8 @@ describe('columnHeaderCells (default letters)', () => {
   it('positions one letter per visible column', () => {
     const cells = columnHeaderCells(geom(), 0, [0, 1, 2], null);
     expect(cells.map((c) => c.label)).toEqual(['A', 'B', 'C']);
-    expect(cells[0]).toMatchObject({ x: 40, y: 0, width: 50, height: 24, isGroup: false });
+    expect(cells[0]).toMatchObject({ x: 40, y: 0, width: 50, height: 24, isGroup: false, col: 0 });
+    expect(cells[2]!.col).toBe(2);
   });
 
   it('returns nothing when no columns are visible', () => {
@@ -51,6 +52,9 @@ describe('columnHeaderCells (multi-level)', () => {
     expect(group.height).toBe(12);
     const leafB = cells.find((c) => c.label === 'B')!;
     expect(leafB.y).toBe(12);
+    // Leaf headers carry their column index; group headers do not.
+    expect(leafB.col).toBe(1);
+    expect(group.col).toBeUndefined();
   });
 
   it('omits header cells outside the visible column range', () => {
