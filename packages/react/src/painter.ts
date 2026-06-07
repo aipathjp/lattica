@@ -67,15 +67,22 @@ export function paintScene(
 
   const registry = options.cellTypes ?? defaultCellTypes;
 
-  // Two passes so frozen (pinned) rows/columns paint over scrolled cells:
-  // scrollable cells first, then frozen cells on an opaque base.
+  // Three passes so frozen (pinned) rows/columns paint over scrolled cells:
+  // scrollable cells first, then single-axis frozen cells on an opaque base,
+  // then the frozen corner (pinned on both axes) on top of everything — an
+  // overscan row in a pinned column must not cover the corner cell.
   for (const cell of scene.cells) {
     if (cell.frozen !== true) {
       paintCell(ctx, cell, theme, registry, false);
     }
   }
   for (const cell of scene.cells) {
-    if (cell.frozen === true) {
+    if (cell.frozen === true && cell.frozenCorner !== true) {
+      paintCell(ctx, cell, theme, registry, true);
+    }
+  }
+  for (const cell of scene.cells) {
+    if (cell.frozenCorner === true) {
       paintCell(ctx, cell, theme, registry, true);
     }
   }

@@ -48,6 +48,28 @@ describe('paintScene', () => {
     expect(texts).toContain('scroll');
   });
 
+  it('paints the frozen corner last, over single-axis frozen cells', () => {
+    const ctx = createMockContext();
+    paintScene(
+      ctx,
+      scene({
+        cells: [
+          // Frozen corner first in the scene; an overscan row in the pinned
+          // column overlaps its rect and must NOT cover it.
+          { row: 0, col: 0, rect: { x: 0, y: 0, width: 50, height: 20 }, text: 'corner', selected: false, active: false, frozen: true, frozenCorner: true },
+          { row: 9, col: 0, rect: { x: 0, y: 1, width: 50, height: 20 }, text: 'overscan', selected: false, active: false, frozen: true },
+          { row: 5, col: 3, rect: { x: 100, y: 40, width: 50, height: 20 }, text: 'scroll', selected: false, active: false },
+        ],
+        activeRect: null,
+      }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    const texts = ctx.calls.filter((c) => c.method === 'fillText').map((c) => c.args[0]);
+    // Paint order: scrolled → single-axis frozen → corner (last = on top).
+    expect(texts).toEqual(['scroll', 'overscan', 'corner']);
+  });
+
   it('draws gridlines via stroke', () => {
     const ctx = createMockContext();
     paintScene(ctx, scene(), defaultTheme, { width: 200, height: 100 });

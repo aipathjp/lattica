@@ -38,6 +38,10 @@ export interface CellPaint {
   sparkline?: SparklineShape;
   /** True for pinned (frozen) rows/columns — painted last, over scrolled cells. */
   frozen?: boolean;
+  /** True when pinned on both axes (the frozen corner) — painted last of all,
+   *  so single-axis frozen cells (e.g. an overscan row in a pinned column)
+   *  cannot cover it. */
+  frozenCorner?: boolean;
 }
 
 export interface Scene {
@@ -158,6 +162,7 @@ export function buildScene(params: BuildSceneParams): Scene {
         icon: visual?.icon,
         sparkline: params.getSparkline?.(row, col, rect.width, rect.height) ?? undefined,
         frozen: row < geom.frozenRows || col < geom.frozenCols,
+        frozenCorner: row < geom.frozenRows && col < geom.frozenCols,
       };
       cells.push(cell);
       if (active && state.active.row === row && state.active.col === col) {

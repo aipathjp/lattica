@@ -239,6 +239,19 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     [dispatchKey],
   );
 
+  /**
+   * The data's edge in view coordinates. Pointer interactions and the header
+   * chrome stop here rather than at the canvas edge, so the area past the last
+   * column/row reads as empty space instead of a phantom column/row.
+   */
+  const contentEdge = useCallback((): { right: number; bottom: number } => {
+    const g = controller.geometry();
+    return {
+      right: g.rowHeaderWidth + g.colSizes.getTotalSize() - scroll.left,
+      bottom: g.colHeaderHeight + g.rowSizes.getTotalSize() - scroll.top,
+    };
+  }, [controller, scroll]);
+
   const onMouseDown = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
       const root = rootRef.current;
@@ -257,6 +270,12 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
             ? controller.colSizes.getSize(border.index)
             : controller.rowSizes.getSize(border.index);
         resizeRef.current = { target: border, start: border.type === 'col' ? x : y, startSize };
+        root.focus();
+        return;
+      }
+      // Clicks past the last column/row hit nothing — keep focus, keep selection.
+      const edge = contentEdge();
+      if (x >= edge.right || y >= edge.bottom) {
         root.focus();
         return;
       }
@@ -283,7 +302,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       }
       rootRef.current?.focus();
     },
-    [controller, scroll],
+    [controller, scroll, contentEdge],
   );
 
   const onMouseMove = useCallback(
@@ -377,11 +396,16 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       const rect = root.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
+      // No menu for the empty space past the last column/row.
+      const edge = contentEdge();
+      if (x >= edge.right || y >= edge.bottom) {
+        return;
+      }
       const hit = hitTest(controller.geometry(), scroll.left, scroll.top, x, y);
       const items = buildMenu(props.contextMenu ? props.contextMenu(hit) : defaultMenu(hit));
       setMenu({ x, y, items });
     },
-    [controller, scroll, props, defaultMenu],
+    [controller, scroll, props, defaultMenu, contentEdge],
   );
 
   const runMenuItem = useCallback((item: MenuItem) => {
@@ -392,10 +416,25 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     setMenu(null);
   }, []);
 
-  const onDoubleClick = useCallback(() => {
-    const { active } = controller.selection.getState();
-    controller.beginEdit(active.row, active.col);
-  }, [controller]);
+  const onDoubleClick = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>) => {
+      const root = rootRef.current;
+      /* v8 ignore next 3 -- root ref is always attached when handlers fire */
+      if (root === null) {
+        return;
+      }
+      // Ignore double-clicks past the last column/row (the mousedown was ignored
+      // there too, so editing would target an unrelated cell).
+      const rect = root.getBoundingClientRect();
+      const edge = contentEdge();
+      if (e.clientX - rect.left >= edge.right || e.clientY - rect.top >= edge.bottom) {
+        return;
+      }
+      const { active } = controller.selection.getState();
+      controller.beginEdit(active.row, active.col);
+    },
+    [controller, contentEdge],
+  );
 
   const onWheel = useCallback(
     (e: ReactWheelEvent<HTMLDivElement>) => {
@@ -429,6 +468,32 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   });
   const colHeaders = columnHeaderCells(geom, scroll.left, scene.visibleCols, layout);
   const rowHeaders = rowHeaderCells(geom, scroll.top, scene.visibleRows);
+
+  // Frozen header cells paint last (and opaque) so scrolled headers slide
+  // beneath them instead of overlapping their text — the DOM mirror of the
+  // canvas painter's two-pass frozen-over-scrolled order.
+  const orderedColHeaders = [
+    ...colHeaders.filter((h) => !(h.col !== undefined && h.col < geom.frozenCols)),
+    ...colHeaders.filter((h) => h.col !== undefined && h.col < geom.frozenCols),
+  ];
+  const orderedRowHeaders = [
+    ...rowHeaders.filter((h) => h.row >= geom.frozenRows),
+    ...rowHeaders.filter((h) => h.row < geom.frozenRows),
+  ];
+
+  // The header band and the row gutter stop at the data's edge (not the canvas
+  // edge) so a grid wider/taller than its content shows plain background — not
+  // a phantom header strip or gutter — past the last column/row.
+  const headerBandWidth = Math.max(
+    0,
+    Math.min(width, geom.rowHeaderWidth + geom.colSizes.getTotalSize() - scroll.left) -
+      geom.rowHeaderWidth,
+  );
+  const gutterHeight = Math.max(
+    0,
+    Math.min(height, geom.colHeaderHeight + geom.rowSizes.getTotalSize() - scroll.top) -
+      geom.colHeaderHeight,
+  );
 
   const editRect =
     edit !== null ? cellRect(geom, scroll.left, scroll.top, edit.row, edit.col) : null;
@@ -613,20 +678,20 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     >
       <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0 }} />
 
-      {/* Column header band (DOM, multi-level). */}
+      {/* Column header band (DOM, multi-level). Ends at the last column. */}
       <div
         style={{
           position: 'absolute',
           top: 0,
           left: geom.rowHeaderWidth,
-          right: 0,
+          width: headerBandWidth,
           height: geom.colHeaderHeight,
           overflow: 'hidden',
           background: theme.headerBackground,
           borderBottom: `1px solid ${theme.headerGridLineColor}`,
         }}
       >
-        {colHeaders.map((h) => (
+        {orderedColHeaders.map((h) => (
           <div
             key={h.id}
             role="columnheader"
@@ -645,6 +710,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
               width: h.width,
               height: h.height,
               boxSizing: 'border-box',
+              background: theme.headerBackground,
               borderRight: `1px solid ${theme.headerGridLineColor}`,
               display: 'flex',
               alignItems: 'center',
@@ -701,20 +767,20 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
         ))}
       </div>
 
-      {/* Row-number gutter (DOM). */}
+      {/* Row-number gutter (DOM). Ends at the last row. */}
       <div
         style={{
           position: 'absolute',
           top: geom.colHeaderHeight,
           left: 0,
           width: geom.rowHeaderWidth,
-          bottom: 0,
+          height: gutterHeight,
           overflow: 'hidden',
           background: theme.headerBackground,
           borderRight: `1px solid ${theme.headerGridLineColor}`,
         }}
       >
-        {rowHeaders.map((h) => (
+        {orderedRowHeaders.map((h) => (
           <div
             key={h.row}
             role="rowheader"
@@ -725,6 +791,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
               width: geom.rowHeaderWidth,
               height: h.height,
               boxSizing: 'border-box',
+              background: theme.headerBackground,
               borderBottom: `1px solid ${theme.headerGridLineColor}`,
               display: 'flex',
               alignItems: 'center',

@@ -30,15 +30,15 @@ test.describe('Lattica dynamic-array spill', () => {
 test.describe('Lattica playground navigation', () => {
   test('home links reach both demos', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Lattica Playground' })).toBeVisible();
+    // Heading of the showcase home (layout nav carries the per-page links).
+    await expect(page.getByRole('heading', { name: 'Lattica — Feature Showcase' })).toBeVisible();
 
-    await page.getByTestId('nav-spill').click();
-    await expect(page).toHaveURL(/\/spill$/);
-    await expect(page.getByTestId('lattica-grid')).toBeVisible();
-
-    await page.goto('/');
     await page.getByTestId('nav-kitchen-sink').click();
     await expect(page).toHaveURL(/\/kitchen-sink$/);
+    await expect(page.getByTestId('lattica-grid')).toBeVisible();
+
+    // The spill demo dropped out of the trimmed nav; it stays routable directly.
+    await page.goto('/spill');
     await expect(page.getByTestId('lattica-grid')).toBeVisible();
   });
 });
