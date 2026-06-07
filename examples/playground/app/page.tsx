@@ -59,6 +59,9 @@ export default function Page() {
         <a href="/spill" data-testid="nav-spill">
           Dynamic Arrays (spill)
         </a>
+        <a href="/data" data-testid="nav-data">
+          Live Neon Data
+        </a>
       </nav>
       <button onClick={exportXlsx}>Export XLSX</button>
       <div style={{ marginTop: 12, border: '1px solid #cbd2d9' }}>
