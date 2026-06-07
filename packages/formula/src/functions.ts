@@ -1510,6 +1510,228 @@ function parityImpl(wantEven: boolean): FunctionImpl {
 def('ISEVEN', parityImpl(true));
 def('ISODD', parityImpl(false));
 
+// ── Statistics (Phase 14) ────────────────────────────────────────────────────
+def('MODE', (args, evaluate) => {
+  const nums = collectNumbers(args, evaluate);
+  if (FormulaError.is(nums)) return nums;
+  // Excel returns the most frequent value; ties resolve to the earliest seen.
+  const counts = new Map<number, number>();
+  let best: number | null = null;
+  let bestCount = 1;
+  for (const n of nums) {
+    const c = (counts.get(n) ?? 0) + 1;
+    counts.set(n, c);
+    if (c > bestCount) {
+      bestCount = c;
+      best = n;
+    }
+  }
+  if (best === null) return NA;
+  return best;
+});
+
+def('GEOMEAN', (args, evaluate) => {
+  const nums = collectNumbers(args, evaluate);
+  if (FormulaError.is(nums)) return nums;
+  if (nums.length === 0) return NUM;
+  let logSum = 0;
+  for (const n of nums) {
+    if (n <= 0) return NUM;
+    logSum += Math.log(n);
+  }
+  return Math.exp(logSum / nums.length);
+});
+
+def('HARMEAN', (args, evaluate) => {
+  const nums = collectNumbers(args, evaluate);
+  if (FormulaError.is(nums)) return nums;
+  if (nums.length === 0) return NUM;
+  let recipSum = 0;
+  for (const n of nums) {
+    if (n <= 0) return NUM;
+    recipSum += 1 / n;
+  }
+  return nums.length / recipSum;
+});
+
+function popVarStdev(args: readonly AstNode[], evaluate: Evaluate, stdev: boolean): FormulaValue {
+  const nums = collectNumbers(args, evaluate);
+  if (FormulaError.is(nums)) return nums;
+  if (nums.length === 0) return DIV0;
+  const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+  const ss = nums.reduce((a, b) => a + (b - mean) ** 2, 0);
+  const variance = ss / nums.length;
+  return stdev ? Math.sqrt(variance) : variance;
+}
+def('VARP', (args, evaluate) => popVarStdev(args, evaluate, false));
+def('STDEVP', (args, evaluate) => popVarStdev(args, evaluate, true));
+
+def('SUMSQ', (args, evaluate) => {
+  const nums = collectNumbers(args, evaluate);
+  if (FormulaError.is(nums)) return nums;
+  return nums.reduce((a, b) => a + b * b, 0);
+});
+
+/** Linear-interpolation percentile (Excel PERCENTILE.INC) for k in [0,1]. */
+function percentileInc(sorted: readonly number[], k: number): number {
+  // sorted is non-empty; rank in [0, n-1].
+  const rank = k * (sorted.length - 1);
+  const lo = Math.floor(rank);
+  const hi = Math.ceil(rank);
+  const lowVal = sorted[lo]!;
+  if (lo === hi) return lowVal;
+  const frac = rank - lo;
+  return lowVal + (sorted[hi]! - lowVal) * frac;
+}
+
+def('PERCENTILE', (args, evaluate) => {
+  const err = expectArgs(args, 2);
+  if (err) return err;
+  const nums = matrixNumbers(argMatrix(args[0]!, evaluate));
+  if (FormulaError.is(nums)) return nums;
+  const kArg = argNumber(args[1], evaluate);
+  if (FormulaError.is(kArg)) return kArg;
+  if (nums.length === 0) return NUM;
+  if (kArg < 0 || kArg > 1) return NUM;
+  const sorted = [...nums].sort((a, b) => a - b);
+  return percentileInc(sorted, kArg);
+});
+
+def('QUARTILE', (args, evaluate) => {
+  const err = expectArgs(args, 2);
+  if (err) return err;
+  const nums = matrixNumbers(argMatrix(args[0]!, evaluate));
+  if (FormulaError.is(nums)) return nums;
+  const qArg = argNumber(args[1], evaluate);
+  if (FormulaError.is(qArg)) return qArg;
+  if (nums.length === 0) return NUM;
+  const q = Math.trunc(qArg);
+  if (q < 0 || q > 4) return NUM;
+  const sorted = [...nums].sort((a, b) => a - b);
+  return percentileInc(sorted, q / 4);
+});
+
+def('AVERAGEA', (args, evaluate) => {
+  // AVERAGEA counts text (as 0) and booleans, unlike AVERAGE which skips text.
+  let total = 0;
+  let count = 0;
+  for (const { value } of iterateValues(args, evaluate)) {
+    if (FormulaError.is(value)) return value;
+    if (typeof value === 'number') {
+      total += value;
+      count++;
+    } else if (typeof value === 'boolean') {
+      total += value ? 1 : 0;
+      count++;
+    } else if (typeof value === 'string') {
+      // Text counts as 0.
+      count++;
+    }
+    // null (blank) is skipped entirely.
+  }
+  if (count === 0) return DIV0;
+  return total / count;
+});
+
+/**
+ * Shared MAXIFS/MINIFS core: aggregate `valueRange` over cells whose parallel
+ * criteria ranges all match, reusing the COUNTIF/SUMIF criterion predicate.
+ */
+function maxMinIfs(args: readonly AstNode[], evaluate: Evaluate, wantMax: boolean): FormulaValue {
+  // MAXIFS(value_range, criteria_range1, criteria1, ...)
+  if (args.length < 3 || args.length % 2 !== 1) return VALUE;
+  const valueRange = argMatrix(args[0]!, evaluate);
+  const res = multiCriteria(args.slice(1), evaluate);
+  if (FormulaError.is(res)) return res;
+  if (valueRange.length !== res.rows || (res.rows > 0 && valueRange[0]!.length !== res.cols)) {
+    return VALUE;
+  }
+  let best: number | null = null;
+  for (let r = 0; r < res.rows; r++) {
+    for (let c = 0; c < res.cols; c++) {
+      if (!res.matches[r]![c]) continue;
+      const cell = valueRange[r]![c]!;
+      if (FormulaError.is(cell) || typeof cell !== 'number') continue;
+      if (best === null || (wantMax ? cell > best : cell < best)) best = cell;
+    }
+  }
+  // Excel returns 0 when no cells match.
+  return best === null ? 0 : best;
+}
+def('MAXIFS', (args, evaluate) => maxMinIfs(args, evaluate, true));
+def('MINIFS', (args, evaluate) => maxMinIfs(args, evaluate, false));
+
+// ── Text (Phase 14) ──────────────────────────────────────────────────────────
+def('REPLACE', (args, evaluate) => {
+  const err = expectArgs(args, 4);
+  if (err) return err;
+  const old = argText(args[0], evaluate);
+  if (FormulaError.is(old)) return old;
+  const startN = argNumber(args[1], evaluate);
+  if (FormulaError.is(startN)) return startN;
+  const lenN = argNumber(args[2], evaluate);
+  if (FormulaError.is(lenN)) return lenN;
+  const insert = argText(args[3], evaluate);
+  if (FormulaError.is(insert)) return insert;
+  const start = Math.trunc(startN);
+  const len = Math.trunc(lenN);
+  if (start < 1 || len < 0) return VALUE;
+  const before = old.slice(0, start - 1);
+  const after = old.slice(start - 1 + len);
+  return before + insert + after;
+});
+
+def('FIXED', (args, evaluate) => {
+  const err = expectArgs(args, 1, 3);
+  if (err) return err;
+  const x = argNumber(args[0], evaluate);
+  if (FormulaError.is(x)) return x;
+  const decArg = args.length >= 2 ? argNumber(args[1], evaluate) : 2;
+  if (FormulaError.is(decArg)) return decArg;
+  let noCommas = false;
+  if (args.length === 3) {
+    const nc = toBoolean(scalarize(evaluate(args[2]!)));
+    if (FormulaError.is(nc)) return nc;
+    noCommas = nc;
+  }
+  const decimals = Math.trunc(decArg);
+  // Negative decimals round to the left of the decimal point (Excel behavior).
+  let value = x;
+  if (decimals < 0) {
+    const factor = Math.pow(10, -decimals);
+    value = Math.round(x / factor) * factor;
+  }
+  const fixed = value.toFixed(Math.max(decimals, 0));
+  if (noCommas) return fixed;
+  const negative = fixed.startsWith('-');
+  const unsigned = negative ? fixed.slice(1) : fixed;
+  const parts = unsigned.split('.');
+  const grouped = parts[0]!.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const out = parts.length === 2 ? `${grouped}.${parts[1]!}` : grouped;
+  return negative ? `-${out}` : out;
+});
+
+def('UNICHAR', (args, evaluate) => {
+  const err = expectArgs(args, 1);
+  if (err) return err;
+  const x = argNumber(args[0], evaluate);
+  if (FormulaError.is(x)) return x;
+  const code = Math.trunc(x);
+  // Valid Unicode code points: 1 .. 0x10FFFF, excluding surrogate range.
+  if (code < 1 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) return VALUE;
+  return String.fromCodePoint(code);
+});
+
+def('UNICODE', (args, evaluate) => {
+  const err = expectArgs(args, 1);
+  if (err) return err;
+  const t = argText(args[0], evaluate);
+  if (FormulaError.is(t)) return t;
+  if (t.length === 0) return VALUE;
+  // codePointAt(0) is defined for any non-empty string.
+  return t.codePointAt(0)!;
+});
+
 /** Build the default function registry. */
 export function createDefaultFunctions(): FunctionRegistry {
   return new Map(registry);
