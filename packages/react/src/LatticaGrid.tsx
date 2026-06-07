@@ -56,7 +56,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   const theme = resolveTheme(props.theme);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLElement | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const composingRef = useRef(false);
   const draggingRef = useRef(false);
@@ -83,11 +83,14 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     };
   }, [controller]);
 
-  // Focus the editor when an edit begins.
+  // Focus the editor when an edit begins. `<select>` has no select() method.
   useEffect(() => {
-    if (edit !== null && editorRef.current !== null) {
-      editorRef.current.focus();
-      editorRef.current.select();
+    const el = editorRef.current;
+    if (edit !== null && el !== null) {
+      el.focus();
+      if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
+        el.select();
+      }
     }
   }, [edit]);
 
@@ -388,6 +391,150 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       ? cellRect(geom, scroll.left, scroll.top, selBounds.end.row, selBounds.end.col)
       : null;
 
+  /**
+   * Render the active-cell editor. The DOM widget varies by the column's editor
+   * kind: a `<select>` for dropdowns, a date input, an autocomplete input backed
+   * by a `<datalist>`, or the default IME-aware textarea.
+   */
+  const renderEditor = (e: EditState, rect: { x: number; y: number; width: number; height: number }) => {
+    const kind = controller.getEditorKind(e.col);
+    const options = controller.getColumnOptions(e.col) ?? [];
+    const baseStyle: CSSProperties = {
+      position: 'absolute',
+      left: rect.x,
+      top: rect.y,
+      width: rect.width,
+      height: rect.height,
+      margin: 0,
+      border: `2px solid ${theme.activeBorder}`,
+      boxSizing: 'border-box',
+      font: `${theme.fontSize}px ${theme.fontFamily}`,
+      padding: `0 ${theme.cellPaddingX}px`,
+      outline: 'none',
+      background: '#fff',
+    };
+    const change = (value: string): void => {
+      controller.updateDraft(value);
+      setEdit({ ...e, draft: value });
+    };
+    const keyDown = (key: string, shiftKey = false): boolean => {
+      const handled = dispatchKey({ key, shiftKey, ctrlKey: false, metaKey: false, altKey: false });
+      if (handled) {
+        rootRef.current?.focus();
+      }
+      return handled;
+    };
+
+    if (kind === 'dropdown') {
+      return (
+        <select
+          ref={(el) => { editorRef.current = el; }}
+          data-testid="lattica-editor-select"
+          value={e.draft}
+          onChange={(ev) => {
+            controller.updateDraft(ev.target.value);
+            controller.commitEdit();
+          }}
+          onKeyDown={(ev) => {
+            if (keyDown(ev.key, ev.shiftKey)) ev.preventDefault();
+          }}
+          onBlur={() => controller.commitEdit()}
+          style={baseStyle}
+        >
+          <option value="" />
+          {options.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
+    if (kind === 'date') {
+      return (
+        <input
+          ref={(el) => { editorRef.current = el; }}
+          type="date"
+          data-testid="lattica-editor-date"
+          value={e.draft}
+          onChange={(ev) => change(ev.target.value)}
+          onKeyDown={(ev) => {
+            if (keyDown(ev.key, ev.shiftKey)) ev.preventDefault();
+          }}
+          onBlur={() => controller.commitEdit()}
+          style={baseStyle}
+        />
+      );
+    }
+
+    if (kind === 'autocomplete') {
+      const listId = 'lattica-editor-options';
+      return (
+        <>
+          <input
+            ref={(el) => { editorRef.current = el; }}
+            list={listId}
+            data-testid="lattica-editor-autocomplete"
+            value={e.draft}
+            onChange={(ev) => change(ev.target.value)}
+            onKeyDown={(ev) => {
+              if (composingRef.current) return;
+              if (keyDown(ev.key, ev.shiftKey)) ev.preventDefault();
+            }}
+            onCompositionStart={() => {
+              composingRef.current = true;
+            }}
+            onCompositionEnd={() => {
+              composingRef.current = false;
+            }}
+            onBlur={() => controller.commitEdit()}
+            style={baseStyle}
+          />
+          <datalist id={listId} data-testid="lattica-editor-datalist">
+            {options.map((o) => (
+              <option key={o} value={o} />
+            ))}
+          </datalist>
+        </>
+      );
+    }
+
+    // Default: IME-aware textarea (text / number / checkbox columns).
+    return (
+      <textarea
+        ref={(el) => { editorRef.current = el; }}
+        data-testid="lattica-editor"
+        value={e.draft}
+        onChange={(ev) => change(ev.target.value)}
+        onCompositionStart={() => {
+          composingRef.current = true;
+        }}
+        onCompositionEnd={() => {
+          composingRef.current = false;
+        }}
+        onKeyDown={(ev) => {
+          if (composingRef.current) {
+            return;
+          }
+          const handled = dispatchKey({
+            key: ev.key,
+            shiftKey: ev.shiftKey,
+            ctrlKey: ev.ctrlKey,
+            metaKey: ev.metaKey,
+            altKey: ev.altKey,
+          });
+          if (handled) {
+            ev.preventDefault();
+            rootRef.current?.focus();
+          }
+        }}
+        onBlur={() => controller.commitEdit()}
+        style={{ ...baseStyle, resize: 'none' }}
+      />
+    );
+  };
+
   return (
     <div
       ref={rootRef}
@@ -557,56 +704,8 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
         }}
       />
 
-      {/* Active-cell editor overlay (IME-aware). */}
-      {edit !== null && editRect !== null && (
-        <textarea
-          ref={editorRef}
-          data-testid="lattica-editor"
-          value={edit.draft}
-          onChange={(e) => {
-            controller.updateDraft(e.target.value);
-            // `edit` is non-null inside this JSX branch.
-            setEdit({ ...edit, draft: e.target.value });
-          }}
-          onCompositionStart={() => {
-            composingRef.current = true;
-          }}
-          onCompositionEnd={() => {
-            composingRef.current = false;
-          }}
-          onKeyDown={(e) => {
-            if (composingRef.current) {
-              return;
-            }
-            const handled = dispatchKey({
-              key: e.key,
-              shiftKey: e.shiftKey,
-              ctrlKey: e.ctrlKey,
-              metaKey: e.metaKey,
-              altKey: e.altKey,
-            });
-            if (handled) {
-              e.preventDefault();
-              rootRef.current?.focus();
-            }
-          }}
-          onBlur={() => controller.commitEdit()}
-          style={{
-            position: 'absolute',
-            left: editRect.x,
-            top: editRect.y,
-            width: editRect.width,
-            height: editRect.height,
-            margin: 0,
-            border: `2px solid ${theme.activeBorder}`,
-            boxSizing: 'border-box',
-            font: `${theme.fontSize}px ${theme.fontFamily}`,
-            padding: `0 ${theme.cellPaddingX}px`,
-            resize: 'none',
-            outline: 'none',
-          }}
-        />
-      )}
+      {/* Active-cell editor overlay (kind depends on the column's cell type). */}
+      {edit !== null && editRect !== null && renderEditor(edit, editRect)}
 
       {/* Fill handle nub at the selection's bottom-right corner. */}
       {fillNubRect !== null && (

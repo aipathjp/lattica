@@ -538,3 +538,84 @@ describe('LatticaGrid nested rows', () => {
     expect(c.getRowCount()).toBe(3);
   });
 });
+
+describe('LatticaGrid rich editors (Phase A)', () => {
+  it('renders a dropdown <select> and commits on change', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    c.setColumnType(0, 'dropdown');
+    c.setColumnOptions(0, ['Tokyo', 'Osaka']);
+    const { container } = renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.doubleClick(grid);
+    const select = screen.getByTestId('lattica-editor-select') as HTMLSelectElement;
+    expect(select.tagName).toBe('SELECT');
+    // option list (blank + 2 options)
+    expect(select.querySelectorAll('option').length).toBe(3);
+    fireEvent.change(select, { target: { value: 'Osaka' } });
+    // committed -> editor gone, value stored
+    expect(screen.queryByTestId('lattica-editor-select')).toBeNull();
+    expect(c.getDisplay(0, 0)).toBe('Osaka');
+    expect(container).toBeTruthy();
+  });
+
+  it('cancels a dropdown edit on Escape', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    c.setColumnType(0, 'dropdown');
+    c.setColumnOptions(0, ['A', 'B']);
+    renderGrid(c);
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    const select = screen.getByTestId('lattica-editor-select');
+    fireEvent.keyDown(select, { key: 'Escape' });
+    expect(screen.queryByTestId('lattica-editor-select')).toBeNull();
+    expect(c.getDisplay(0, 0)).toBe('');
+  });
+
+  it('renders a date input and commits on Enter', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    c.setColumnType(0, 'date');
+    renderGrid(c);
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    const input = screen.getByTestId('lattica-editor-date') as HTMLInputElement;
+    expect(input.getAttribute('type')).toBe('date');
+    fireEvent.change(input, { target: { value: '2025-03-04' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.queryByTestId('lattica-editor-date')).toBeNull();
+    expect(c.getDisplay(0, 0)).toBe('2025-03-04');
+  });
+
+  it('renders an autocomplete input with a datalist and is IME-aware', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    c.setColumnType(0, 'autocomplete');
+    c.setColumnOptions(0, ['apple', 'apricot']);
+    renderGrid(c);
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    const input = screen.getByTestId('lattica-editor-autocomplete') as HTMLInputElement;
+    expect(input.getAttribute('list')).toBe('lattica-editor-options');
+    const datalist = screen.getByTestId('lattica-editor-datalist');
+    expect(datalist.querySelectorAll('option').length).toBe(2);
+    // During IME composition, keydown is ignored (no commit).
+    fireEvent.compositionStart(input);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.queryByTestId('lattica-editor-autocomplete')).not.toBeNull();
+    fireEvent.compositionEnd(input);
+    fireEvent.change(input, { target: { value: 'apple' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.queryByTestId('lattica-editor-autocomplete')).toBeNull();
+    expect(c.getDisplay(0, 0)).toBe('apple');
+  });
+
+  it('paints invalid cells after a failed validation (no throw)', async () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    c.setColumnType(0, 'dropdown');
+    c.setColumnOptions(0, ['X', 'Y']);
+    renderGrid(c);
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    const select = screen.getByTestId('lattica-editor-select') as HTMLSelectElement;
+    // Force an out-of-list value via the underlying option set is impossible from
+    // the select UI, so drive an invalid commit through the controller directly.
+    c.beginEdit(0, 0, 'ZZZ');
+    c.commitEdit();
+    await waitFor(() => expect(c.isInvalid(0, 0)).toBe(true));
+    expect(select).toBeTruthy();
+  });
+});

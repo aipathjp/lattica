@@ -37,6 +37,7 @@ export {
   type CellAlign,
 } from './cell-types.js';
 export { interpretKey, type KeyInput, type KeyAction } from './keyboard.js';
+export { editorKindForType, type EditorKind } from './editors.js';
 export { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
 export {
   columnHeaderCells,
