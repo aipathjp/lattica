@@ -7,7 +7,7 @@
 
 import type { AstNode } from './ast.js';
 import type { EvalContext, FunctionImpl, FunctionRegistry } from './evaluator.js';
-import { scalarize } from './evaluator.js';
+import { scalarize, evaluate } from './evaluator.js';
 import { FormulaError, DIV0, NA, NUM, REF, VALUE } from './errors.js';
 import {
   compareScalars,
@@ -1866,6 +1866,205 @@ def('FILTER', (args, evaluate) => {
     return args.length === 3 ? [[scalarize(evaluate(args[2]!))]] : NA;
   }
   return out;
+});
+
+// ── Modern lookup / text / array functions (Phase D-1) ───────────────────────
+
+/**
+ * XLOOKUP-style position search. mode 0 = exact; -1 = exact or next smaller;
+ * 1 = exact or next larger. Returns a 1-based index or null.
+ */
+function xMatchPos(
+  lookup: CellScalar,
+  values: (CellScalar | FormulaError)[],
+  mode: number,
+): number | null {
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i]!;
+    if (!FormulaError.is(v) && compareScalars(v, lookup) === 0) {
+      return i + 1;
+    }
+  }
+  if (mode === 0) {
+    return null;
+  }
+  let best: number | null = null;
+  let bestVal: CellScalar | null = null;
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i]!;
+    if (FormulaError.is(v)) continue;
+    const cmp = compareScalars(v, lookup);
+    if (mode === -1 && cmp < 0 && (bestVal === null || compareScalars(v, bestVal) > 0)) {
+      best = i + 1;
+      bestVal = v;
+    } else if (mode === 1 && cmp > 0 && (bestVal === null || compareScalars(v, bestVal) < 0)) {
+      best = i + 1;
+      bestVal = v;
+    }
+  }
+  return best;
+}
+
+def('XLOOKUP', (args, evaluate) => {
+  const err = expectArgs(args, 3, 5);
+  if (err) return err;
+  const lookup = scalarize(evaluate(args[0]!));
+  if (FormulaError.is(lookup)) return lookup;
+  const lookupArr = flatten(argMatrix(args[1]!, evaluate));
+  const returnArr = flatten(argMatrix(args[2]!, evaluate));
+  if (lookupArr.length !== returnArr.length) return VALUE;
+  let mode = 0;
+  if (args.length >= 5) {
+    const m = argNumber(args[4], evaluate);
+    if (FormulaError.is(m)) return m;
+    mode = Math.sign(Math.trunc(m));
+  }
+  const pos = xMatchPos(lookup, lookupArr, mode);
+  if (pos === null) {
+    return args.length >= 4 ? scalarize(evaluate(args[3]!)) : NA;
+  }
+  return returnArr[pos - 1]!;
+});
+
+def('XMATCH', (args, evaluate) => {
+  const err = expectArgs(args, 2, 3);
+  if (err) return err;
+  const lookup = scalarize(evaluate(args[0]!));
+  if (FormulaError.is(lookup)) return lookup;
+  const arr = flatten(argMatrix(args[1]!, evaluate));
+  let mode = 0;
+  if (args.length === 3) {
+    const m = argNumber(args[2], evaluate);
+    if (FormulaError.is(m)) return m;
+    mode = Math.sign(Math.trunc(m));
+  }
+  const pos = xMatchPos(lookup, arr, mode);
+  return pos === null ? NA : pos;
+});
+
+def('SORTBY', (args, evaluate) => {
+  const err = expectArgs(args, 2, 3);
+  if (err) return err;
+  const m = argMatrix(args[0]!, evaluate);
+  const by = flatten(argMatrix(args[1]!, evaluate));
+  if (by.length !== m.length) return VALUE;
+  let order = 1;
+  if (args.length === 3) {
+    const o = argNumber(args[2], evaluate);
+    if (FormulaError.is(o)) return o;
+    order = o;
+  }
+  const sign = order < 0 ? -1 : 1;
+  const idx = m.map((_, i) => i);
+  idx.sort((a, b) => {
+    const av = by[a]!;
+    const bv = by[b]!;
+    if (FormulaError.is(av) || FormulaError.is(bv)) return 0;
+    return sign * compareScalars(av, bv);
+  });
+  return idx.map((i) => [...m[i]!]);
+});
+
+/** Index of the `n`-th (1-based) non-overlapping occurrence of `sub`, or -1. */
+function nthIndexOf(s: string, sub: string, n: number): number {
+  let from = 0;
+  let idx = -1;
+  for (let k = 0; k < n; k++) {
+    idx = s.indexOf(sub, from);
+    if (idx === -1) return -1;
+    from = idx + Math.max(sub.length, 1);
+  }
+  return idx;
+}
+
+def('TEXTSPLIT', (args, evaluate) => {
+  const err = expectArgs(args, 2);
+  if (err) return err;
+  const t = argText(args[0], evaluate);
+  if (FormulaError.is(t)) return t;
+  const d = argText(args[1], evaluate);
+  if (FormulaError.is(d)) return d;
+  if (d === '') return VALUE;
+  return [t.split(d)];
+});
+
+function textSliceImpl(side: 'before' | 'after'): FunctionImpl {
+  return (args, evaluate) => {
+    const err = expectArgs(args, 2, 3);
+    if (err) return err;
+    const t = argText(args[0], evaluate);
+    if (FormulaError.is(t)) return t;
+    const d = argText(args[1], evaluate);
+    if (FormulaError.is(d)) return d;
+    let inst = 1;
+    if (args.length === 3) {
+      const n = argNumber(args[2], evaluate);
+      if (FormulaError.is(n)) return n;
+      inst = Math.trunc(n);
+    }
+    if (d === '') return NA;
+    const idx = nthIndexOf(t, d, inst);
+    if (idx === -1) return NA;
+    return side === 'before' ? t.slice(0, idx) : t.slice(idx + d.length);
+  };
+}
+def('TEXTBEFORE', textSliceImpl('before'));
+def('TEXTAFTER', textSliceImpl('after'));
+
+def('VSTACK', (args, evaluate) => {
+  if (args.length < 1) return VALUE;
+  const mats = args.map((a) => argMatrix(a, evaluate));
+  // argMatrix always yields at least a 1×1 grid, so m[0] exists.
+  const width = Math.max(...mats.map((m) => m[0]!.length));
+  const out: Matrix = [];
+  for (const m of mats) {
+    for (const row of m) {
+      const line: (CellScalar | FormulaError)[] = [...row];
+      while (line.length < width) line.push(null);
+      out.push(line);
+    }
+  }
+  return out;
+});
+
+def('HSTACK', (args, evaluate) => {
+  if (args.length < 1) return VALUE;
+  const mats = args.map((a) => argMatrix(a, evaluate));
+  const height = Math.max(...mats.map((m) => m.length));
+  const out: Matrix = [];
+  for (let r = 0; r < height; r++) {
+    const line: (CellScalar | FormulaError)[] = [];
+    for (const m of mats) {
+      const w = m[0]!.length; // argMatrix guarantees a non-empty first row
+      const row = m[r] ?? [];
+      for (let c = 0; c < w; c++) line.push(row[c] ?? null);
+    }
+    out.push(line);
+  }
+  return out;
+});
+
+/**
+ * LET(name1, value1, [name2, value2, ...], calculation) — bind names to values
+ * and evaluate the final expression with those bindings in scope. Bindings are
+ * visible to later bindings and to the calculation.
+ */
+def('LET', (args, _evaluate, ctx) => {
+  if (args.length < 3 || args.length % 2 === 0) return VALUE;
+  const locals = new Map<string, FormulaValue>();
+  const childCtx: EvalContext = {
+    ...ctx,
+    getName: (n) => {
+      const key = n.toUpperCase();
+      return locals.has(key) ? locals.get(key) : ctx.getName?.(n);
+    },
+  };
+  for (let i = 0; i + 1 < args.length - 1; i += 2) {
+    const nameNode = args[i]!;
+    if (nameNode.kind !== 'name') return VALUE;
+    locals.set(nameNode.name.toUpperCase(), evaluate(args[i + 1]!, childCtx));
+  }
+  return evaluate(args[args.length - 1]!, childCtx);
 });
 
 /** Build the default function registry. */

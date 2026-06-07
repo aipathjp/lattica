@@ -173,3 +173,6 @@
   - `GridController`: `setColorScale`/`setDataBar`/`setIconSet`/`clearColumnVisual`・`getCellVisual`（列の数値 min/max を全行から算出）。
   - `scene.ts`/`painter.ts`: `CellPaint.bar`/`icon` を追加。**データバーを canvas 描画**（テキスト背後）、**アイコングリフを左端に描画**。カラースケール背景は明示 cf/検索/不正背景に劣後。
   - 全体 **1773テスト・100%カバレッジ**。typecheck/lint/build クリーン。**Phase C 完了**。次は Phase D（数式拡張＋スタイル付き XLSX）。
+- 2026-06-07: **Phase D-1 完了**（モダン数式関数 135→**144**）。
+  - **XLOOKUP**/**XMATCH**（match_mode 0/-1/1・if_not_found）、**SORTBY**（キー配列でソート、スピル）、**TEXTSPLIT**/**TEXTBEFORE**/**TEXTAFTER**（n 番目の区切り）、**VSTACK**/**HSTACK**（配列の縦横結合、欠損は null パディング）、**LET**（名前束縛＋スコープ。evaluator にローカルスコープ getName を注入）。
+  - 全体 **1803テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase D-2（スタイル付き XLSX 出力）。
