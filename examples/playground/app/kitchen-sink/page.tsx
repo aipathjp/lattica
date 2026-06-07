@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { LatticaGrid, useGridController } from '@lattica/react';
+import { LatticaGrid, LatticaFormulaBar, useGridController } from '@lattica/react';
 import type { ColumnNode } from '@lattica/core';
 import { serializeDelimited, matrixToXlsx } from '@lattica/io';
 import { AIClient, MockProvider, nlToFormula } from '@lattica/ai';
@@ -156,7 +156,8 @@ export default function KitchenSinkPage(): React.ReactElement {
         </button>
       </div>
 
-      <div style={{ border: '1px solid #cbd2d9', borderRadius: 6, width: 'fit-content' }}>
+      <div style={{ border: '1px solid #cbd2d9', borderRadius: 6, width: 'fit-content', overflow: 'hidden' }}>
+        <LatticaFormulaBar controller={controller} />
         <LatticaGrid controller={controller} columns={columns} width={640} height={360} />
       </div>
 
