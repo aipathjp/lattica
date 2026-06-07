@@ -127,3 +127,45 @@ describe('buildScene merges', () => {
     expect(scene.cells.find((k) => k.row === 1 && k.col === 1)).toBeUndefined();
   });
 });
+
+describe('buildScene visual conditional formatting', () => {
+  it('populates bar/icon and applies a color-scale background', () => {
+    const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
+    const scene = buildScene({
+      geom: geom(),
+      scrollLeft: 0,
+      scrollTop: 0,
+      clientWidth: 200,
+      clientHeight: 100,
+      selection: sel,
+      getDisplay: () => '5',
+      getVisual: (r, c) =>
+        c === 0
+          ? { background: '#808080' }
+          : c === 1
+            ? { bar: { ratio: 0.5, color: '#39f' } }
+            : c === 2
+              ? { icon: '🟢' }
+              : null,
+    });
+    expect(scene.cells.find((k) => k.col === 0)!.cfStyle?.background).toBe('#808080');
+    expect(scene.cells.find((k) => k.col === 1)!.bar).toEqual({ ratio: 0.5, color: '#39f' });
+    expect(scene.cells.find((k) => k.col === 2)!.icon).toBe('🟢');
+  });
+
+  it('explicit cf background wins over a color-scale background', () => {
+    const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
+    const scene = buildScene({
+      geom: geom(),
+      scrollLeft: 0,
+      scrollTop: 0,
+      clientWidth: 200,
+      clientHeight: 100,
+      selection: sel,
+      getDisplay: () => '5',
+      getCfStyle: () => ({ background: '#ffd6d6' }),
+      getVisual: () => ({ background: '#808080' }),
+    });
+    expect(scene.cells[0]!.cfStyle?.background).toBe('#ffd6d6');
+  });
+});

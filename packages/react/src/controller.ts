@@ -20,6 +20,9 @@ import {
   aggregate,
   distinctValues,
   formatNumber,
+  computeCellVisual,
+  type CfVisualRule,
+  type CellVisual,
   type AggregateFn,
   type Validator,
   type MergeArea,
@@ -133,6 +136,8 @@ export class GridController {
   private readonly columnOptions = new Map<number, readonly string[]>();
   /** Excel-style number format patterns per physical column. */
   private readonly columnFormats = new Map<number, string>();
+  /** Visual conditional-format rules (color scale / data bar / icon set) per physical column. */
+  private readonly columnVisualRules = new Map<number, CfVisualRule>();
   /** View transform (sort/filter) mapping visual↔physical indices. */
   readonly view: DataView;
   private readonly sortModel = new SortModel();
@@ -549,6 +554,61 @@ export class GridController {
   /** Number format pattern for a (visual) column, or undefined. */
   getColumnFormat(visualCol: number): string | undefined {
     return this.columnFormats.get(this.view.cols.getPhysicalIndex(visualCol));
+  }
+
+  // ── Visual conditional formatting (color scale / data bar / icon set) ───────
+  /** Apply a 2/3-color color scale to a (physical) column. */
+  setColorScale(col: number, colors: string[]): void {
+    this.columnVisualRules.set(col, { kind: 'colorScale', colors });
+    this.emitter.emit('change', undefined);
+  }
+
+  /** Apply in-cell data bars to a (physical) column. */
+  setDataBar(col: number, color: string): void {
+    this.columnVisualRules.set(col, { kind: 'dataBar', color });
+    this.emitter.emit('change', undefined);
+  }
+
+  /** Apply an icon set (low→high) to a (physical) column. */
+  setIconSet(col: number, icons: string[]): void {
+    this.columnVisualRules.set(col, { kind: 'iconSet', icons });
+    this.emitter.emit('change', undefined);
+  }
+
+  /** Remove any visual conditional format from a (physical) column. */
+  clearColumnVisual(col: number): void {
+    if (this.columnVisualRules.delete(col)) {
+      this.emitter.emit('change', undefined);
+    }
+  }
+
+  /**
+   * Compute the drawable visual (background / bar / icon) for a (visual) cell,
+   * or null when the column has no visual rule or the value is non-numeric. The
+   * domain is the numeric min/max of the column over all physical rows.
+   */
+  getCellVisual(visualRow: number, visualCol: number): CellVisual | null {
+    const pcol = this.view.cols.getPhysicalIndex(visualCol);
+    const rule = this.columnVisualRules.get(pcol);
+    if (rule === undefined) {
+      return null;
+    }
+    let min = Infinity;
+    let max = -Infinity;
+    let any = false;
+    for (let r = 0; r < this.view.rows.length; r++) {
+      const v = this.engine.getValue({ row: r, col: pcol });
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        any = true;
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+    }
+    if (!any) {
+      return null;
+    }
+    const value = this.engine.getValue(this.toPhysical(visualRow, visualCol));
+    return computeCellVisual(value as CellValue, min, max, rule);
   }
 
   /** Is the cell (visual coords) currently flagged invalid by validation? */
