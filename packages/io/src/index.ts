@@ -23,3 +23,10 @@ export {
 } from './xlsx.js';
 export { inflateRaw } from './inflate.js';
 export { readXlsx, type ReadSheet, type ReadWorkbook } from './xlsx-read.js';
+export {
+  matrixToJson,
+  jsonToMatrix,
+  recordsToMatrix,
+  matrixToRecords,
+  type RecordsResult,
+} from './json.js';
