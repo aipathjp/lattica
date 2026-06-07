@@ -11,7 +11,39 @@ export {
   type GridControllerOptions,
   type EditState,
 } from './controller.js';
-export { defaultTheme, resolveTheme, type GridTheme } from './theme.js';
+export {
+  defaultTheme,
+  resolveTheme,
+  buildTheme,
+  DEFAULT_FONT_FAMILY,
+  type GridTheme,
+  type BuildThemeOptions,
+} from './theme.js';
+export {
+  palettes,
+  getPalette,
+  isDarkPalette,
+  darkPaletteNames,
+  lightPalette,
+  darkPalette,
+  highContrastPalette,
+  midnightPalette,
+  sepiaPalette,
+  solarizedLightPalette,
+  solarizedDarkPalette,
+  type ColorPalette,
+  type PaletteName,
+} from './palette.js';
+export {
+  densityPresets,
+  getDensity,
+  scaleDensity,
+  compactDensity,
+  comfortableDensity,
+  spaciousDensity,
+  type Density,
+  type DensityTokens,
+} from './density.js';
 export {
   hitTest,
   cellRect,
@@ -80,6 +112,10 @@ export {
   lightTheme,
   darkTheme,
   highContrastTheme,
+  midnightTheme,
+  sepiaTheme,
+  solarizedLightTheme,
+  solarizedDarkTheme,
   themePresets,
   getPreset,
 } from './theme-presets.js';

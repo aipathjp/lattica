@@ -210,3 +210,9 @@
   - `structured-refs.ts`: `expandStructuredRefs(formula, resolve)` — **パース前に `Table[Col]` を A1 範囲へ展開**（`[Col]`/`[[Col]]`/`[@Col]`/`[@[Col]]` 対応、未知・特殊項目は `#REF!`）。lexer/parser/evaluator/値型は不変更で、依存追跡・再計算・全関数がそのまま機能。
   - `SheetEngine`: `defineTable`/`removeTable`/`getTables`。formula は元の `Table[Col]` 表記を `source` に保持し往復可能。
   - 全体 **1909テスト・100%カバレッジ**・**150 関数**。typecheck/lint/build クリーン。**ギャップ分析ロードマップの全項目（Phase A〜E＋構造化参照）完了。**
+- 2026-06-07: **Phase F-1 完了**（デザインシステム：カラーパレット × 密度）。
+  - `palette.ts`: 9 セマンティックカラーの **ColorPalette** と 7 パレット（light/dark/highContrast/midnight/sepia/solarizedLight/solarizedDark）＋ `getPalette`/`isDarkPalette`。
+  - `density.ts`: **密度トークン**（compact/comfortable/spacious、余白・行高・ヘッダ等）＋ `getDensity`/`scaleDensity`（無段階の余白調整）。
+  - `theme.ts`: **`buildTheme({palette, density, fontFamily, overrides})`** で「パレット × 密度 × フォント」を合成。`comfortable` は従来既定と一致。
+  - `theme-presets.ts`: 全プリセットを `buildTheme` で再構成（light/dark/highContrast に加え midnight/sepia/solarized 追加）。
+  - 全体 **1923テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase F-2（StatusBar のテーマ対応・密度連動）。

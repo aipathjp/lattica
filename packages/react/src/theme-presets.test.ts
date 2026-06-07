@@ -75,6 +75,15 @@ describe('theme presets', () => {
     expect(getPreset('dark')).toBe(darkTheme);
     expect(getPreset('highContrast')).toBe(highContrastTheme);
   });
+
+  it('exposes the extended palette presets with the full key set', () => {
+    for (const name of ['midnight', 'sepia', 'solarizedLight', 'solarizedDark'] as const) {
+      const theme = getPreset(name);
+      expect(Object.keys(theme).sort()).toEqual(defaultKeys);
+      // each differs from light in at least one color
+      expect(colorKeys.some((k) => theme[k] !== lightTheme[k])).toBe(true);
+    }
+  });
 });
 
 type GridThemeLike = typeof lightTheme;
