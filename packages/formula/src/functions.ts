@@ -2067,6 +2067,112 @@ def('LET', (args, _evaluate, ctx) => {
   return evaluate(args[args.length - 1]!, childCtx);
 });
 
+// ── LAMBDA & higher-order array functions (Phase E-6) ────────────────────────
+
+interface LambdaSpec {
+  params: string[];
+  body: AstNode;
+}
+
+/** Interpret an AST node as an inline `LAMBDA(p1, …, body)`, or null. */
+function asLambda(node: AstNode): LambdaSpec | null {
+  if (node.kind !== 'call' || node.name !== 'LAMBDA' || node.args.length < 2) {
+    return null;
+  }
+  const params = node.args.slice(0, -1);
+  if (!params.every((p) => p.kind === 'name')) {
+    return null;
+  }
+  return {
+    params: params.map((p) => (p as { name: string }).name),
+    body: node.args[node.args.length - 1]!,
+  };
+}
+
+/** Evaluate a lambda body with its parameters bound to `argValues`. */
+function invokeLambda(lam: LambdaSpec, argValues: FormulaValue[], ctx: EvalContext): FormulaValue {
+  const locals = new Map<string, FormulaValue>();
+  // Callers always pass exactly one value per parameter.
+  lam.params.forEach((p, i) => locals.set(p.toUpperCase(), argValues[i]!));
+  const childCtx: EvalContext = {
+    ...ctx,
+    getName: (n) => {
+      const key = n.toUpperCase();
+      return locals.has(key) ? locals.get(key) : ctx.getName?.(n);
+    },
+  };
+  return evaluate(lam.body, childCtx);
+}
+
+// A bare LAMBDA must be consumed by a higher-order function; alone it is an error.
+def('LAMBDA', () => VALUE);
+
+def('MAP', (args, evaluate, ctx) => {
+  if (args.length < 2) return VALUE;
+  const lam = asLambda(args[args.length - 1]!);
+  if (lam === null) return VALUE;
+  const arrays = args.slice(0, -1).map((a) => argMatrix(a, evaluate));
+  if (lam.params.length !== arrays.length) return VALUE;
+  const rows = arrays[0]!.length;
+  const cols = arrays[0]![0]!.length;
+  const out: Matrix = [];
+  for (let r = 0; r < rows; r++) {
+    const line: (CellScalar | FormulaError)[] = [];
+    for (let c = 0; c < cols; c++) {
+      const vals = arrays.map((m) => (m[r]?.[c] ?? null) as FormulaValue);
+      line.push(scalarize(invokeLambda(lam, vals, ctx)));
+    }
+    out.push(line);
+  }
+  return out;
+});
+
+def('REDUCE', (args, evaluate, ctx) => {
+  if (args.length !== 3) return VALUE;
+  const lam = asLambda(args[2]!);
+  if (lam === null || lam.params.length !== 2) return VALUE;
+  let acc: FormulaValue = scalarize(evaluate(args[0]!));
+  for (const cell of flatten(argMatrix(args[1]!, evaluate))) {
+    acc = scalarize(invokeLambda(lam, [acc, cell], ctx));
+  }
+  return acc;
+});
+
+def('SCAN', (args, evaluate, ctx) => {
+  if (args.length !== 3) return VALUE;
+  const lam = asLambda(args[2]!);
+  if (lam === null || lam.params.length !== 2) return VALUE;
+  let acc: FormulaValue = scalarize(evaluate(args[0]!));
+  const out: (CellScalar | FormulaError)[] = [];
+  for (const cell of flatten(argMatrix(args[1]!, evaluate))) {
+    acc = scalarize(invokeLambda(lam, [acc, cell], ctx));
+    out.push(acc as CellScalar | FormulaError);
+  }
+  return [out];
+});
+
+def('BYROW', (args, evaluate, ctx) => {
+  if (args.length !== 2) return VALUE;
+  const lam = asLambda(args[1]!);
+  if (lam === null || lam.params.length !== 1) return VALUE;
+  const m = argMatrix(args[0]!, evaluate);
+  return m.map((row) => [scalarize(invokeLambda(lam, [[row]], ctx))]);
+});
+
+def('BYCOL', (args, evaluate, ctx) => {
+  if (args.length !== 2) return VALUE;
+  const lam = asLambda(args[1]!);
+  if (lam === null || lam.params.length !== 1) return VALUE;
+  const m = argMatrix(args[0]!, evaluate);
+  const cols = m[0]!.length;
+  const line: (CellScalar | FormulaError)[] = [];
+  for (let c = 0; c < cols; c++) {
+    const col = m.map((row) => row[c]!);
+    line.push(scalarize(invokeLambda(lam, [[col]], ctx)));
+  }
+  return [line];
+});
+
 /** Build the default function registry. */
 export function createDefaultFunctions(): FunctionRegistry {
   return new Map(registry);
