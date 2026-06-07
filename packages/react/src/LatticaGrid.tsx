@@ -462,6 +462,25 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
           >
             {h.collapsible ? (h.collapsed ? '▸ ' : '▾ ') : ''}
             {h.label}
+            {!h.isGroup && h.col !== undefined && (
+              <span
+                role="button"
+                aria-label={`sort column ${h.col}`}
+                data-testid={`lattica-sort-${h.col}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  controller.toggleSort(h.col!, e.shiftKey);
+                  force();
+                }}
+                style={{ marginLeft: 'auto', paddingRight: 4, cursor: 'pointer', userSelect: 'none' }}
+              >
+                {controller.getSortDirection(h.col) === 'asc'
+                  ? '▲'
+                  : controller.getSortDirection(h.col) === 'desc'
+                    ? '▼'
+                    : '⇅'}
+              </span>
+            )}
           </div>
         ))}
       </div>
