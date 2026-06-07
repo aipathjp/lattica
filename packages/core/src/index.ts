@@ -79,6 +79,13 @@ export {
   type CellVisual,
 } from './cf-visual.js';
 export {
+  pivot,
+  pivotToMatrix,
+  matrixToRecordsForPivot,
+  type PivotConfig,
+  type PivotResult,
+} from './pivot.js';
+export {
   toNumberOrNull,
   summarize,
   summarizeColumn,

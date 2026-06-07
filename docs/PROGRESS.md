@@ -180,3 +180,6 @@
   - `@lattica/io` `xlsx-style.ts`: `writeStyledXlsx(workbook)`。`styles.xml`（numFmts/fonts/fills/cellXfs を重複排除）を生成し、各セルが `s` インデックスでスタイル参照。**数値書式・太字/斜体・文字色・背景色・水平整列・結合セル（mergeCells）**に対応。依存ゼロ（自前 ZIP）。
   - 既存 `writeXlsx`（値のみ）は維持。`readXlsx` で値の往復を検証。
   - 全体 **1819テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E（ピボット/チャート/サーバモデル）。
+- 2026-06-07: **Phase E-1 完了**（ピボットテーブル）。
+  - core `pivot.ts`: `pivot(records, config)`（純粋）— 行/列フィールドでクロス集計し、値フィールドを `aggregate`（sum/avg/count/min/max/median）で集計。行/列/総計付き。`matrixToRecordsForPivot`（ヘッダ＋行列→レコード）と `pivotToMatrix`（結果→表示行列）も提供。キーはソート済み、欠損は空キー/`null`。
+  - 全体 **1828テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E-2（スパークライン）。
