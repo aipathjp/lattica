@@ -141,3 +141,7 @@
   - 数式関数 130→**135**（動的配列 TRANSPOSE/SEQUENCE/UNIQUE/SORT/FILTER）。
   - インフラ: Playwright E2E 雛形（`playwright.config.ts`＋`e2e/grid.spec.ts`・実 testid 利用、`*.spec.ts` はカバレッジ対象外）＋ VitePress ドキュメントサイト（`docs/.vitepress/`・各パッケージ頁・`docs:dev`/`docs:build`）。ブラウザ E2E/サイトビルドは未実行（アプリ dev サーバ未結線）。
   - 全体 **1687テスト・100%カバレッジ**。typecheck/lint/build クリーン。**Part A の WORKPLAN 主要 Phase（1–18, R1C1/スピル含む）と Part B（AI A1–A12）が完了**。残るオプションはブラウザ実機 E2E の結線とサイト公開のみ。
+- 2026-06-07: **デモサイト実機化＋ライブ DB＋Vercel 公開**。
+  - `examples/playground` を実行可能な Next.js アプリ化（`/`・`/kitchen-sink`・`/spill`・`/data`）。Playwright で実ブラウザ検証（7/7）。
+  - **Neon ダミー DB**（`lattica-demo` / project `dark-hill-93073372`・`sales_records` 150行）を作成。`/api/sales`（`@neondatabase/serverless`・`DATABASE_URL` は env 管理）→ `/data` ページがグリッドへ読込。Revenue=`ROUND(Units*UnitPrice,2)` 数式列・チェックボックス・条件付き書式（>5000緑）・ソート/フィルタ/検索・CSV/XLSX 出力。
+  - **Vercel 本番公開**: https://lattica-demo.vercel.app （ai-path-inc、Root Directory=examples/playground、モノレポ build、region hnd1）。本番で全ルート 200・API が Neon から 150 行返却・コンソールエラー 0 を確認。
