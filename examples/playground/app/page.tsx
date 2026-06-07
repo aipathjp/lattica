@@ -1,71 +1,55 @@
-'use client';
+import type { ReactElement } from 'react';
 
-import { useEffect } from 'react';
-import { LatticaGrid, useGridController } from '@lattica/react';
-import type { ColumnNode } from '@lattica/core';
-import { matrixToXlsx } from '@lattica/io';
-
-const columns: ColumnNode[] = [
-  { headerName: 'Item', field: 'item' },
-  {
-    headerName: 'Q1 / Q2',
-    children: [{ headerName: 'Q1' }, { headerName: 'Q2' }],
-  },
-  {
-    headerName: 'Analysis',
-    collapsible: true,
-    children: [
-      { headerName: 'Total' },
-      { headerName: 'Avg', showWhen: 'open' },
-    ],
-  },
+const FEATURES: { href: string; title: string; desc: string }[] = [
+  { href: '/kitchen-sink', title: 'Kitchen Sink', desc: 'Formulas, checkbox/right-align, conditional format, sort, filter, merge, search, export, AI.' },
+  { href: '/editors', title: 'Editors & Validation', desc: 'Dropdown / date / autocomplete editors and data validation (invalid cells turn red).' },
+  { href: '/formatting', title: 'Formatting & Status Bar', desc: 'Number formats, color scales, data bars, icon sets, and a live selection status bar.' },
+  { href: '/data-ops', title: 'Sort / Filter / Find', desc: 'Multi-sort, faceted filter dropdown, column hide/move, find & replace, column aggregates.' },
+  { href: '/formulas', title: 'Formulas & Spill', desc: 'Dynamic arrays, XLOOKUP, LET, LAMBDA/MAP, SORTBY, structured references (150 functions).' },
+  { href: '/pivot', title: 'Pivot Table', desc: 'Cross-tabulate records by row/column fields with aggregates and totals.' },
+  { href: '/charts', title: 'Charts & Sparklines', desc: 'Line / bar / pie charts and in-cell sparklines.' },
+  { href: '/master-detail', title: 'Master / Detail', desc: 'Expandable detail panels under master rows.' },
+  { href: '/themes', title: 'Themes & Density', desc: '7 palettes × 3 densities composed with buildTheme; live light/dark switcher.' },
+  { href: '/export', title: 'Export', desc: 'CSV, plain & styled XLSX, and dependency-free PDF — all client-side.' },
+  { href: '/async', title: 'Async Rows', desc: 'Server-side / lazy block-loaded row model with a mock fetcher.' },
+  { href: '/data', title: 'Live Neon Data', desc: 'Real Postgres (Neon) data loaded over an API route into the grid.' },
 ];
 
-export default function Page() {
-  const controller = useGridController({ rowCount: 1000, colCount: 5 });
-
-  useEffect(() => {
-    controller.setCellText(0, 0, 'Apples');
-    controller.setCellText(0, 1, '120');
-    controller.setCellText(0, 2, '150');
-    controller.setCellText(0, 3, '=B1+C1'); // 270
-    controller.setCellText(0, 4, '=AVERAGE(B1:C1)'); // 135
-  }, [controller]);
-
-  const exportXlsx = () => {
-    const matrix = [
-      ['Item', 'Q1', 'Q2', 'Total', 'Avg'],
-      ['Apples', '120', '150', '270', '135'],
-    ];
-    const bytes = matrixToXlsx(matrix, 'Sales');
-    const blob = new Blob([bytes as unknown as BlobPart], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sales.xlsx';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
+export default function Home(): ReactElement {
   return (
-    <main style={{ padding: 16 }}>
-      <h1>Lattica Playground</h1>
-      <nav style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-        <a href="/kitchen-sink" data-testid="nav-kitchen-sink">
-          Kitchen Sink
-        </a>
-        <a href="/spill" data-testid="nav-spill">
-          Dynamic Arrays (spill)
-        </a>
-        <a href="/data" data-testid="nav-data">
-          Live Neon Data
-        </a>
-      </nav>
-      <button onClick={exportXlsx}>Export XLSX</button>
-      <div style={{ marginTop: 12, border: '1px solid #cbd2d9' }}>
-        <LatticaGrid controller={controller} columns={columns} width={800} height={480} />
+    <main style={{ padding: 24, maxWidth: 1000 }}>
+      <h1 style={{ marginTop: 0 }}>Lattica — Feature Showcase</h1>
+      <p style={{ color: '#52606d' }}>
+        A clean-room, MIT-licensed data grid &amp; spreadsheet engine for React. Every page below
+        demonstrates a feature you can interact with. Source: <code>examples/playground</code>.
+      </p>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+          gap: 12,
+          marginTop: 16,
+        }}
+      >
+        {FEATURES.map((f) => (
+          <a
+            key={f.href}
+            href={f.href}
+            data-testid={`card-${f.href.slice(1)}`}
+            style={{
+              display: 'block',
+              padding: 14,
+              border: '1px solid #cbd2d9',
+              borderRadius: 10,
+              textDecoration: 'none',
+              color: '#1f2933',
+              background: '#fff',
+            }}
+          >
+            <div style={{ fontWeight: 600, color: '#2563eb' }}>{f.title}</div>
+            <div style={{ fontSize: 13, color: '#52606d', marginTop: 4 }}>{f.desc}</div>
+          </a>
+        ))}
       </div>
     </main>
   );

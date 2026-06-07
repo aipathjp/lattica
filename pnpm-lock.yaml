@@ -71,6 +71,9 @@ importers:
       '@lattica/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@lattica/data':
+        specifier: workspace:*
+        version: link:../../packages/data
       '@lattica/formula':
         specifier: workspace:*
         version: link:../../packages/formula
