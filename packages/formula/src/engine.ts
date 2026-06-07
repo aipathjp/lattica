@@ -19,9 +19,10 @@
  * recalculate when the anchor's array changes.
  */
 
-import { addressKey, type CellAddress } from '@lattica/core';
+import { addressKey, toA1, type CellAddress } from '@lattica/core';
 import type { AstNode } from './ast.js';
 import { parseFormula } from './parser.js';
+import { expandStructuredRefs } from './structured-refs.js';
 import { evaluate, type EvalContext, type FunctionRegistry } from './evaluator.js';
 import { createDefaultFunctions } from './functions.js';
 import { extractReferences } from './references.js';
@@ -76,6 +77,18 @@ export interface SheetEngineOptions {
   maxRangeCells?: number;
 }
 
+/** A named table for structured references: data top-left + column headers. */
+export interface TableDef {
+  /** Row of the first data cell (header row excluded). */
+  row: number;
+  /** Column of the first data cell. */
+  col: number;
+  /** Number of data rows. */
+  rowCount: number;
+  /** Column headers in left-to-right order. */
+  headers: string[];
+}
+
 /** Parse a `"row,col"` cell key back into numeric coordinates. */
 function parseKey(key: string): { row: number; col: number } {
   const comma = key.indexOf(',');
@@ -96,6 +109,8 @@ export class SheetEngine {
   private readonly evalContext: EvalContext;
   /** Maps each spilled (non-anchor) cell key to its source array slot. */
   private readonly spillMap = new Map<string, SpillTarget>();
+  /** Named tables for structured references, keyed by upper-cased name. */
+  private readonly tables = new Map<string, TableDef>();
 
   constructor(options: SheetEngineOptions = {}) {
     this.functions = options.functions ?? createDefaultFunctions();
@@ -125,6 +140,42 @@ export class SheetEngine {
   /** List all defined names, normalised to upper case. */
   getNames(): string[] {
     return this.names.list();
+  }
+
+  /** Define (or replace) a table for `Table[Column]` structured references. */
+  defineTable(name: string, def: TableDef): void {
+    this.tables.set(name.toUpperCase(), { ...def, headers: [...def.headers] });
+  }
+
+  /** Remove a defined table. Returns true if it existed. */
+  removeTable(name: string): boolean {
+    return this.tables.delete(name.toUpperCase());
+  }
+
+  /** List defined table names (upper-cased). */
+  getTables(): string[] {
+    return [...this.tables.keys()];
+  }
+
+  /** Resolve `Table[Column]` to an A1 range string, or null when unknown. */
+  private resolveTableRange(table: string, column: string): string | null {
+    const def = this.tables.get(table.toUpperCase());
+    if (def === undefined) {
+      return null;
+    }
+    const ci = def.headers.findIndex((h) => h.toLowerCase() === column.toLowerCase());
+    if (ci === -1 || def.rowCount <= 0) {
+      return null;
+    }
+    const col = def.col + ci;
+    const top = toA1({ row: def.row, col });
+    const bottom = toA1({ row: def.row + def.rowCount - 1, col });
+    return `${top}:${bottom}`;
+  }
+
+  /** Expand any structured references in a formula body to A1 ranges. */
+  private expand(body: string): string {
+    return expandStructuredRefs(body, (t, c) => this.resolveTableRange(t, c));
   }
 
   /**
@@ -160,7 +211,9 @@ export class SheetEngine {
 
     if (isFormula) {
       const body = raw.slice(1);
-      const parsed = tryParse(body);
+      // Structured refs (Table[Col]) expand to A1 ranges before parsing; the
+      // original body is kept as `source` for round-tripping.
+      const parsed = tryParse(this.expand(body));
       if (FormulaError.is(parsed)) {
         // Store the parse error as the cell value.
         this.cells.set(key, this.makeEntry({ source: body, value: parsed }));
@@ -225,7 +278,7 @@ export class SheetEngine {
   /** Parse and evaluate a one-off formula without storing it. */
   evaluateFormula(body: string): FormulaValue {
     const trimmed = body.startsWith('=') ? body.slice(1) : body;
-    const parsed = tryParse(trimmed);
+    const parsed = tryParse(this.expand(trimmed));
     return FormulaError.is(parsed) ? parsed : evaluate(parsed, this.evalContext);
   }
 
