@@ -525,3 +525,16 @@ describe('LatticaGrid header sort', () => {
     expect(c.getSortDirection(1)).toBe('asc');
   });
 });
+
+describe('LatticaGrid nested rows', () => {
+  it('renders a row-group toggle and collapses descendants on click', () => {
+    const c = new GridController({ rowCount: 5, colCount: 1 });
+    for (let r = 0; r < 5; r++) c.setCellText(r, 0, `r${r}`);
+    c.setRowTree([{ row: 0, children: [{ row: 1 }, { row: 2 }] }]);
+    renderGrid(c);
+    const toggle = screen.getByTestId('lattica-rowgroup-0');
+    fireEvent.click(toggle);
+    expect(c.isRowCollapsed(0)).toBe(true);
+    expect(c.getRowCount()).toBe(3);
+  });
+});

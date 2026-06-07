@@ -481,3 +481,45 @@ describe('merged cells', () => {
     expect(c.getMerge(0, 0)).toBeNull();
   });
 });
+
+describe('nested rows', () => {
+  // physical rows: 0 (parent) -> 1,2 ; 3 (parent) -> 4
+  const tree = () => new GridController({ rowCount: 5, colCount: 1 });
+  const setup = (c: GridController) => {
+    for (let r = 0; r < 5; r++) c.setCellText(r, 0, `r${r}`);
+    c.setRowTree([{ row: 0, children: [{ row: 1 }, { row: 2 }] }, { row: 3, children: [{ row: 4 }] }]);
+  };
+
+  it('reports parent/depth/collapsed for rows', () => {
+    const c = tree();
+    setup(c);
+    expect(c.isRowParent(0)).toBe(true);
+    expect(c.isRowParent(1)).toBe(false);
+    expect(c.getRowDepth(0)).toBe(0);
+    expect(c.getRowDepth(1)).toBe(1);
+    expect(c.isRowCollapsed(0)).toBe(false);
+  });
+
+  it('collapsing a parent hides its descendants', () => {
+    const c = tree();
+    setup(c);
+    c.toggleRowGroup(0);
+    expect(c.isRowCollapsed(0)).toBe(true);
+    // rows 1,2 hidden -> visible rows: r0, r3, r4 = 3
+    expect(c.getRowCount()).toBe(3);
+    expect([c.getDisplay(0, 0), c.getDisplay(1, 0), c.getDisplay(2, 0)]).toEqual(['r0', 'r3', 'r4']);
+    c.toggleRowGroup(0); // expand
+    expect(c.getRowCount()).toBe(5);
+  });
+
+  it('combines nested collapse with a column filter', () => {
+    const c = tree();
+    setup(c);
+    c.toggleRowGroup(3); // hide r4
+    expect(c.getRowCount()).toBe(4);
+    c.setColumnFilter(0, [{ kind: 'notContains', text: 'r1' }]); // additionally hide r1
+    expect(c.getRowCount()).toBe(3); // r0,r2,r3 (r1 filtered, r4 nested-hidden)
+    c.clearView();
+    expect(c.getRowCount()).toBe(4); // filter cleared, nested r4 still hidden
+  });
+});

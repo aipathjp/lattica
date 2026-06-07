@@ -30,8 +30,11 @@ import {
   DataView,
   SortModel,
   FilterModel,
+  NestedRowModel,
+  filteredHiddenRows,
   type SortDirection,
   type FilterCondition,
+  type NestedRowNode,
 } from '@lattica/data';
 import { SheetEngine, FormulaError, type CellContent } from '@lattica/formula';
 import type { GridGeometry } from './geometry.js';
@@ -90,6 +93,7 @@ export class GridController {
   readonly view: DataView;
   private readonly sortModel = new SortModel();
   private readonly filterModel = new FilterModel();
+  private readonly nestedRows = new NestedRowModel([]);
   private readonly columnTypes = new Map<number, string>();
   private readonly columnAligns = new Map<number, CellAlign>();
   private readonly searchKeys = new Set<string>();
@@ -174,10 +178,21 @@ export class GridController {
     return FormulaError.is(v) ? v.type : v;
   };
 
-  /** Re-apply the current sort + filter, refresh sizes/selection, and emit. */
+  /**
+   * Re-apply sort + (filter ∪ nested-collapse) hidden rows wholesale, refresh
+   * sizes/selection, and emit. Managing hidden directly lets multiple sources
+   * (column filters and nested-row collapse) combine cleanly.
+   */
   private refreshView(): void {
-    this.view.applyFilter(this.engineGet, this.filterModel.getFilters());
     this.view.applySort(this.engineGet, this.sortModel.getConfigs());
+    const filterHidden = filteredHiddenRows(
+      this.view.rows.length,
+      (pr, c) => this.engineGet(pr, c),
+      this.filterModel.getFilters(),
+    );
+    const hide = new Set<number>([...filterHidden, ...this.nestedRows.hiddenRows()]);
+    this.view.rows.setHidden(this.view.rows.getHidden(), false);
+    this.view.rows.setHidden([...hide], true);
     this.rebuildViewSizes();
     this.selection.setDimensions(this.view.getRowCount(), this.view.getColCount());
     this.emitter.emit('change', undefined);
@@ -243,6 +258,30 @@ export class GridController {
       this.merges.remove(area.row, area.col);
       this.emitter.emit('change', undefined);
     }
+  }
+
+  // ── Nested rows (tree on physical rows; queries take visual rows) ──────────
+  /** Define the row hierarchy (physical row indices) and refresh the view. */
+  setRowTree(roots: readonly NestedRowNode[]): void {
+    this.nestedRows.setTree(roots);
+    this.refreshView();
+  }
+  /** Whether the (visual) row is a collapsible parent in the tree. */
+  isRowParent(visualRow: number): boolean {
+    return this.nestedRows.isParent(this.view.rows.getPhysicalIndex(visualRow));
+  }
+  /** Nesting depth of the (visual) row (0 = root, -1 = not in the tree). */
+  getRowDepth(visualRow: number): number {
+    return this.nestedRows.getDepth(this.view.rows.getPhysicalIndex(visualRow));
+  }
+  /** Whether the (visual) parent row is collapsed. */
+  isRowCollapsed(visualRow: number): boolean {
+    return this.nestedRows.isCollapsed(this.view.rows.getPhysicalIndex(visualRow));
+  }
+  /** Toggle collapse on the (visual) parent row, hiding/showing descendants. */
+  toggleRowGroup(visualRow: number): void {
+    this.nestedRows.toggle(this.view.rows.getPhysicalIndex(visualRow));
+    this.refreshView();
   }
 
   /** Geometry snapshot for the renderer (visible-indexed). */
