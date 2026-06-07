@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { GridController, formatValue, replaceInText } from './controller.js';
+import { GridController, formatValue, replaceInText, parseNumberInput } from './controller.js';
 import { FormulaError } from '@lattica/formula';
 
 const make = () => new GridController({ rowCount: 50, colCount: 26 });
@@ -859,5 +859,48 @@ describe('formula bar support', () => {
     c.setCellText(1, 0, 'drop');
     c.setColumnFilter(0, [{ kind: 'equals', value: 'keep' }]); // hides row 1
     expect(c.goToRef('A2')).toBe(false);
+  });
+});
+
+describe('parseNumberInput / formatted input', () => {
+  it('parses plain numbers', () => {
+    expect(parseNumberInput('1650')).toBe(1650);
+    expect(parseNumberInput('-2.5')).toBe(-2.5);
+    expect(parseNumberInput('1e3')).toBe(1000);
+  });
+  it('parses thousands separators and currency symbols', () => {
+    expect(parseNumberInput('1,234')).toBe(1234);
+    expect(parseNumberInput('1,234.56')).toBe(1234.56);
+    expect(parseNumberInput('$1,000')).toBe(1000);
+    expect(parseNumberInput('¥500')).toBe(500);
+    expect(parseNumberInput('-$5')).toBe(-5);
+  });
+  it('parses trailing percent to a fraction', () => {
+    expect(parseNumberInput('50%')).toBe(0.5);
+    expect(parseNumberInput('12.5%')).toBe(0.125);
+  });
+  it('returns null for non-numeric or malformed grouping', () => {
+    expect(parseNumberInput('')).toBeNull();
+    expect(parseNumberInput('abc')).toBeNull();
+    expect(parseNumberInput('12,34')).toBeNull();
+    expect(parseNumberInput('1-2')).toBeNull();
+  });
+
+  it('stores formatted input as a number so column formats apply', () => {
+    const c = make();
+    c.setColumnFormat(0, '$#,##0.00');
+    c.setCellText(0, 0, '1,234'); // typed with a comma
+    expect(c.getValue(0, 0)).toBe(1234);
+    expect(c.getDisplay(0, 0)).toBe('$1,234.00');
+    c.setCellText(1, 0, '$2,000');
+    expect(c.getDisplay(1, 0)).toBe('$2,000.00');
+  });
+
+  it('percent input round-trips through a percent format', () => {
+    const c = make();
+    c.setColumnFormat(0, '0.0%');
+    c.setCellText(0, 0, '50%');
+    expect(c.getValue(0, 0)).toBe(0.5);
+    expect(c.getDisplay(0, 0)).toBe('50.0%');
   });
 });

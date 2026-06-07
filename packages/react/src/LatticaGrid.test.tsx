@@ -735,3 +735,41 @@ describe('LatticaGrid master/detail (Phase E-7)', () => {
     expect(screen.queryByTestId('lattica-detail-0')).toBeNull();
   });
 });
+
+describe('LatticaGrid fill (auto-size to container)', () => {
+  it('fixed size by default: root uses px width/height', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    render(<LatticaGrid controller={c} width={400} height={200} />);
+    const root = screen.getByTestId('lattica-grid');
+    expect(root.style.width).toBe('400px');
+    expect(root.style.height).toBe('200px');
+  });
+
+  it('fill: root is 100% and the canvas matches the measured container', () => {
+    let cb: ((entries: { contentRect: { width: number; height: number } }[]) => void) | null = null;
+    class MockRO {
+      constructor(handler: typeof cb) {
+        cb = handler;
+      }
+      observe(): void {}
+      disconnect(): void {}
+    }
+    const prev = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = MockRO as unknown;
+    try {
+      const c = new GridController({ rowCount: 5, colCount: 5 });
+      render(<LatticaGrid controller={c} fill />);
+      const root = screen.getByTestId('lattica-grid');
+      expect(root.style.width).toBe('100%');
+      expect(root.style.height).toBe('100%');
+      // Empty entries → no change (covers the guard); then a real measurement.
+      act(() => cb!([]));
+      act(() => cb!([{ contentRect: { width: 800, height: 600 } }]));
+      const canvas = root.querySelector('canvas')!;
+      expect(canvas.style.width).toBe('800px');
+      expect(canvas.style.height).toBe('600px');
+    } finally {
+      (globalThis as { ResizeObserver?: unknown }).ResizeObserver = prev;
+    }
+  });
+});
