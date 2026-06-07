@@ -126,3 +126,8 @@
   - ドキュメント: 全8パッケージ README ＋ `docs/USAGE.md`（API は index.ts 突合で検証済）。
   - React: 結合セル描画（`mergeSelection`/`unmerge`・アンカースパン・被覆スキップ）。
   - 全体 **1610テスト・100%カバレッジ**。typecheck/lint/build クリーン。
+- 2026-06-07: **Wave 12 完了**（io JSON＋性能ベンチ＋ヘッダーソートUI）。
+  - `@lattica/io` JSON: `matrixToJson`/`jsonToMatrix`/`recordsToMatrix`/`matrixToRecords`（own-key undefined→null 修正）。
+  - 性能ベンチ（packages/react/bench, カバレッジ対象外）＋ `docs/PERFORMANCE.md`：100万行×1000列で buildScene+paintScene ≈0.12ms/frame・約8000fps を実測。
+  - React: ヘッダークリックのソートUI（▲/▼/⇅・Shiftで複数列、`PositionedHeader.col` 追加）。
+  - 全体 **1625テスト・100%カバレッジ**。typecheck/lint/build クリーン。
