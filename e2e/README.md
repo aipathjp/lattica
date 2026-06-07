@@ -8,8 +8,8 @@ End-to-end browser tests live here, separate from the Vitest unit suite under
 
 ## What is covered
 
-`grid.spec.ts` is a representative smoke for the canvas grid via the
-kitchen-sink page:
+`grid.spec.ts` — representative smoke for the canvas grid via the kitchen-sink
+page:
 
 - loads `/kitchen-sink` and asserts the grid renders (`role="grid"` /
   `data-testid="lattica-grid"`),
@@ -18,8 +18,15 @@ kitchen-sink page:
 - checks the fill handle (`data-testid="lattica-fill-handle"`) appears on
   selection.
 
-Selectors mirror `examples/playground/app/kitchen-sink/page.tsx` and the testids
-emitted by `packages/react/src/LatticaGrid.tsx` (`lattica-grid`, `lattica-sort-<col>`,
+`spill.spec.ts` — dynamic-array (spill) demo via the `/spill` page:
+
+- asserts the grid renders,
+- asserts the in-page probe reports `spill OK` (the seeded SEQUENCE / SORT
+  array formulas resolve through the controller into spilled cells),
+- exercises the home-page navigation links to both demos.
+
+Selectors mirror the playground pages and the testids emitted by
+`packages/react/src/LatticaGrid.tsx` (`lattica-grid`, `lattica-sort-<col>`,
 `lattica-fill-handle`, `lattica-menu`).
 
 ## One-time setup
@@ -27,30 +34,26 @@ emitted by `packages/react/src/LatticaGrid.tsx` (`lattica-grid`, `lattica-sort-<
 Install the Playwright browsers (Chromium is the only configured project):
 
 ```bash
-pnpm exec playwright install
+pnpm exec playwright install chromium
 ```
-
-## Serving the app
-
-The specs need a server at `baseURL` (default `http://localhost:4321`). The
-playground is App Router source only — it does **not yet declare Next.js or a
-`dev` script**. To run these tests for real you must first:
-
-1. Add `next` to `examples/playground/package.json` and a script such as
-   `"dev": "next dev -p 4321"`.
-2. Either let Playwright manage the server (the `webServer` block in
-   `playwright.config.ts` runs `pnpm --filter ./examples/playground run dev`), or
-   start it yourself and point Playwright at it:
-
-   ```bash
-   # external server already running on some URL:
-   PLAYWRIGHT_BASE_URL=http://localhost:3000 pnpm exec playwright test
-   ```
 
 ## Running
 
+The playground is a wired Next.js App Router app (`dev` / `build` / `start`
+scripts). By default Playwright boots its `dev` server automatically via the
+`webServer` block in `playwright.config.ts` (port 4310):
+
 ```bash
-pnpm exec playwright test          # full chromium run
+pnpm exec playwright test          # full chromium run (managed dev server)
 pnpm exec playwright test --ui     # interactive UI mode
-pnpm exec playwright test e2e/grid.spec.ts
+pnpm exec playwright test e2e/spill.spec.ts
+```
+
+To run against an already-running server (e.g. a production build), set
+`PLAYWRIGHT_BASE_URL` and the managed server is skipped:
+
+```bash
+pnpm --filter ./examples/playground build
+pnpm --filter ./examples/playground start &      # serves on :4310
+PLAYWRIGHT_BASE_URL=http://localhost:4310 pnpm exec playwright test
 ```

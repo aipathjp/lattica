@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Next.js (App Router) example consuming the published Lattica packages.",
   "scripts": {
+    "dev": "next dev -p 4310",
+    "build": "next build",
+    "start": "next start -p 4310",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -13,6 +16,13 @@
     "@lattica/formula": "workspace:*",
     "@lattica/io": "workspace:*",
     "@lattica/collab": "workspace:*",
-    "@lattica/react": "workspace:*"
+    "@lattica/react": "workspace:*",
+    "next": "^15.1.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.2"
   }
 }
