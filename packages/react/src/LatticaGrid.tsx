@@ -38,8 +38,13 @@ export interface LatticaGridProps {
   /** Optional multi-level column definitions; defaults to A, B, C… letters. */
   columns?: readonly ColumnNode[];
   theme?: Partial<GridTheme>;
+  /** Fixed pixel width (ignored when `fill` is set). Defaults to 640. */
   width?: number;
+  /** Fixed pixel height (ignored when `fill` is set). Defaults to 400. */
   height?: number;
+  /** Expand to fill the parent element (measured via ResizeObserver). Size the
+   *  parent however you like — e.g. `width:100%; height:100vh`. */
+  fill?: boolean;
   className?: string;
   style?: CSSProperties;
   /** Build the right-click context menu for a hit target; defaults to the built-in menu. */
@@ -55,8 +60,11 @@ interface MenuState {
 }
 
 export function LatticaGrid(props: LatticaGridProps): ReactElement {
-  const { controller, columns, width = 640, height = 400 } = props;
+  const { controller, columns } = props;
   const theme = resolveTheme(props.theme);
+  const fill = props.fill ?? false;
+  const fixedWidth = props.width ?? 640;
+  const fixedHeight = props.height ?? 400;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const editorRef = useRef<HTMLElement | null>(null);
@@ -72,7 +80,29 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [filterPanel, setFilterPanel] = useState<{ col: number; x: number; y: number } | null>(null);
   const [filterChecked, setFilterChecked] = useState<Set<string>>(new Set());
+  const [measured, setMeasured] = useState<{ w: number; h: number } | null>(null);
   const [, force] = useReducer((n: number) => n + 1, 0);
+
+  // Effective pixel size: the measured container when `fill`, else the fixed size.
+  const width = fill && measured !== null ? measured.w : fixedWidth;
+  const height = fill && measured !== null ? measured.h : fixedHeight;
+
+  // Measure the container when filling, so the canvas matches its parent.
+  useEffect(() => {
+    const el = rootRef.current;
+    /* v8 ignore next 3 -- ResizeObserver is present in browsers; absent only in some envs */
+    if (!fill || el === null || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const ro = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect;
+      if (cr !== undefined) {
+        setMeasured({ w: Math.max(0, Math.floor(cr.width)), h: Math.max(0, Math.floor(cr.height)) });
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fill]);
 
   const headerModelRef = useRef<HeaderModel | null>(null);
   if (columns !== undefined && headerModelRef.current === null) {
@@ -565,8 +595,8 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       className={props.className}
       style={{
         position: 'relative',
-        width,
-        height,
+        width: fill ? '100%' : width,
+        height: fill ? '100%' : height,
         overflow: 'hidden',
         outline: 'none',
         background: theme.background,

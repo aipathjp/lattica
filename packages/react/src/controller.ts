@@ -99,6 +99,40 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Optional sign, optional currency symbol, grouped or plain digits, optional
+// decimals, optional trailing percent.
+const FORMATTED_NUMBER = /^([-+]?)\s*[$¥€£]?\s*((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(%?)$/;
+
+/**
+ * Parse a user-typed value into a number, accepting plain numbers and common
+ * human formats: thousands separators (`1,234`), a leading currency symbol
+ * (`$1,000`, `¥500`), and a trailing percent (`50%` → 0.5). Returns null when
+ * the text is not numeric, so callers keep it as text.
+ */
+export function parseNumberInput(raw: string): number | null {
+  const t = raw.trim();
+  if (t === '') {
+    return null;
+  }
+  const plain = Number(t);
+  if (Number.isFinite(plain)) {
+    return plain;
+  }
+  const m = FORMATTED_NUMBER.exec(t);
+  if (m === null) {
+    return null;
+  }
+  // The regex guarantees a valid numeric string after stripping commas.
+  let value = Number(m[2]!.replace(/,/g, ''));
+  if (m[1] === '-') {
+    value = -value;
+  }
+  if (m[3] === '%') {
+    value /= 100;
+  }
+  return value;
+}
+
 /**
  * Replace occurrences of `query` in `text` honoring the search options used to
  * find it. `wholeCell` replaces the entire text when it matches; `regex` treats
@@ -776,13 +810,14 @@ export class GridController {
     if (raw.startsWith('=')) {
       return raw;
     }
-    // Numbers are stored as numbers so the formula engine treats them numerically.
-    const num = Number(raw);
-    if (raw.trim() !== '' && !Number.isNaN(num)) {
-      return num;
-    }
     if (raw === 'TRUE' || raw === 'FALSE') {
       return raw === 'TRUE';
+    }
+    // Numbers — including human-formatted input ("1,234", "$1,000", "50%") —
+    // are stored as numbers so column formats apply and aggregates work.
+    const num = parseNumberInput(raw);
+    if (num !== null) {
+      return num;
     }
     return raw;
   }

@@ -234,3 +234,8 @@
   - `GridController`：`getActiveCell`/`getActiveRef`/`getActiveEditText`/`setActiveCellText`/`goToRef`。
   - セルへの数式直接入力は従来からインラインエディタで対応（`=A1*2` 等）。デモ kitchen-sink / formulas に数式バーを設置。
   - 全体 **1947テスト・100%カバレッジ**。typecheck/lint/build クリーン。
+- 2026-06-07: **数値書式の入力修正＋グリッドのフルサイズ表示**。
+  - **入力フォーマット修正**：`parseNumberInput` を追加し、`1,234`・`$1,000`・`¥500`・`50%`（→0.5）等の**人間が打つ書式付き数値を数値として解釈**。これまで文字列扱いで列の数値書式が効かなかった不具合を解消（集計も正しく動作）。
+  - **`<LatticaGrid fill />`**：`ResizeObserver` で親要素を実測し、**横幅/高さいっぱい**に自動拡張。コンテナを `100%`/`100vh`/`resize:both` 等にするだけで全画面・可変サイズに。
+  - デモ `/fullscreen`（Fit width / Full screen / Resizable box / Fixed の切替、数式バー＋ステータスバー、書式付き入力の確認）。
+  - 全体 **1955テスト・100%カバレッジ**。typecheck/lint/build クリーン。
