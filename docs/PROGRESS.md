@@ -188,3 +188,6 @@
   - `GridController`: `setCellSparkline`/`getCellSparkline`（セル寸法を渡して形状を計算）。
   - `scene.ts`/`painter.ts`: `CellPaint.sparkline` を追加。**line は stroke、bar/winloss は fillRect**（正=活性色/負=赤）でセル原点へ平行移動して描画。
   - 全体 **1839テスト・100%カバレッジ**。typecheck/lint/build クリーン。残: Phase E-3（マスターディテール/サーバサイド行モデル等）。
+- 2026-06-07: **Phase E-3 完了**（非同期/サーバサイド行モデル）。
+  - `@lattica/data` `async-rows.ts`: `AsyncRowModel<R>` — 固定ブロック単位の遅延ロード。`ensureRange(start,end)` で可視範囲を覆うブロックを `RowFetcher` 経由で取得（**in-flight 重複排除**・ブロックキャッシュ）、`getRow`/`isLoaded`/`getTotal`/`isTotalKnown`、`invalidate`（ソート/フィルタ後の再取得）、`subscribe`（到着通知）。汎用 `R`・DOM 非依存。
+  - 全体 **1847テスト・100%カバレッジ**。typecheck/lint/build クリーン。残: チャート（フル描画）・PDF/印刷・LAMBDA/構造化参照は大型のため必要に応じ別途。
