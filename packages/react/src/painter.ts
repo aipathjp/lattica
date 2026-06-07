@@ -7,7 +7,7 @@
 
 import { iconColor, lerpColor, type IconMark } from '@lattica/core';
 import type { GridTheme } from './theme.js';
-import type { Scene } from './scene.js';
+import type { Scene, CellPaint } from './scene.js';
 import { defaultCellTypes, type CellTypeRegistry } from './cell-types.js';
 
 export interface Canvas2D {
@@ -67,82 +67,17 @@ export function paintScene(
 
   const registry = options.cellTypes ?? defaultCellTypes;
 
+  // Two passes so frozen (pinned) rows/columns paint over scrolled cells:
+  // scrollable cells first, then frozen cells on an opaque base.
   for (const cell of scene.cells) {
-    const { rect } = cell;
-    // Conditional-format background sits below the selection tint.
-    if (cell.cfStyle?.background !== undefined) {
-      ctx.fillStyle = cell.cfStyle.background;
-      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    if (cell.frozen !== true) {
+      paintCell(ctx, cell, theme, registry, false);
     }
-    if (cell.selected) {
-      ctx.fillStyle = theme.selectionFill;
-      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+  }
+  for (const cell of scene.cells) {
+    if (cell.frozen === true) {
+      paintCell(ctx, cell, theme, registry, true);
     }
-
-    // In-cell data bar (drawn behind the text) with a softer top + thin border.
-    if (cell.bar !== undefined && cell.bar.ratio > 0) {
-      const inset = 2;
-      const barWidth = Math.max(2, (rect.width - inset * 2) * cell.bar.ratio);
-      const bx = rect.x + inset;
-      const by = rect.y + inset;
-      const bh = rect.height - inset * 2;
-      // Two-tone fill (lighter top half) approximates Excel's gradient bar.
-      ctx.fillStyle = lerpColor(cell.bar.color, '#ffffff', 0.35);
-      ctx.fillRect(bx, by, barWidth, bh);
-      ctx.fillStyle = cell.bar.color;
-      ctx.fillRect(bx, by + bh / 2, barWidth, bh / 2);
-      ctx.strokeStyle = lerpColor(cell.bar.color, '#000000', 0.25);
-      ctx.lineWidth = 1;
-      ctx.strokeRect(bx + 0.5, by + 0.5, barWidth - 1, bh - 1);
-    }
-
-    // Gridlines (right + bottom edge).
-    ctx.strokeStyle = theme.gridLineColor;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(rect.x, rect.y + rect.height);
-    ctx.lineTo(rect.x + rect.width, rect.y + rect.height);
-    ctx.moveTo(rect.x + rect.width, rect.y);
-    ctx.lineTo(rect.x + rect.width, rect.y + rect.height);
-    ctx.stroke();
-
-    // In-cell sparkline (cell-local coords translated by the cell origin).
-    if (cell.sparkline !== undefined) {
-      const sk = cell.sparkline;
-      if (sk.points !== undefined && sk.points.length > 0) {
-        ctx.strokeStyle = theme.activeBorder;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        sk.points.forEach((p, i) => {
-          const x = rect.x + p.x;
-          const y = rect.y + p.y;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-      }
-      if (sk.bars !== undefined) {
-        for (const b of sk.bars) {
-          ctx.fillStyle = b.positive ? theme.activeBorder : '#c0392b';
-          ctx.fillRect(rect.x + b.x, rect.y + b.y, b.width, b.height);
-        }
-      }
-    }
-
-    // Crisp vector icon-set mark at the cell's left edge (before the text).
-    if (cell.icon !== undefined) {
-      drawIcon(ctx, cell.icon, rect.x + theme.cellPaddingX, rect.y + rect.height / 2, theme);
-    }
-
-    registry.resolve(cell.type)({
-      ctx,
-      rect,
-      value: cell.value ?? cell.text,
-      text: cell.text,
-      theme,
-      align: cell.align ?? 'left',
-      color: cell.cfStyle?.color,
-    });
   }
 
   if (scene.activeRect !== null) {
@@ -153,6 +88,96 @@ export function paintScene(
   }
 
   ctx.restore();
+}
+
+/** Paint a single cell. `opaqueBase` fills the theme background first (for
+ *  frozen cells, so scrolled content does not show through). */
+function paintCell(
+  ctx: Canvas2D,
+  cell: CellPaint,
+  theme: GridTheme,
+  registry: CellTypeRegistry,
+  opaqueBase: boolean,
+): void {
+  const { rect } = cell;
+  if (opaqueBase) {
+    ctx.fillStyle = theme.background;
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+  }
+  // Conditional-format background sits below the selection tint.
+  if (cell.cfStyle?.background !== undefined) {
+    ctx.fillStyle = cell.cfStyle.background;
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+  }
+  if (cell.selected) {
+    ctx.fillStyle = theme.selectionFill;
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+  }
+
+  // In-cell data bar (drawn behind the text) with a softer top + thin border.
+  if (cell.bar !== undefined && cell.bar.ratio > 0) {
+    const inset = 2;
+    const barWidth = Math.max(2, (rect.width - inset * 2) * cell.bar.ratio);
+    const bx = rect.x + inset;
+    const by = rect.y + inset;
+    const bh = rect.height - inset * 2;
+    // Two-tone fill (lighter top half) approximates Excel's gradient bar.
+    ctx.fillStyle = lerpColor(cell.bar.color, '#ffffff', 0.35);
+    ctx.fillRect(bx, by, barWidth, bh);
+    ctx.fillStyle = cell.bar.color;
+    ctx.fillRect(bx, by + bh / 2, barWidth, bh / 2);
+    ctx.strokeStyle = lerpColor(cell.bar.color, '#000000', 0.25);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx + 0.5, by + 0.5, barWidth - 1, bh - 1);
+  }
+
+  // Gridlines (right + bottom edge).
+  ctx.strokeStyle = theme.gridLineColor;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(rect.x, rect.y + rect.height);
+  ctx.lineTo(rect.x + rect.width, rect.y + rect.height);
+  ctx.moveTo(rect.x + rect.width, rect.y);
+  ctx.lineTo(rect.x + rect.width, rect.y + rect.height);
+  ctx.stroke();
+
+  // In-cell sparkline (cell-local coords translated by the cell origin).
+  if (cell.sparkline !== undefined) {
+    const sk = cell.sparkline;
+    if (sk.points !== undefined && sk.points.length > 0) {
+      ctx.strokeStyle = theme.activeBorder;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      sk.points.forEach((p, i) => {
+        const x = rect.x + p.x;
+        const y = rect.y + p.y;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+    if (sk.bars !== undefined) {
+      for (const b of sk.bars) {
+        ctx.fillStyle = b.positive ? theme.activeBorder : '#c0392b';
+        ctx.fillRect(rect.x + b.x, rect.y + b.y, b.width, b.height);
+      }
+    }
+  }
+
+  // Crisp vector icon-set mark at the cell's left edge (before the text).
+  if (cell.icon !== undefined) {
+    drawIcon(ctx, cell.icon, rect.x + theme.cellPaddingX, rect.y + rect.height / 2, theme);
+  }
+
+  registry.resolve(cell.type)({
+    ctx,
+    rect,
+    value: cell.value ?? cell.text,
+    text: cell.text,
+    theme,
+    align: cell.align ?? 'left',
+    color: cell.cfStyle?.color,
+  });
 }
 
 /** Apply a DPR scale by drawing scaled gridlines — kept tiny and overridable. */
