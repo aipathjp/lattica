@@ -5,8 +5,73 @@
 > 本書は着手前の全量計画。各 Phase は独立 PR としてマージ可能な粒度に分割する。
 
 - 関連: [`ARCHITECTURE.md`](ARCHITECTURE.md) / [`RESEARCH.md`](RESEARCH.md)
-- 現状: core / formula / react / io / collab の 5 パッケージ実装済・565 テスト・カバレッジ 99.5%
-- 公開: https://github.com/aipathjp/lattica (MIT・クリーンルーム)
+- 現状 (2026-06-08 実測): core / data / formula / react / io / collab / ai / mcp の **8 パッケージ実装済**・**1,955 テスト (108 ファイル) 全パス**・カバレッジ閾値 **100%** (vitest.config thresholds)
+- 公開: https://github.com/aipathjp/lattica (MIT・クリーンルーム) / デモ: https://lattica-demo.vercel.app
+
+---
+
+## 進捗トラッキング（2026-06-08 実測棚卸し）
+
+> 凡例: ✅ 完了 / 🔶 部分実装（残項目あり） / ⬜ 未着手。
+> 実装はおおむね PR #13〜#42 で本計画の Phase 名と異なる Wave/Phase A〜F 系の命名で進行した。
+> 下表は **コードベースの実測**（ソース・テストの存在確認）に基づく対応付け。
+
+### Part A 進捗
+
+| Phase | 状態 | 実績 / 残項目 |
+|---|---|---|
+| 1 IndexMapper＋データバインド | ✅ | `data/index-mapper.ts`(hide/move/trim/insert/remove)・`data-source.ts`・`data-view.ts` |
+| 2 セル型システム | 🔶 | レジストリ`react/cell-types.ts`＋text/numeric/boolean/checkbox レンダラ、エディタ text/number/checkbox/date/dropdown/autocomplete (PR#19)。**残: password・rating/progress/tag/image/link 等の超越型**（sparkline はセル内描画として実装済 PR#27） |
+| 3 検証・read-only・配置 | 🔶 | `core/validation.ts`(numeric/integer/nonEmpty/range/list/regex)・align 描画適用済。**残: per-cell readOnly・非同期 validator** |
+| 4 対話 UX 基盤 | 🔶 | ドラッグ範囲選択・Ctrl+クリック複数範囲・Shift拡張(E2E回帰 PR#42)・フィルハンドル＋系列推論`core/fill-series.ts`(PR#41)・列行リサイズ`react/resize.ts`・固定ペイン(PR#39)。**残: 列/行ドラッグ移動 UI・ダブルクリック auto-fit** |
+| 5 メニュー＋ショートカット | ✅ | `react/menu.ts`・`react/shortcuts.ts`(ShortcutRegistry)・列ヘッダーメニュー(PR#21) |
+| 6 並べ替え | ✅ | `data/sort.ts` 複数列・安定ソート・型別 comparator (PR#14/#20) |
+| 7 フィルタ | ✅ | `data/filter.ts` 12条件演算子＋ファセット UI (PR#20/#21) |
+| 8 hide/trim/move/ネスト行 | ✅ | IndexMapper 経由＋`data/nested-rows.ts` (PR#15) |
+| 9 結合セル | ✅ | `core/merge.ts` (PR#13) |
+| 10 コメント・条件付き書式・枠線・サマリ | ✅ | `core/comments.ts`・`conditional-format.ts`＋`cf-visual.ts`(カラースケール/データバー/アイコンセット PR#23/#38)・`borders.ts`・`summary.ts`(PR#22) |
+| 11 検索・ハイライト | ✅ | `core/search.ts` 検索置換 (PR#20) |
+| 12 数式エンジン拡張 | 🔶 | **150 関数**・名前付き範囲・R1C1・配列スピル・構造化参照 Table[Column]・LAMBDA/MAP/REDUCE/SCAN/BYROW/BYCOL (PR#24/#31/#33)。**残: 関数 400+ への拡大・複数シート参照** |
+| 13 IO 拡張 | ✅ | `io/xlsx-read.ts`・スタイル付き出力`xlsx-style.ts`(PR#25)・JSON(PR#14)・PDF`io/pdf.ts`(PR#30) |
+| 14 自動サイズ・折返し | 🔶 | 純粋ヘルパー`react/measure.ts`(wrapText/autoColumnWidth/autoRowHeight)実装済。**残: グリッド UI への結線（auto-fit 操作・折返し描画・可変行高）** |
+| 15 i18n・RTL・テーマ | 🔶 | `react/i18n.ts`(en-US/ja-JP)・テーマ light/dark/high-contrast＋トークン(PR#34/#35)。**残: RTL** |
+| 16 アクセシビリティ | 🔶 | `react/aria.ts`(ARIA grid/rowindex/colindex/sort)・キーボードナビ。**残: IME 統合・SR 実機検証・axe 自動検査** |
+| 17 フック・永続状態・プラグイン | 🔶 | `core/hooks.ts`(before/after)・`persistent-state.ts`。**残: 公式プラグイン API の明文化** |
+| 18 性能・E2E・docs | 🔶 | ベンチ`react/bench/bench.mjs`(PR#14)・Playwright E2E 3 spec・VitePress docs(PR#16)。**残: 100万セル級ベンチの公称数値実証・E2E 拡充** |
+
+### Part B 進捗
+
+| Phase | 状態 | 実績 / 残項目 |
+|---|---|---|
+| A1 `@lattica/ai` 基盤 | ✅ | `provider.ts`(抽象＋MockProvider)・`provenance.ts`(AICommand)・`client.ts`。AC どおり mock provider で全フロー検証済 |
+| A2 NL⇄数式 | ✅ | `nl-formula.ts`(nlToFormula/explainFormula/fixFormula) |
+| A3 AI 列 | ✅ | `ai-column.ts`(generateColumn) |
+| A4 スマートフィル | ✅ | `smart-fill.ts`(inferRule/applyRule) |
+| A5 スキーマ推論・クレンジング | ✅ | `schema-infer.ts`(型推論/normalize/detectDuplicateRows) |
+| A6 意味検索 | ✅ | `semantic-search.ts`(SemanticIndex) |
+| A7 表と対話 | 🔶 | `nl-transform.ts`(nlToOperation: NL→sort/filter/group 構造化生成)。**残: Q&A 回答＋根拠セル引用** |
+| A8 異常検知 | 🔶 | `anomaly.ts`(zScore/IQR/列別外れ値)。**残: 条件付き書式ルール自動提案 (Phase10 連携)** |
+| A9 AI 検証ルール生成 | ✅ | `rule-gen.ts`(inferRule/fitRate/suggestRule) |
+| A10 要約・翻訳・分類 | ✅ | `text-ops.ts`(summarize/translate/classify) |
+| A11 `@lattica/mcp` | 🔶 | `tools.ts`(get/set cell/range 等)・`dispatcher.ts`。**残: 書込み承認モード・監査ログ・認可スコープ** |
+| A12 エージェント・HITL | 🔶 | `workflow.ts`(planWorkflow/WorkflowRunner)。**残: 監査ログ可視化・差分承認 UI・本適用ゲート** |
+
+### 計画外の追加実装（本計画に無い完了機能）
+
+- ピボットテーブル `core/pivot.ts` (PR#26) / セル内スパークライン `core/sparkline.ts` (PR#27) / チャート `core/chart.ts`＋`react/LatticaChart` (PR#29)
+- 非同期サーバサイド行モデル `data/async-rows.ts` (PR#28) / マスターディテール `core/detail.ts` (PR#32)
+- 数式バー `react/FormulaBar.tsx` (PR#40) / ステータスバー `react/StatusBar.tsx` (PR#22) / 密度システム `react/density.ts` (PR#35)
+- Neon ライブデータ＋Vercel 公開デモ 11 ページ (PR#18/#36) / AGENTS.md＋llms.txt (PR#37)
+
+### 残項目の優先候補（次スプリント案）
+
+1. **Phase 4 残**: 列/行ドラッグ移動 UI・ダブルクリック auto-fit（Phase 14 の measure ヘルパー結線と同時に）
+2. **Phase 14 残**: wordWrap 描画＋可変行高（仮想化整合）
+3. **Phase 2 残**: 超越セル型（rating/progress/tag/link/image）＋ per-cell readOnly（Phase 3 残と同時）
+4. **collab 残**: Supabase Realtime トランスポート（現状 InMemoryNetwork のみ）
+5. **A11/A12 残**: MCP 書込み承認・監査ログ・HITL 差分承認 UI（AI 書込みの絶対ルール完遂）
+6. **Phase 12 残**: 関数拡大（150→400+）・複数シート参照
+7. **Phase 18 残**: 100万セル級ベンチ実証＋README 数値掲載
 
 ---
 
@@ -24,16 +89,16 @@
 
 ### パッケージ構成（追加予定を含む）
 
-| パッケージ | 役割 | 状態 |
+| パッケージ | 役割 | 状態 (2026-06-08) |
 |---|---|---|
-| `@lattica/core` | 座標・仮想化・選択・コマンド・ヘッダー・セルメタ・merge・検証モデル | 拡張 |
-| `@lattica/data` | **新規**: IndexMapper(物理↔表示)・データソースバインド・sort/filter/hide/move/trim/group モデル | 新規 |
-| `@lattica/formula` | 数式エンジン（関数拡張・名前付き範囲・R1C1・配列スピル） | 拡張 |
-| `@lattica/react` | Canvas描画・セル型レジストリ・対話UX・メニュー・条件付き書式・a11y | 拡張 |
-| `@lattica/io` | CSV/TSV・XLSX 入出力(import 追加)・スタイル往復・JSON | 拡張 |
-| `@lattica/collab` | CRDT・プレゼンス・Supabase Realtime アダプタ | 拡張 |
-| `@lattica/ai` | **新規**: AI 親和機能（NL→数式・AI列・スマートフィル・意味検索・対話・異常検知）provider 抽象 | 新規 |
-| `@lattica/mcp` | **新規**: MCP サーバ。外部 AI エージェントにグリッド操作を公開 | 新規 |
+| `@lattica/core` | 座標・仮想化・選択・コマンド・ヘッダー・セルメタ・merge・検証モデル | ✅ 実装済（pivot/sparkline/chart/detail/borders/summary 等も格納） |
+| `@lattica/data` | IndexMapper(物理↔表示)・データソースバインド・sort/filter/hide/move/trim・nested-rows・async-rows | ✅ 実装済 |
+| `@lattica/formula` | 数式エンジン（150関数・名前付き範囲・R1C1・配列スピル・構造化参照・LAMBDA） | ✅ 実装済（関数 400+ へ拡張余地） |
+| `@lattica/react` | Canvas描画・セル型レジストリ・対話UX・メニュー・テーマ・i18n・aria・FormulaBar/StatusBar | ✅ 実装済（超越セル型・RTL・wordWrap 結線が残） |
+| `@lattica/io` | CSV/TSV・XLSX 読書き・スタイル往復・JSON・PDF | ✅ 実装済 |
+| `@lattica/collab` | CRDT・プレゼンス・order-key・セッション | 🔶 Supabase Realtime アダプタ未（InMemoryNetwork のみ） |
+| `@lattica/ai` | AI 親和機能（NL→数式・AI列・スマートフィル・意味検索・異常検知・ルール生成 ほか）provider 抽象 | ✅ 実装済（mock provider、HITL UI 残） |
+| `@lattica/mcp` | MCP サーバ。外部 AI エージェントにグリッド操作を公開 | 🔶 ツール公開済・承認/監査/認可が残 |
 
 ---
 
@@ -222,17 +287,19 @@
 ## マイルストーン（推奨順序とゲート）
 
 ```
-M1 基盤        : Phase 1, 2, 3            → セル型を持つ実用グリッド
-M2 操作性      : Phase 4, 5               → HoT 同等の操作感
-M3 データ操作  : Phase 6, 7, 8, 9         → 並替/フィルタ/隠す/移動/ネスト/結合
-M4 表現/IO     : Phase 10, 11, 13, 14     → 書式/検索/XLSX往復/自動サイズ
-M5 仕上げ      : Phase 12, 15, 16, 17, 18 → 数式拡張/i18n/a11y/フック/性能・公開
+M1 基盤        : Phase 1, 2, 3            → セル型を持つ実用グリッド        [🔶 超越セル型/readOnly 残]
+M2 操作性      : Phase 4, 5               → HoT 同等の操作感               [🔶 ドラッグ移動/auto-fit 残]
+M3 データ操作  : Phase 6, 7, 8, 9         → 並替/フィルタ/隠す/移動/ネスト/結合 [✅ 完了]
+M4 表現/IO     : Phase 10, 11, 13, 14     → 書式/検索/XLSX往復/自動サイズ   [🔶 自動サイズ UI 結線残]
+M5 仕上げ      : Phase 12, 15, 16, 17, 18 → 数式拡張/i18n/a11y/フック/性能・公開 [🔶 各所に残項目]
 ── ここで Handsontable 全面超越 ──
-M6 AI 基盤     : Phase A1, A2             → NL⇄数式
-M7 AI 生成     : A3, A4, A5               → AI列/スマートフィル/クレンジング
-M8 AI 知能     : A6, A7, A8, A9, A10      → 意味検索/対話/異常検知/検証生成/要約
-M9 エージェント: A11, A12                 → MCP 公開/ワークフロー/HITL 監査
+M6 AI 基盤     : Phase A1, A2             → NL⇄数式                       [✅ 完了]
+M7 AI 生成     : A3, A4, A5               → AI列/スマートフィル/クレンジング [✅ 完了]
+M8 AI 知能     : A6, A7, A8, A9, A10      → 意味検索/対話/異常検知/検証生成/要約 [🔶 対話Q&A/CF連携 残]
+M9 エージェント: A11, A12                 → MCP 公開/ワークフロー/HITL 監査  [🔶 承認/監査/HITL UI 残]
 ```
+
+> 進捗実測の詳細は冒頭「進捗トラッキング（2026-06-08 実測棚卸し）」を参照。
 
 各 Phase: 実装 → 単体テスト(98%) → typecheck/lint/build → PR → AC 判定 → マージ → 次へ。
 M3 以降は Playwright E2E を併走（Phase18 で本格スイート）。
