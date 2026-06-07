@@ -4,7 +4,16 @@ import tsparser from '@typescript-eslint/parser';
 
 export default [
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/coverage/**', '**/.next/**'],
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      '**/.next/**',
+      'e2e/**',
+      'docs/.vitepress/**',
+      'docs/.vitepress/cache/**',
+      'docs/.vitepress/dist/**',
+    ],
   },
   {
     files: ['**/*.ts', '**/*.tsx'],
