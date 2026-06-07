@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen, waitFor, act } from '@testing-library/react';
 import { LatticaGrid } from './LatticaGrid.js';
 import { GridController } from './controller.js';
 import type { ColumnNode } from '@lattica/core';
@@ -706,5 +706,32 @@ describe('LatticaGrid filter UI & column menu (Phase B-UI)', () => {
     fireEvent.contextMenu(grid, { clientX: 80, clientY: 8 });
     fireEvent.mouseDown(screen.getByText('Show all columns'));
     expect(c.getColCount()).toBe(3);
+  });
+});
+
+describe('LatticaGrid master/detail (Phase E-7)', () => {
+  it('renders a detail panel for an expanded row when renderDetail is given', () => {
+    const c = new GridController({ rowCount: 10, colCount: 4 });
+    c.setCellText(0, 0, 'master');
+    render(
+      <LatticaGrid
+        controller={c}
+        width={400}
+        height={300}
+        renderDetail={(physRow) => <div>detail for {physRow}</div>}
+      />,
+    );
+    // Nothing expanded yet.
+    expect(screen.queryByTestId('lattica-detail-0')).toBeNull();
+    act(() => c.toggleDetail(0));
+    const panel = screen.getByTestId('lattica-detail-0');
+    expect(panel.textContent).toContain('detail for 0');
+  });
+
+  it('renders no detail panels without a renderDetail prop', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    render(<LatticaGrid controller={c} width={300} height={200} />);
+    act(() => c.toggleDetail(0));
+    expect(screen.queryByTestId('lattica-detail-0')).toBeNull();
   });
 });

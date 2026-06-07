@@ -795,3 +795,35 @@ describe('Phase E-2 — sparklines', () => {
     expect(c.getCellSparkline(0, 0, 50, 20)?.kind).toBe('bar');
   });
 });
+
+describe('Phase E-7 — master/detail', () => {
+  it('toggles detail and enlarges the row height by the detail height', () => {
+    const c = make();
+    expect(c.isDetailExpanded(0)).toBe(false);
+    const baseH = c.geometry().rowSizes.getSize(0);
+    c.toggleDetail(0);
+    expect(c.isDetailExpanded(0)).toBe(true);
+    expect(c.geometry().rowSizes.getSize(0)).toBe(baseH + c.getDetailHeight());
+    c.toggleDetail(0);
+    expect(c.isDetailExpanded(0)).toBe(false);
+    expect(c.geometry().rowSizes.getSize(0)).toBe(baseH);
+  });
+
+  it('setDetailHeight changes reserved space and emits', () => {
+    const c = make();
+    const listener = vi.fn();
+    c.on('change', listener);
+    c.setDetailHeight(200);
+    expect(c.getDetailHeight()).toBe(200);
+    c.toggleDetail(1);
+    expect(c.geometry().rowSizes.getSize(1)).toBe(24 + 200);
+    expect(listener).toHaveBeenCalled();
+    c.setDetailHeight(-50); // clamped to 0
+    expect(c.getDetailHeight()).toBe(0);
+  });
+
+  it('maps a visual row to its physical row', () => {
+    const c = make();
+    expect(c.getPhysicalRow(3)).toBe(3); // identity view
+  });
+});

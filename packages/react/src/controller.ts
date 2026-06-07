@@ -16,6 +16,7 @@ import {
   searchGrid,
   MergeModel,
   ValidationModel,
+  DetailModel,
   validators,
   aggregate,
   distinctValues,
@@ -135,6 +136,10 @@ export class GridController {
   readonly merges = new MergeModel();
   /** Per-cell validation; invalid cells are tinted red. Keyed by physical coords. */
   readonly validation = new ValidationModel();
+  /** Master/detail expansion state (physical row keys). */
+  readonly details = new DetailModel();
+  /** Extra height reserved below an expanded master row for its detail panel. */
+  private detailHeight = 120;
   /** Allowed option lists for dropdown/autocomplete columns (physical col). */
   private readonly columnOptions = new Map<number, readonly string[]>();
   /** Excel-style number format patterns per physical column. */
@@ -188,6 +193,11 @@ export class GridController {
     this.selection.subscribe(() => this.emitter.emit('change', undefined));
     // Repaint when the invalid-cell set changes (validation runs on commit).
     this.validation.subscribe(() => this.emitter.emit('change', undefined));
+    // Expanding/collapsing a detail panel changes row heights.
+    this.details.subscribe(() => {
+      this.rebuildViewSizes();
+      this.emitter.emit('change', undefined);
+    });
   }
 
   getRowCount(): number {
@@ -212,7 +222,12 @@ export class GridController {
     const cols = this.view.getColCount();
     const vr = new SizeManager({ count: rows, defaultSize: this.defaultRowHeight });
     for (let v = 0; v < rows; v++) {
-      const size = this.rowSizes.getSize(this.view.rows.getPhysicalIndex(v));
+      const physical = this.view.rows.getPhysicalIndex(v);
+      let size = this.rowSizes.getSize(physical);
+      // Expanded master rows reserve extra height for their detail panel.
+      if (this.details.isExpanded(physical)) {
+        size += this.detailHeight;
+      }
       if (size !== this.defaultRowHeight) {
         vr.setSize(v, size);
       }
@@ -314,6 +329,33 @@ export class GridController {
   showAllColumns(): void {
     this.view.cols.setHidden(this.view.cols.getHidden(), false);
     this.refreshColumns();
+  }
+
+  // ── Master / detail ────────────────────────────────────────────────────────
+  /** Extra height reserved below an expanded master row (default 120). */
+  setDetailHeight(height: number): void {
+    this.detailHeight = Math.max(0, height);
+    this.rebuildViewSizes();
+    this.emitter.emit('change', undefined);
+  }
+
+  getDetailHeight(): number {
+    return this.detailHeight;
+  }
+
+  /** Toggle the detail panel of a (visual) row. */
+  toggleDetail(visualRow: number): void {
+    this.details.toggle(this.view.rows.getPhysicalIndex(visualRow));
+  }
+
+  /** Is the (visual) row's detail panel expanded? */
+  isDetailExpanded(visualRow: number): boolean {
+    return this.details.isExpanded(this.view.rows.getPhysicalIndex(visualRow));
+  }
+
+  /** Physical (data) row index for a visual row. */
+  getPhysicalRow(visualRow: number): number {
+    return this.view.rows.getPhysicalIndex(visualRow);
   }
 
   /** Move `count` columns from one visual position to another. */
