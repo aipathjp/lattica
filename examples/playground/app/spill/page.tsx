@@ -71,7 +71,7 @@ export default function SpillPage(): React.ReactElement {
         {probe}
       </div>
       <div style={{ border: '1px solid #cbd2d9', borderRadius: 6, width: 'fit-content' }}>
-        <LatticaGrid controller={controller} columns={columns} width={680} height={520} />
+        <LatticaGrid controller={controller} columns={columns} width={648} height={520} />
       </div>
     </main>
   );

@@ -42,7 +42,7 @@ export default function EditorsPage(): React.ReactElement {
         <code>-1</code> and commit to see the cell flagged <span style={{ color: '#b00020' }}>red</span>.
       </p>
       <div style={{ border: '1px solid #cbd2d9', borderRadius: 6, width: 'fit-content' }}>
-        <LatticaGrid controller={controller} columns={columns} width={820} height={420} />
+        <LatticaGrid controller={controller} columns={columns} width={798} height={420} />
       </div>
     </main>
   );

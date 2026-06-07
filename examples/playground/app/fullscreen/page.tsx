@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { LatticaGrid, LatticaFormulaBar, LatticaStatusBar, useGridController } from '@lattica/react';
 import type { ColumnNode } from '@lattica/core';
 
@@ -16,6 +16,31 @@ const columns: readonly ColumnNode[] = [
 export default function FullscreenPage(): React.ReactElement {
   const controller = useGridController({ rowCount: 500, colCount: 4, defaultColWidth: 160 });
   const [mode, setMode] = useState<Mode>('fitWidth');
+  const gridBoxRef = useRef<HTMLDivElement | null>(null);
+
+  // Stretch the 4 columns to always fill the container width — a fill-mode
+  // showcase should leave no dead space right of the last column in any mode.
+  useEffect(() => {
+    const el = gridBoxRef.current;
+    if (el === null || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w === undefined) {
+        return;
+      }
+      // Inner width minus the row-number gutter (48px), split across 4 columns;
+      // the last column absorbs the rounding remainder.
+      const inner = Math.max(320, Math.floor(w) - 48);
+      const base = Math.floor(inner / 4);
+      for (let c = 0; c < 4; c++) {
+        controller.resizeCol(c, c === 3 ? inner - base * 3 : base);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [controller]);
 
   useEffect(() => {
     controller.setColumnFormat(2, '$#,##0.00');
@@ -78,7 +103,7 @@ export default function FullscreenPage(): React.ReactElement {
         }}
       >
         <LatticaFormulaBar controller={controller} />
-        <div style={{ flex: '1 1 auto', minHeight: 0 }}>
+        <div ref={gridBoxRef} style={{ flex: '1 1 auto', minHeight: 0 }}>
           <LatticaGrid controller={controller} columns={columns} fill />
         </div>
         <LatticaStatusBar controller={controller} />

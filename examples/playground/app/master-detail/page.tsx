@@ -54,7 +54,7 @@ export default function MasterDetailPage(): React.ReactElement {
           controller={controller}
           columns={columns}
           width={440}
-          height={420}
+          height={264}
           renderDetail={(physRow) => {
             const o = ORDERS[physRow];
             return (
