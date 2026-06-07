@@ -751,12 +751,12 @@ describe('Phase C-2 — visual conditional formatting', () => {
     expect(c.getCellVisual(1, 0)).toEqual({ bar: { ratio: 0.5, color: '#39f' } });
   });
 
-  it('icon set picks an icon by bucket', () => {
+  it('icon set picks a level by bucket', () => {
     const c = make();
     seed(c);
-    c.setIconSet(0, ['🔴', '🟡', '🟢']);
-    expect(c.getCellVisual(0, 0)?.icon).toBe('🔴');
-    expect(c.getCellVisual(2, 0)?.icon).toBe('🟢');
+    c.setIconSet(0, 'traffic');
+    expect(c.getCellVisual(0, 0)?.icon).toEqual({ set: 'traffic', level: 0, total: 3 });
+    expect(c.getCellVisual(2, 0)?.icon).toEqual({ set: 'traffic', level: 2, total: 3 });
   });
 
   it('returns null without a rule, for non-numeric values, or an all-empty column', () => {

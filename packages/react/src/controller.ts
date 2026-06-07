@@ -25,6 +25,7 @@ import {
   computeSparkline,
   type CfVisualRule,
   type CellVisual,
+  type IconSet,
   type SparklineKind,
   type SparklineShape,
   type AggregateFn,
@@ -616,9 +617,9 @@ export class GridController {
     this.emitter.emit('change', undefined);
   }
 
-  /** Apply an icon set (low→high) to a (physical) column. */
-  setIconSet(col: number, icons: string[]): void {
-    this.columnVisualRules.set(col, { kind: 'iconSet', icons });
+  /** Apply a named Excel-style icon set (low→high) to a (physical) column. */
+  setIconSet(col: number, set: IconSet): void {
+    this.columnVisualRules.set(col, { kind: 'iconSet', set });
     this.emitter.emit('change', undefined);
   }
 

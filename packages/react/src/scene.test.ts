@@ -145,12 +145,12 @@ describe('buildScene visual conditional formatting', () => {
           : c === 1
             ? { bar: { ratio: 0.5, color: '#39f' } }
             : c === 2
-              ? { icon: '🟢' }
+              ? { icon: { set: 'traffic' as const, level: 2, total: 3 } }
               : null,
     });
     expect(scene.cells.find((k) => k.col === 0)!.cfStyle?.background).toBe('#808080');
     expect(scene.cells.find((k) => k.col === 1)!.bar).toEqual({ ratio: 0.5, color: '#39f' });
-    expect(scene.cells.find((k) => k.col === 2)!.icon).toBe('🟢');
+    expect(scene.cells.find((k) => k.col === 2)!.icon).toEqual({ set: 'traffic', level: 2, total: 3 });
   });
 
   it('explicit cf background wins over a color-scale background', () => {

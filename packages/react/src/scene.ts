@@ -10,6 +10,7 @@ import {
   type SelectionModel,
   type MergeArea,
   type CellVisual,
+  type IconMark,
   type SparklineShape,
 } from '@lattica/core';
 import { cellRect, type GridGeometry, type Rect } from './geometry.js';
@@ -31,8 +32,8 @@ export interface CellPaint {
   cfStyle?: { background?: string; color?: string };
   /** In-cell data bar (ratio 0..1 + color), if any. */
   bar?: { ratio: number; color: string };
-  /** Icon-set glyph to draw at the cell's left, if any. */
-  icon?: string;
+  /** Icon-set mark to draw at the cell's left, if any. */
+  icon?: IconMark;
   /** In-cell sparkline shape (cell-local coordinates), if any. */
   sparkline?: SparklineShape;
 }
