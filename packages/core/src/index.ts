@@ -93,6 +93,21 @@ export {
   type SparklineBar,
 } from './sparkline.js';
 export {
+  layoutChart,
+  niceScale,
+  CHART_PALETTE,
+  type ChartKind,
+  type ChartSeries,
+  type ChartSpec,
+  type ChartLayout,
+  type ChartRect,
+  type AxisTick,
+  type LinePoint,
+  type ChartBar,
+  type PieSlice,
+  type NiceScale,
+} from './chart.js';
+export {
   toNumberOrNull,
   summarize,
   summarizeColumn,

@@ -28,6 +28,10 @@ export interface Canvas2D {
   moveTo(x: number, y: number): void;
   lineTo(x: number, y: number): void;
   stroke(): void;
+  /** Arc drawing — used by the pie chart renderer. */
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number): void;
+  closePath(): void;
+  fill(): void;
 }
 
 export interface PaintOptions {

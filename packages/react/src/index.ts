@@ -2,6 +2,8 @@
 
 export { LatticaGrid, type LatticaGridProps } from './LatticaGrid.js';
 export { LatticaStatusBar, type LatticaStatusBarProps } from './StatusBar.js';
+export { LatticaChart, type LatticaChartProps } from './LatticaChart.js';
+export { paintChart, type ChartPaintOptions } from './chart-painter.js';
 export { useGridController } from './useGridController.js';
 export {
   GridController,
