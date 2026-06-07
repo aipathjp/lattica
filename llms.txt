@@ -1,0 +1,29 @@
+# Lattica
+
+> Clean-room, MIT-licensed data grid & spreadsheet engine for React/Next.js:
+> canvas rendering, a self-built Excel-compatible formula engine (150 functions,
+> dynamic-array spill, LAMBDA, structured references), CRDT collaboration,
+> AI-native helpers, and an MCP tool layer. Eight packages, headless-first.
+
+For AI coding agents, the primary guide is AGENTS.md — task-oriented, copy-paste
+recipes and conventions. Start there.
+
+## Docs
+- [AGENTS.md](AGENTS.md): how agents should use Lattica (APIs, recipes, gotchas).
+- [docs/USAGE.md](docs/USAGE.md): human usage guide.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): design and rendering model.
+- [docs/COMPETITIVE_GAP_ANALYSIS.md](docs/COMPETITIVE_GAP_ANALYSIS.md): feature coverage vs Handsontable/AG Grid/Univer.
+- [docs/PROGRESS.md](docs/PROGRESS.md): full feature changelog.
+
+## Packages (import from the package name)
+- @lattica/core: headless models (sizes, selection, undo, merge, validation, conditional format, number format, aggregate, pivot, sparkline, chart layout, detail, fill, coords).
+- @lattica/formula: SheetEngine, parser, 150 functions, dependency graph, spill, named ranges, R1C1, structured refs.
+- @lattica/data: visual↔physical index mapping, sort/filter, nested rows, DataView, AsyncRowModel.
+- @lattica/react: <LatticaGrid>, <LatticaStatusBar>, <LatticaChart>, useGridController, themes (palette × density).
+- @lattica/io: CSV/TSV, XLSX read + plain/styled write, JSON, clipboard, tableToPdf.
+- @lattica/collab: CRDT (LWW), fractional index keys, presence.
+- @lattica/ai: provider-agnostic NL→formula/operation, smart fill, anomaly (MockProvider for tests).
+- @lattica/mcp: grid tool registry + ToolDispatcher.
+
+## Live demo
+https://lattica-demo.vercel.app — one interactive page per feature.
