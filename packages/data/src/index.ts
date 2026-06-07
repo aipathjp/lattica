@@ -19,3 +19,9 @@ export {
 } from './filter.js';
 export { NestedRowModel, type NestedRowNode } from './nested-rows.js';
 export { DataView, type PhysicalCell } from './data-view.js';
+export {
+  AsyncRowModel,
+  type RowBlock,
+  type RowFetcher,
+  type AsyncRowModelOptions,
+} from './async-rows.js';
