@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { GridController, formatValue } from './controller.js';
+import { GridController, formatValue, replaceInText } from './controller.js';
 import { FormulaError } from '@lattica/formula';
 
 const make = () => new GridController({ rowCount: 50, colCount: 26 });
@@ -583,5 +583,111 @@ describe('editors, options & validation (Phase A)', () => {
     c.commitEdit();
     await flush();
     expect(c.isInvalid(0, 0)).toBe(false);
+  });
+});
+
+describe('Phase B — column ops, facets, aggregation, replace', () => {
+  const seedCol = (c: GridController, col: number, vals: (string | number)[]) =>
+    vals.forEach((v, r) => c.setCellText(r, col, String(v)));
+
+  it('hides and shows a column', () => {
+    const c = make();
+    seedCol(c, 0, [1, 2]);
+    seedCol(c, 1, [3, 4]);
+    expect(c.getColCount()).toBe(26);
+    c.hideColumn(0);
+    expect(c.getColCount()).toBe(25);
+    // visual col 0 is now the old physical col 1
+    expect(c.getDisplay(0, 0)).toBe('3');
+    expect(c.isColumnHidden(0)).toBe(true);
+    c.showColumn(0);
+    expect(c.getColCount()).toBe(26);
+    expect(c.isColumnHidden(0)).toBe(false);
+  });
+
+  it('moves a column', () => {
+    const c = make();
+    seedCol(c, 0, [10]);
+    seedCol(c, 1, [20]);
+    seedCol(c, 2, [30]);
+    c.moveColumn(0, 2); // move col A so it sits before visual position 2
+    expect(c.getDisplay(0, 0)).toBe('20');
+    expect(c.getDisplay(0, 1)).toBe('10');
+    expect(c.getDisplay(0, 2)).toBe('30');
+  });
+
+  it('computes column facets (distinct labels sorted)', () => {
+    const c = make();
+    seedCol(c, 0, ['b', 'a', 'b', 'c', 'a']);
+    const facets = c.columnFacets(0);
+    expect(facets.map((f) => f.label)).toEqual(['', 'a', 'b', 'c']);
+  });
+
+  it('applies and clears a set filter', () => {
+    const c = make();
+    ['x', 'y', 'z', 'x'].forEach((v, r) => c.setCellText(r, 0, v));
+    c.setColumnSetFilter(0, ['x']);
+    expect(c.getRowCount()).toBe(2);
+    expect(c.getDisplay(0, 0)).toBe('x');
+    c.setColumnSetFilter(0, []); // clear
+    expect(c.getRowCount()).toBe(50);
+  });
+
+  it('aggregates a column over visible rows', () => {
+    const c = make();
+    seedCol(c, 0, [10, 20, 30]);
+    expect(c.aggregateColumn(0, 'sum')).toBe(60);
+    expect(c.aggregateColumn(0, 'avg')).toBe(20);
+    expect(c.aggregateColumn(0, 'count')).toBe(3);
+    // After filtering, aggregation reflects only visible rows.
+    c.setColumnFilter(0, [{ kind: 'gt', value: 15 }]);
+    expect(c.aggregateColumn(0, 'sum')).toBe(50);
+  });
+
+  it('replaceAll replaces matching cell text (undoable)', () => {
+    const c = make();
+    c.setCellText(0, 0, 'cat');
+    c.setCellText(1, 0, 'caterpillar');
+    c.setCellText(2, 0, 'dog');
+    const n = c.replaceAll('cat', 'CAT');
+    expect(n).toBe(2);
+    expect(c.getDisplay(0, 0)).toBe('CAT');
+    expect(c.getDisplay(1, 0)).toBe('CATerpillar');
+    expect(c.getDisplay(2, 0)).toBe('dog');
+    c.undoLast();
+    expect(c.getDisplay(0, 0)).toBe('cat');
+  });
+
+  it('replaceAll honors wholeCell and returns 0 for empty query / no match', () => {
+    const c = make();
+    c.setCellText(0, 0, 'cat');
+    c.setCellText(1, 0, 'category');
+    expect(c.replaceAll('cat', 'X', { wholeCell: true })).toBe(1);
+    expect(c.getDisplay(0, 0)).toBe('X');
+    expect(c.getDisplay(1, 0)).toBe('category');
+    expect(c.replaceAll('', 'Y')).toBe(0);
+    expect(c.replaceAll('zzz', 'Y')).toBe(0);
+  });
+});
+
+describe('replaceInText', () => {
+  it('literal global replace (default, case-insensitive)', () => {
+    expect(replaceInText('aAa', 'a', 'b')).toBe('bbb');
+  });
+  it('case-sensitive replace', () => {
+    expect(replaceInText('aAa', 'a', 'b', { caseSensitive: true })).toBe('bAb');
+  });
+  it('escapes regex metachars in literal mode', () => {
+    expect(replaceInText('1+1=2', '+', '-')).toBe('1-1=2');
+  });
+  it('wholeCell only replaces a full match', () => {
+    expect(replaceInText('cat', 'cat', 'X', { wholeCell: true })).toBe('X');
+    expect(replaceInText('cats', 'cat', 'X', { wholeCell: true })).toBe('cats');
+  });
+  it('regex mode applies the pattern', () => {
+    expect(replaceInText('a1b2', '[0-9]', '#', { regex: true })).toBe('a#b#');
+  });
+  it('invalid regex leaves text unchanged', () => {
+    expect(replaceInText('abc', '(', 'X', { regex: true })).toBe('abc');
   });
 });
