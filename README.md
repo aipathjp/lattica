@@ -17,7 +17,7 @@ on any GPL/commercial grid or formula library.
 | Package | Description | Runtime deps |
 |---------|-------------|--------------|
 | [`@lattica/core`](packages/core) | Framework-agnostic engine: A1 coords, virtualization math, sparse data store, selection, command/undo, multi-level header flattening, typed emitter | **none** |
-| [`@lattica/formula`](packages/formula) | Clean-room Excel-compatible formula engine: lexer → Pratt parser → evaluator + incremental dependency graph (`#CYCLE!` detection), ~55 functions | core |
+| [`@lattica/formula`](packages/formula) | Clean-room Excel-compatible formula engine: lexer → Pratt parser → evaluator + incremental dependency graph (`#CYCLE!` detection), 150 functions, dynamic-array spill, LAMBDA, structured references | core |
 | [`@lattica/react`](packages/react) | React bindings: canvas-rendered virtualized grid, DOM editing overlay (IME-aware), multi-level grouping headers, `GridController` | core, formula |
 | [`@lattica/io`](packages/io) | CSV/TSV (RFC 4180), clipboard (TSV + HTML), dependency-free XLSX export (stored-ZIP + CRC-32) | core |
 | [`@lattica/collab`](packages/collab) | Realtime: LWW table CRDT, fractional indexing for stable row/col order, presence, transport abstraction | core |
@@ -33,6 +33,10 @@ on any GPL/commercial grid or formula library.
   minimal re-evaluation, circular-reference detection, Excel error propagation.
 - **Collaboration-ready** — a tombstone-free LWW CRDT converges deterministically;
   fractional indexing keeps row/column order stable across concurrent inserts.
+
+> **Using an AI coding agent?** Read [`AGENTS.md`](AGENTS.md) — a task-oriented,
+> copy-paste guide (APIs, recipes, conventions, gotchas) written for Claude Code,
+> Cursor, and similar tools. Live demo of every feature: **https://lattica-demo.vercel.app**.
 
 ## Quick start
 
