@@ -40,6 +40,8 @@ import {
   forEachCell,
   normalizeRange,
   fillRegion,
+  toA1,
+  parseA1,
 } from '@lattica/core';
 import {
   DataView,
@@ -357,6 +359,54 @@ export class GridController {
   /** Physical (data) row index for a visual row. */
   getPhysicalRow(visualRow: number): number {
     return this.view.rows.getPhysicalIndex(visualRow);
+  }
+
+  // ── Formula bar support ────────────────────────────────────────────────────
+  /** The active (visual) cell. */
+  getActiveCell(): { row: number; col: number } {
+    const { active } = this.selection.getState();
+    return { row: active.row, col: active.col };
+  }
+
+  /** A1 reference of the active cell (physical coords, matching formulas). */
+  getActiveRef(): string {
+    const { active } = this.selection.getState();
+    return toA1(this.toPhysical(active.row, active.col));
+  }
+
+  /** Editable text (`=formula` or literal) of the active cell. */
+  getActiveEditText(): string {
+    const { active } = this.selection.getState();
+    return this.getEditText(active.row, active.col);
+  }
+
+  /** Set the active cell's content (undoable) — used by the formula bar. */
+  setActiveCellText(raw: string): void {
+    const { active } = this.selection.getState();
+    this.setCellText(active.row, active.col, raw);
+  }
+
+  /**
+   * Select the cell named by an A1 reference (physical), e.g. from the name box.
+   * Returns false for an invalid or out-of-range / hidden reference.
+   */
+  goToRef(ref: string): boolean {
+    let addr: { row: number; col: number };
+    try {
+      addr = parseA1(ref);
+    } catch {
+      return false;
+    }
+    if (addr.row >= this.rowCount || addr.col >= this.colCount) {
+      return false;
+    }
+    const visualRow = this.view.rows.getVisualIndex(addr.row);
+    const visualCol = this.view.cols.getVisualIndex(addr.col);
+    if (visualRow < 0 || visualCol < 0) {
+      return false; // hidden by filter / collapse
+    }
+    this.selection.setActive({ row: visualRow, col: visualCol });
+    return true;
   }
 
   /** Move `count` columns from one visual position to another. */

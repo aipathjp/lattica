@@ -827,3 +827,37 @@ describe('Phase E-7 — master/detail', () => {
     expect(c.getPhysicalRow(3)).toBe(3); // identity view
   });
 });
+
+describe('formula bar support', () => {
+  it('reports the active cell, ref, and edit text', () => {
+    const c = make();
+    c.setCellText(2, 1, '=1+2');
+    c.selection.setActive({ row: 2, col: 1 });
+    expect(c.getActiveCell()).toEqual({ row: 2, col: 1 });
+    expect(c.getActiveRef()).toBe('B3');
+    expect(c.getActiveEditText()).toBe('=1+2');
+  });
+
+  it('sets the active cell content', () => {
+    const c = make();
+    c.selection.setActive({ row: 0, col: 0 });
+    c.setActiveCellText('=10*2');
+    expect(c.getDisplay(0, 0)).toBe('20');
+  });
+
+  it('goToRef selects a valid A1 reference and rejects bad/out-of-range ones', () => {
+    const c = make();
+    expect(c.goToRef('C5')).toBe(true);
+    expect(c.getActiveCell()).toEqual({ row: 4, col: 2 });
+    expect(c.goToRef('nonsense')).toBe(false);
+    expect(c.goToRef('A9999')).toBe(false); // beyond rowCount (50)
+  });
+
+  it('goToRef returns false for a filtered-out (hidden) reference', () => {
+    const c = make();
+    c.setCellText(0, 0, 'keep');
+    c.setCellText(1, 0, 'drop');
+    c.setColumnFilter(0, [{ kind: 'equals', value: 'keep' }]); // hides row 1
+    expect(c.goToRef('A2')).toBe(false);
+  });
+});

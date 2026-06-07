@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { LatticaGrid, useGridController } from '@lattica/react';
+import { LatticaGrid, LatticaFormulaBar, useGridController } from '@lattica/react';
 import type { ColumnNode } from '@lattica/core';
 
 const columns: readonly ColumnNode[] = Array.from({ length: 7 }, (_, i) => ({
@@ -45,7 +45,8 @@ export default function FormulasPage(): React.ReactElement {
         <code> LET</code> (F3), <code>SUM(Fruit[Price])</code> structured ref (F5), and
         <code> MAP(…,LAMBDA(…))</code> (A7). Click a spilled cell to confirm it is virtual.
       </p>
-      <div style={{ border: '1px solid #cbd2d9', borderRadius: 6, width: 'fit-content' }}>
+      <div style={{ border: '1px solid #cbd2d9', borderRadius: 6, width: 'fit-content', overflow: 'hidden' }}>
+        <LatticaFormulaBar controller={controller} />
         <LatticaGrid controller={controller} columns={columns} width={790} height={420} />
       </div>
     </main>

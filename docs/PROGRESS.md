@@ -229,3 +229,8 @@
   - 列幅・行高の変更（ヘッダ境界ドラッグ）と固定行/列（`frozenRows`/`frozenCols`）は実装済みだったが、**スクロール時に固定セルがスクロールセルに上書きされる描画バグ**を修正：`CellPaint.frozen` を追加し、painter を「非固定→固定の2パス＋固定は不透明背景」に変更。固定行/列がスクロール中も崩れず最前面に保持される。
   - デモに `/freeze`（タイトル行＋列を固定してデータのみスクロール、列リサイズ）を追加。
   - 全体 **1935テスト・100%カバレッジ**。typecheck/lint/build クリーン。
+- 2026-06-07: **数式バー（Excel 風）追加**。
+  - **`<LatticaFormulaBar>`**：ネームボックス（アクティブセルの A1・入力で Go To 移動）＋ `fx` ＋ 数式入力。アクティブセルと**双方向同期**（選択移動・セル編集でバー更新、Enter でコミット＆下移動、Escape で取消、blur でコミット）。`=` 入力でそのまま数式。
+  - `GridController`：`getActiveCell`/`getActiveRef`/`getActiveEditText`/`setActiveCellText`/`goToRef`。
+  - セルへの数式直接入力は従来からインラインエディタで対応（`=A1*2` 等）。デモ kitchen-sink / formulas に数式バーを設置。
+  - 全体 **1947テスト・100%カバレッジ**。typecheck/lint/build クリーン。
