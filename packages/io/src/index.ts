@@ -21,6 +21,14 @@ export {
   type XlsxSheet,
   type XlsxWorkbook,
 } from './xlsx.js';
+export {
+  writeStyledXlsx,
+  type CellStyle,
+  type StyledCell,
+  type StyledSheet,
+  type StyledWorkbook,
+  type XlsxMerge,
+} from './xlsx-style.js';
 export { inflateRaw } from './inflate.js';
 export { readXlsx, type ReadSheet, type ReadWorkbook } from './xlsx-read.js';
 export {
