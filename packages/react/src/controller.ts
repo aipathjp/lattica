@@ -15,6 +15,9 @@ import {
   SearchState,
   searchGrid,
   MergeModel,
+  ValidationModel,
+  validators,
+  type Validator,
   type MergeArea,
   type Command,
   type CellAddress,
@@ -39,6 +42,7 @@ import {
 import { SheetEngine, FormulaError, type CellContent } from '@lattica/formula';
 import type { GridGeometry } from './geometry.js';
 import type { CellAlign } from './cell-types.js';
+import { editorKindForType, type EditorKind } from './editors.js';
 
 export interface GridControllerOptions {
   rowCount: number;
@@ -89,6 +93,10 @@ export class GridController {
   readonly search = new SearchState();
   /** Merged cell areas (visual coordinates). */
   readonly merges = new MergeModel();
+  /** Per-cell validation; invalid cells are tinted red. Keyed by physical coords. */
+  readonly validation = new ValidationModel();
+  /** Allowed option lists for dropdown/autocomplete columns (physical col). */
+  private readonly columnOptions = new Map<number, readonly string[]>();
   /** View transform (sort/filter) mapping visual↔physical indices. */
   readonly view: DataView;
   private readonly sortModel = new SortModel();
@@ -132,6 +140,8 @@ export class GridController {
     this.frozenRows = options.frozenRows ?? 0;
     this.frozenCols = options.frozenCols ?? 0;
     this.selection.subscribe(() => this.emitter.emit('change', undefined));
+    // Repaint when the invalid-cell set changes (validation runs on commit).
+    this.validation.subscribe(() => this.emitter.emit('change', undefined));
   }
 
   getRowCount(): number {
@@ -330,16 +340,52 @@ export class GridController {
     return this.columnAligns.get(this.view.cols.getPhysicalIndex(visualCol));
   }
 
+  // ── Editors, options & validation ──────────────────────────────────────────
+  /**
+   * Set the allowed option list for a column (used by `dropdown`/`autocomplete`
+   * cell types). A `dropdown` column additionally gets a list validator so that
+   * a value outside the options is flagged invalid.
+   */
+  setColumnOptions(col: number, options: readonly string[]): void {
+    this.columnOptions.set(col, options);
+    this.validation.setColumnValidator(col, validators.list(options));
+    this.emitter.emit('change', undefined);
+  }
+
+  /** Options for a column (by visual index), or undefined when none set. */
+  getColumnOptions(visualCol: number): readonly string[] | undefined {
+    return this.columnOptions.get(this.view.cols.getPhysicalIndex(visualCol));
+  }
+
+  /** Set a custom validator on a (physical) column. */
+  setColumnValidator(col: number, validator: Validator): void {
+    this.validation.setColumnValidator(col, validator);
+  }
+
+  /** Which DOM editor a column should use, derived from its cell type. */
+  getEditorKind(visualCol: number): EditorKind {
+    return editorKindForType(this.getColumnType(visualCol));
+  }
+
+  /** Is the cell (visual coords) currently flagged invalid by validation? */
+  isInvalid(visualRow: number, visualCol: number): boolean {
+    const p = this.toPhysical(visualRow, visualCol);
+    return this.validation.isInvalid(p.row, p.col);
+  }
+
   // ── Conditional formatting & search styling ────────────────────────────────
   /** Combined per-cell style: conditional-format rule, overlaid by a search-hit tint. */
   getCellStyle(row: number, col: number): CfStyle | null {
-    const base = this.conditionalFormat.styleFor(
-      this.engine.getValue(this.toPhysical(row, col)) as never,
-    );
+    const p = this.toPhysical(row, col);
+    let style = this.conditionalFormat.styleFor(this.engine.getValue(p) as never);
     if (this.searchKeys.has(`${row},${col}`)) {
-      return { ...(base ?? {}), background: '#fff3a3' };
+      style = { ...(style ?? {}), background: '#fff3a3' };
     }
-    return base;
+    // Invalid cells win visually (red tint), overlaying cf/search.
+    if (this.validation.isInvalid(p.row, p.col)) {
+      style = { ...(style ?? {}), background: '#ffd6d6', color: '#b00020' };
+    }
+    return style;
   }
 
   /** Run a search over displayed cell text, updating match state. Returns hit count. */
@@ -572,6 +618,9 @@ export class GridController {
     const { row, col, draft } = this.editState;
     this.editState = null;
     this.setCellText(row, col, draft);
+    // Validate the committed value against the column/cell validator (if any).
+    const p = this.toPhysical(row, col);
+    void this.validation.validate(p.row, p.col, this.parseInput(draft) as CellValue);
     this.emitter.emit('edit', null);
   }
 

@@ -145,3 +145,9 @@
   - `examples/playground` を実行可能な Next.js アプリ化（`/`・`/kitchen-sink`・`/spill`・`/data`）。Playwright で実ブラウザ検証（7/7）。
   - **Neon ダミー DB**（`lattica-demo` / project `dark-hill-93073372`・`sales_records` 150行）を作成。`/api/sales`（`@neondatabase/serverless`・`DATABASE_URL` は env 管理）→ `/data` ページがグリッドへ読込。Revenue=`ROUND(Units*UnitPrice,2)` 数式列・チェックボックス・条件付き書式（>5000緑）・ソート/フィルタ/検索・CSV/XLSX 出力。
   - **Vercel 本番公開**: https://lattica-demo.vercel.app （ai-path-inc、Root Directory=examples/playground、モノレポ build、region hnd1）。本番で全ルート 200・API が Neon から 150 行返却・コンソールエラー 0 を確認。
+- 2026-06-07: **競合ギャップ分析**（`docs/COMPETITIVE_GAP_ANALYSIS.md`）。Handsontable/AG Grid/Univer 他を横断調査し、P0=編集器/検証/フィルタUI/数値書式/集計、P1=条件付き書式ビジュアル/ステータスバー/スタイル付きXLSX/数式拡張/ピボット、を特定。以降の Phase はこのロードマップ準拠。
+- 2026-06-07: **Phase A 完了**（リッチセル編集器＋データ検証 UI）。
+  - 新エディタ種別 `editors.ts`（dropdown/date/autocomplete/number/checkbox/text を列型から解決）。
+  - `<LatticaGrid>` がアクティブセルのエディタを列型で出し分け: **ドロップダウン(`<select>`)・日付(`<input type=date>`)・オートコンプリート(`<input list>`+`<datalist>`、IME 対応)**、既定は従来の textarea。
+  - `GridController`: `setColumnOptions`/`getColumnOptions`（ドロップダウン候補）・`setColumnValidator`・`getEditorKind`・`isInvalid`。ドロップダウン列には list バリデータを自動付与。コミット時に `ValidationModel` で検証し、**不正セルを赤くティント**（`getCellStyle` に重畳、cf/検索より優先）。
+  - 全体 **1701テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase B（フィルタ UI / 列操作 / 検索置換 / グループ集計）。

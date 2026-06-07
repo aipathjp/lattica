@@ -523,3 +523,65 @@ describe('nested rows', () => {
     expect(c.getRowCount()).toBe(4); // filter cleared, nested r4 still hidden
   });
 });
+
+describe('editors, options & validation (Phase A)', () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it('resolves editor kind from column type', () => {
+    const c = make();
+    expect(c.getEditorKind(0)).toBe('text');
+    c.setColumnType(0, 'dropdown');
+    c.setColumnType(1, 'date');
+    c.setColumnType(2, 'autocomplete');
+    c.setColumnType(3, 'checkbox');
+    expect(c.getEditorKind(0)).toBe('dropdown');
+    expect(c.getEditorKind(1)).toBe('date');
+    expect(c.getEditorKind(2)).toBe('autocomplete');
+    expect(c.getEditorKind(3)).toBe('checkbox');
+  });
+
+  it('stores column options and applies a list validator for dropdowns', async () => {
+    const c = make();
+    const changed = vi.fn();
+    c.on('change', changed);
+    c.setColumnOptions(0, ['Tokyo', 'Osaka']);
+    expect(c.getColumnOptions(0)).toEqual(['Tokyo', 'Osaka']);
+    expect(changed).toHaveBeenCalled();
+
+    // Committing an out-of-list value flags the cell invalid.
+    c.beginEdit(0, 0, 'Nowhere');
+    c.commitEdit();
+    await flush();
+    expect(c.isInvalid(0, 0)).toBe(true);
+
+    // A valid value clears it.
+    c.beginEdit(0, 0, 'Osaka');
+    c.commitEdit();
+    await flush();
+    expect(c.isInvalid(0, 0)).toBe(false);
+  });
+
+  it('returns undefined options when none set', () => {
+    expect(make().getColumnOptions(5)).toBeUndefined();
+  });
+
+  it('supports a custom column validator and tints invalid cells red', async () => {
+    const c = make();
+    c.setColumnValidator(0, (v) => typeof v === 'number' && v > 0);
+    c.beginEdit(0, 0, '-3');
+    c.commitEdit();
+    await flush();
+    expect(c.isInvalid(0, 0)).toBe(true);
+    const style = c.getCellStyle(0, 0);
+    expect(style?.background).toBe('#ffd6d6');
+    expect(style?.color).toBe('#b00020');
+  });
+
+  it('commitEdit without a validator leaves the cell valid', async () => {
+    const c = make();
+    c.beginEdit(0, 0, 'free text');
+    c.commitEdit();
+    await flush();
+    expect(c.isInvalid(0, 0)).toBe(false);
+  });
+});
