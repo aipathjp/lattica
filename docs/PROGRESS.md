@@ -198,3 +198,6 @@
 - 2026-06-07: **Phase E-5 完了**（PDF 出力）。
   - `@lattica/io` `pdf.ts`: `tableToPdf(rows, options)` — 依存ゼロの PDF 1.4 ライタ。Helvetica（WinAnsi）・罫線グリッド・**自動ページ分割**・タイトル・列幅指定。バイト精度の xref/trailer を手組み。非 Latin-1 は `?` に畳む（フォント埋め込みは対象外）。
   - 全体 **1877テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E-6（数式 LAMBDA／構造化参照）。
+- 2026-06-07: **Phase E-6 完了**（LAMBDA ファミリ）。数式 144→**150**。
+  - **LAMBDA / MAP / REDUCE / SCAN / BYROW / BYCOL**。LAMBDA は高階関数の最終引数の **AST を直接解釈**する方式（`asLambda`/`invokeLambda` で仮引数を子スコープに束縛）。値型・パーサ変更なしで安全に実装。LET 束縛名もラムダ本体から解決。
+  - 全体 **1891テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E-7（マスターディテール UI）。
