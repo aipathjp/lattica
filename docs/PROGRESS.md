@@ -220,3 +220,8 @@
   - `<LatticaStatusBar theme={...}>`：グリッドと同じ surface/text/border 色・フォントに連動（ハードコード色を撤廃）。
   - `density.ts` `densityOptions(density)`：密度から `useGridController` 用の既定サイズ（行高/列幅/ヘッダ）を生成し spread で適用。
   - 全体 **1927テスト・100%カバレッジ**。typecheck/lint/build クリーン。**デザインシステム（Phase F）完了**：7 パレット × 3 密度（＋無段階調整）＋ `buildTheme` 合成＋テーマ連動 UI。
+- 2026-06-07: **Phase F-3 完了**（条件付き書式ビジュアルの刷新：Excel 風アイコン）。
+  - 絵文字アイコンを廃止し **ベクター描画の名前付きアイコンセット** に刷新：`traffic`（信号機円）/`signs`（円内 ✗/!/✓）/`arrows`（3方向）/`arrows5`（5方向・斜め）/`triangles`（▲/—/▼）/`ratings`（段階バー）。core `cf-visual.ts` に `IconSet`/`IconMark`/`iconSetSize`/`iconColor`、painter に `drawIcon`（arc/triangle/arrow 等の vector）。
+  - **データバー**を 2 トーン（上明/下濃）＋細枠でグラデ風に高品質化。
+  - `setIconSet(col, set)` は名前付きセットを受け取る形に変更。デモ formatting に全アイコンセットのギャラリーを追加。
+  - 全体 **1934テスト・100%カバレッジ**。typecheck/lint/build クリーン。

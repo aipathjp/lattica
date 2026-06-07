@@ -5,6 +5,7 @@
  * lightweight recording mock in tests.
  */
 
+import { iconColor, lerpColor, type IconMark } from '@lattica/core';
 import type { GridTheme } from './theme.js';
 import type { Scene } from './scene.js';
 import { defaultCellTypes, type CellTypeRegistry } from './cell-types.js';
@@ -78,12 +79,21 @@ export function paintScene(
       ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
     }
 
-    // In-cell data bar (drawn behind the text).
-    if (cell.bar !== undefined) {
+    // In-cell data bar (drawn behind the text) with a softer top + thin border.
+    if (cell.bar !== undefined && cell.bar.ratio > 0) {
       const inset = 2;
-      const barWidth = Math.max(0, (rect.width - inset * 2) * cell.bar.ratio);
+      const barWidth = Math.max(2, (rect.width - inset * 2) * cell.bar.ratio);
+      const bx = rect.x + inset;
+      const by = rect.y + inset;
+      const bh = rect.height - inset * 2;
+      // Two-tone fill (lighter top half) approximates Excel's gradient bar.
+      ctx.fillStyle = lerpColor(cell.bar.color, '#ffffff', 0.35);
+      ctx.fillRect(bx, by, barWidth, bh);
       ctx.fillStyle = cell.bar.color;
-      ctx.fillRect(rect.x + inset, rect.y + inset, barWidth, rect.height - inset * 2);
+      ctx.fillRect(bx, by + bh / 2, barWidth, bh / 2);
+      ctx.strokeStyle = lerpColor(cell.bar.color, '#000000', 0.25);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx + 0.5, by + 0.5, barWidth - 1, bh - 1);
     }
 
     // Gridlines (right + bottom edge).
@@ -119,11 +129,9 @@ export function paintScene(
       }
     }
 
-    // Icon-set glyph at the cell's left edge (drawn before the text).
+    // Crisp vector icon-set mark at the cell's left edge (before the text).
     if (cell.icon !== undefined) {
-      ctx.fillStyle = theme.textColor;
-      ctx.textAlign = 'left';
-      ctx.fillText(cell.icon, rect.x + theme.cellPaddingX, rect.y + rect.height / 2);
+      drawIcon(ctx, cell.icon, rect.x + theme.cellPaddingX, rect.y + rect.height / 2, theme);
     }
 
     registry.resolve(cell.type)({
@@ -153,5 +161,121 @@ function scaleForDpr(ctx: Canvas2D, dpr: number): void {
   const scalable = ctx as Canvas2D & { scale?: (x: number, y: number) => void };
   if (typeof scalable.scale === 'function') {
     scalable.scale(dpr, dpr);
+  }
+}
+
+/** Draw a filled triangle through three points. */
+function triangle(ctx: Canvas2D, ax: number, ay: number, bx: number, by: number, cx: number, cy: number): void {
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(bx, by);
+  ctx.lineTo(cx, cy);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** Draw an arrow (shaft + head) of radius `r` at angle `a` (radians, y-down). */
+function arrow(ctx: Canvas2D, cx: number, cy: number, r: number, a: number, color: string): void {
+  const dx = Math.cos(a);
+  const dy = Math.sin(a);
+  const hx = cx + dx * r;
+  const hy = cy + dy * r;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1.5, r * 0.32);
+  ctx.beginPath();
+  ctx.moveTo(cx - dx * r, cy - dy * r);
+  ctx.lineTo(hx, hy);
+  ctx.stroke();
+  const hl = r * 0.8;
+  const la = a + Math.PI * 0.78;
+  const ra = a - Math.PI * 0.78;
+  ctx.beginPath();
+  ctx.moveTo(hx, hy);
+  ctx.lineTo(hx + Math.cos(la) * hl, hy + Math.sin(la) * hl);
+  ctx.moveTo(hx, hy);
+  ctx.lineTo(hx + Math.cos(ra) * hl, hy + Math.sin(ra) * hl);
+  ctx.stroke();
+}
+
+/**
+ * Draw an Excel-style icon-set mark, vertically centered at `cy`, starting at
+ * left edge `x`. Crisp vector shapes — no emoji.
+ */
+function drawIcon(ctx: Canvas2D, mark: IconMark, x: number, cy: number, theme: GridTheme): void {
+  const size = Math.min(14, theme.fontSize + 2);
+  const color = iconColor(mark.set, mark.level, mark.total) ?? theme.activeBorder;
+  const r = size / 2;
+  const ccx = x + r;
+
+  if (mark.set === 'traffic') {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(ccx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  if (mark.set === 'signs') {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(ccx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(1.4, r * 0.32);
+    const u = r * 0.5;
+    if (mark.level >= mark.total - 1) {
+      // check
+      ctx.beginPath();
+      ctx.moveTo(ccx - u, cy);
+      ctx.lineTo(ccx - u * 0.2, cy + u * 0.8);
+      ctx.lineTo(ccx + u, cy - u * 0.8);
+      ctx.stroke();
+    } else if (mark.level === 0) {
+      // cross
+      ctx.beginPath();
+      ctx.moveTo(ccx - u, cy - u);
+      ctx.lineTo(ccx + u, cy + u);
+      ctx.moveTo(ccx + u, cy - u);
+      ctx.lineTo(ccx - u, cy + u);
+      ctx.stroke();
+    } else {
+      // exclamation
+      ctx.beginPath();
+      ctx.moveTo(ccx, cy - u);
+      ctx.lineTo(ccx, cy + u * 0.3);
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(ccx - 0.8, cy + u * 0.7, 1.6, 1.6);
+    }
+    return;
+  }
+
+  if (mark.set === 'arrows' || mark.set === 'arrows5') {
+    // level 0 (low) → down (PI/2); high → up (-PI/2); linear via diagonals.
+    const a = mark.total <= 1 ? 0 : Math.PI / 2 - (mark.level / (mark.total - 1)) * Math.PI;
+    arrow(ctx, ccx, cy, r * 0.85, a, color);
+    return;
+  }
+
+  if (mark.set === 'triangles') {
+    ctx.fillStyle = color;
+    if (mark.level >= mark.total - 1) {
+      triangle(ctx, ccx, cy - r, ccx + r, cy + r, ccx - r, cy + r); // up
+    } else if (mark.level === 0) {
+      triangle(ctx, ccx, cy + r, ccx + r, cy - r, ccx - r, cy - r); // down
+    } else {
+      ctx.fillRect(ccx - r, cy - r * 0.28, size, r * 0.56); // dash
+    }
+    return;
+  }
+
+  // ratings: graduated bars filled up to the level, rest faint.
+  const bars = mark.total;
+  const gap = 1.5;
+  const bw = (size + 4 - gap * (bars - 1)) / bars;
+  for (let i = 0; i < bars; i++) {
+    const bh = ((i + 1) / bars) * size;
+    ctx.fillStyle = i <= mark.level ? theme.activeBorder : lerpColor(theme.headerGridLineColor, '#ffffff', 0.3);
+    ctx.fillRect(x + i * (bw + gap), cy + size / 2 - bh, bw, bh);
   }
 }

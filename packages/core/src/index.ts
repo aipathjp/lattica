@@ -76,8 +76,12 @@ export {
   colorScaleAt,
   lerpColor,
   normalize,
+  iconSetSize,
+  iconColor,
   type CfVisualRule,
   type CellVisual,
+  type IconSet,
+  type IconMark,
 } from './cf-visual.js';
 export {
   pivot,

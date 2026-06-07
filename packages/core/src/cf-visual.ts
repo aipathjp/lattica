@@ -7,17 +7,53 @@
 
 import type { CellValue } from './types.js';
 
+/**
+ * Named, Excel-style icon sets. Rendered as crisp vector shapes (not emoji):
+ *  - `traffic`  : 3 filled circles (red / amber / green)
+ *  - `signs`    : 3 circled symbols (✗ / ! / ✓)
+ *  - `arrows`   : 3 directional arrows (down / right / up)
+ *  - `arrows5`  : 5 arrows (down → up, via diagonals)
+ *  - `triangles`: down triangle / dash / up triangle
+ *  - `ratings`  : 4 graduated bars filled to the value's level
+ */
+export type IconSet = 'traffic' | 'signs' | 'arrows' | 'arrows5' | 'triangles' | 'ratings';
+
+/** A resolved icon to draw: which set, the value's level, and the level count. */
+export interface IconMark {
+  set: IconSet;
+  level: number;
+  total: number;
+}
+
 /** A visual conditional-format rule applied to a column. */
 export type CfVisualRule =
   | { kind: 'colorScale'; colors: string[] }
   | { kind: 'dataBar'; color: string }
-  | { kind: 'iconSet'; icons: string[] };
+  | { kind: 'iconSet'; set: IconSet };
 
 /** The drawable result for a single cell. */
 export interface CellVisual {
   background?: string;
   bar?: { ratio: number; color: string };
-  icon?: string;
+  icon?: IconMark;
+}
+
+/** Number of levels (icons) in a set. */
+export function iconSetSize(set: IconSet): number {
+  if (set === 'arrows5') return 5;
+  if (set === 'ratings') return 4;
+  return 3;
+}
+
+/**
+ * Semantic color for a colored icon set's level (red→amber→green ramp), or
+ * `null` for sets drawn with the theme accent (e.g. `ratings`).
+ */
+export function iconColor(set: IconSet, level: number, total: number): string | null {
+  if (set === 'ratings') {
+    return null;
+  }
+  return colorScaleAt(['#e02d2d', '#f6b21b', '#2ca02c'], total <= 1 ? 0 : level / (total - 1));
 }
 
 function clamp01(t: number): number {
@@ -82,11 +118,9 @@ export function computeCellVisual(
     case 'dataBar':
       return { bar: { ratio: t, color: rule.color } };
     case 'iconSet': {
-      if (rule.icons.length === 0) {
-        return null;
-      }
-      const idx = Math.min(Math.floor(t * rule.icons.length), rule.icons.length - 1);
-      return { icon: rule.icons[idx]! };
+      const total = iconSetSize(rule.set);
+      const level = Math.min(Math.floor(t * total), total - 1);
+      return { icon: { set: rule.set, level, total } };
     }
   }
 }

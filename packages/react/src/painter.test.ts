@@ -165,29 +165,56 @@ describe('paintScene visual conditional formatting', () => {
     expect(bar).toBeTruthy();
   });
 
-  it('draws an icon-set glyph via fillText', () => {
+  const iconScene = (icon: { set: string; level: number; total: number }) =>
+    scene({
+      cells: [
+        {
+          row: 0, col: 0, rect: { x: 0, y: 0, width: 50, height: 20 },
+          text: '9', selected: false, active: false,
+          icon: icon as never,
+        },
+      ],
+      activeRect: null,
+    });
+
+  const paintIcon = (icon: { set: string; level: number; total: number }) => {
     const ctx = createMockContext();
-    paintScene(
-      ctx,
-      scene({
-        cells: [
-          {
-            row: 0,
-            col: 0,
-            rect: { x: 0, y: 0, width: 50, height: 20 },
-            text: '9',
-            selected: false,
-            active: false,
-            icon: '🟢',
-          },
-        ],
-        activeRect: null,
-      }),
-      defaultTheme,
-      { width: 200, height: 100 },
-    );
-    const icon = ctx.calls.find((c) => c.method === 'fillText' && c.args[0] === '🟢');
-    expect(icon).toBeTruthy();
+    paintScene(ctx, iconScene(icon), defaultTheme, { width: 200, height: 100 });
+    return methods(ctx);
+  };
+
+  it('draws traffic icons as filled circles (arc + fill)', () => {
+    const m = paintIcon({ set: 'traffic', level: 2, total: 3 });
+    expect(m).toContain('arc');
+    expect(m).toContain('fill');
+  });
+
+  it('draws sign icons (circle + symbol) for each level', () => {
+    for (const level of [0, 1, 2]) {
+      const m = paintIcon({ set: 'signs', level, total: 3 });
+      expect(m).toContain('arc');
+      expect(m).toContain('stroke');
+    }
+  });
+
+  it('draws arrows as strokes (3- and 5-level)', () => {
+    expect(paintIcon({ set: 'arrows', level: 1, total: 3 })).toContain('stroke');
+    expect(paintIcon({ set: 'arrows5', level: 0, total: 5 })).toContain('stroke');
+    expect(paintIcon({ set: 'arrows5', level: 4, total: 5 })).toContain('stroke');
+    expect(paintIcon({ set: 'arrows', level: 0, total: 1 })).toContain('stroke'); // single-level guard
+  });
+
+  it('draws triangles (up/dash/down) with fills', () => {
+    expect(paintIcon({ set: 'triangles', level: 2, total: 3 })).toContain('fill'); // up
+    expect(paintIcon({ set: 'triangles', level: 0, total: 3 })).toContain('fill'); // down
+    expect(paintIcon({ set: 'triangles', level: 1, total: 3 })).toContain('fillRect'); // dash
+  });
+
+  it('draws ratings as graduated bars (fillRect per bar)', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, iconScene({ set: 'ratings', level: 2, total: 4 }), defaultTheme, { width: 200, height: 100 });
+    const bars = ctx.calls.filter((c) => c.method === 'fillRect');
+    expect(bars.length).toBeGreaterThanOrEqual(4);
   });
 });
 
