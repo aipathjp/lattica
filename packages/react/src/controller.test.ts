@@ -448,3 +448,36 @@ describe('DataView with error cells', () => {
     expect(c.getRowCount()).toBe(3);
   });
 });
+
+describe('merged cells', () => {
+  it('merges the selection and maps covered cells to the anchor', () => {
+    const c = make();
+    c.selection.setActive({ row: 0, col: 0 });
+    c.selection.extendTo({ row: 1, col: 1 });
+    c.mergeSelection();
+    expect(c.getMerge(0, 0)).toMatchObject({ row: 0, col: 0, rowspan: 2, colspan: 2 });
+    expect(c.getMerge(1, 1)).toMatchObject({ row: 0, col: 0 });
+  });
+
+  it('treats a 1x1 selection merge as a no-op', () => {
+    const c = make();
+    c.selection.setActive({ row: 0, col: 0 });
+    c.mergeSelection();
+    expect(c.getMerge(0, 0)).toBeNull();
+  });
+
+  it('unmerges via a covered cell', () => {
+    const c = make();
+    c.selection.setActive({ row: 0, col: 0 });
+    c.selection.extendTo({ row: 1, col: 1 });
+    c.mergeSelection();
+    c.unmerge(1, 1);
+    expect(c.getMerge(0, 0)).toBeNull();
+  });
+
+  it('unmerge on a non-merged cell is a no-op', () => {
+    const c = make();
+    expect(() => c.unmerge(0, 0)).not.toThrow();
+    expect(c.getMerge(0, 0)).toBeNull();
+  });
+});

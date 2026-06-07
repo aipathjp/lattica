@@ -121,6 +121,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       getAlign: (_r, c) => controller.getColumnAlign(c),
       getValue: (r, c) => controller.getValue(r, c),
       getCfStyle: (r, c) => controller.getCellStyle(r, c),
+      getMerge: (r, c) => controller.getMerge(r, c),
     });
     paintScene(ctx, scene, theme, { width, height, dpr });
   });
@@ -372,6 +373,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     getAlign: (_r, c) => controller.getColumnAlign(c),
     getValue: (r, c) => controller.getValue(r, c),
     getCfStyle: (r, c) => controller.getCellStyle(r, c),
+      getMerge: (r, c) => controller.getMerge(r, c),
   });
   const colHeaders = columnHeaderCells(geom, scroll.left, scene.visibleCols, layout);
   const rowHeaders = rowHeaderCells(geom, scroll.top, scene.visibleRows);

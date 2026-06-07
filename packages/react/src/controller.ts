@@ -14,6 +14,8 @@ import {
   ConditionalFormatModel,
   SearchState,
   searchGrid,
+  MergeModel,
+  type MergeArea,
   type Command,
   type CellAddress,
   type CfStyle,
@@ -82,6 +84,8 @@ export class GridController {
   readonly conditionalFormat = new ConditionalFormatModel();
   /** Current search matches/navigation state. */
   readonly search = new SearchState();
+  /** Merged cell areas (visual coordinates). */
+  readonly merges = new MergeModel();
   /** View transform (sort/filter) mapping visual↔physical indices. */
   readonly view: DataView;
   private readonly sortModel = new SortModel();
@@ -208,6 +212,37 @@ export class GridController {
     const col = this.view.cols.getPhysicalIndex(visualCol);
     const config = this.sortModel.getConfigs().find((c) => c.col === col);
     return config ? config.direction : null;
+  }
+
+  // ── Merged cells (visual coordinates) ──────────────────────────────────────
+  /** The merge covering a (visual) cell, or null. */
+  getMerge(row: number, col: number): MergeArea | null {
+    return this.merges.getMergeAt(row, col);
+  }
+
+  /** Merge the current selection bounding box into one cell. */
+  mergeSelection(): void {
+    const b = normalizeRange(this.selection.getSelectionBounds());
+    const area: MergeArea = {
+      row: b.top,
+      col: b.left,
+      rowspan: b.bottom - b.top + 1,
+      colspan: b.right - b.left + 1,
+    };
+    if (area.rowspan === 1 && area.colspan === 1) {
+      return; // nothing to merge
+    }
+    this.merges.add(area);
+    this.emitter.emit('change', undefined);
+  }
+
+  /** Remove the merge anchored at (or covering) a (visual) cell. */
+  unmerge(row: number, col: number): void {
+    const area = this.merges.getMergeAt(row, col);
+    if (area !== null) {
+      this.merges.remove(area.row, area.col);
+      this.emitter.emit('change', undefined);
+    }
   }
 
   /** Geometry snapshot for the renderer (visible-indexed). */

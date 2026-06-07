@@ -5,7 +5,7 @@
  * consumes a Scene; tests assert on the Scene directly.
  */
 
-import { computeVisibleWindow, type SelectionModel } from '@lattica/core';
+import { computeVisibleWindow, type SelectionModel, type MergeArea } from '@lattica/core';
 import { cellRect, type GridGeometry, type Rect } from './geometry.js';
 
 export interface CellPaint {
@@ -49,6 +49,17 @@ export interface BuildSceneParams {
   getValue?: (row: number, col: number) => unknown;
   /** Conditional-format style accessor (optional). */
   getCfStyle?: (row: number, col: number) => { background?: string; color?: string } | null;
+  /** Merge-area accessor (optional); covered cells are skipped, anchors span. */
+  getMerge?: (row: number, col: number) => MergeArea | null;
+}
+
+/** Sum the sizes of `count` indices starting at `start`. */
+function spanSize(sizes: GridGeometry['rowSizes'], start: number, count: number): number {
+  let total = 0;
+  for (let i = 0; i < count; i++) {
+    total += sizes.getSize(start + i);
+  }
+  return total;
 }
 
 /** The visible index list along one axis: frozen leading indices + the window. */
@@ -95,7 +106,16 @@ export function buildScene(params: BuildSceneParams): Scene {
 
   for (const row of visibleRows) {
     for (const col of visibleCols) {
+      const merge = params.getMerge?.(row, col) ?? null;
+      // Skip cells covered by a merge (only the anchor is painted).
+      if (merge !== null && (merge.row !== row || merge.col !== col)) {
+        continue;
+      }
       const rect = cellRect(geom, scrollLeft, scrollTop, row, col);
+      if (merge !== null) {
+        rect.width = spanSize(geom.colSizes, merge.col, merge.colspan);
+        rect.height = spanSize(geom.rowSizes, merge.row, merge.rowspan);
+      }
       const active = selection.isActive({ row, col });
       const cell: CellPaint = {
         row,

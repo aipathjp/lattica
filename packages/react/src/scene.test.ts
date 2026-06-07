@@ -104,3 +104,26 @@ describe('buildScene', () => {
     expect(scene.activeRect).toBeNull();
   });
 });
+
+describe('buildScene merges', () => {
+  it('spans the anchor and skips covered cells', () => {
+    const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
+    const scene = buildScene({
+      geom: geom(),
+      scrollLeft: 0,
+      scrollTop: 0,
+      clientWidth: 400,
+      clientHeight: 200,
+      selection: sel,
+      getDisplay: () => '',
+      getMerge: (r, c) =>
+        r <= 1 && c <= 1 ? { row: 0, col: 0, rowspan: 2, colspan: 2 } : null,
+    });
+    const anchor = scene.cells.find((k) => k.row === 0 && k.col === 0)!;
+    expect(anchor.rect.width).toBe(100); // 2 * 50
+    expect(anchor.rect.height).toBe(40); // 2 * 20
+    // covered cells are not painted
+    expect(scene.cells.find((k) => k.row === 0 && k.col === 1)).toBeUndefined();
+    expect(scene.cells.find((k) => k.row === 1 && k.col === 1)).toBeUndefined();
+  });
+});
