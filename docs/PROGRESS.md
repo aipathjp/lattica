@@ -158,3 +158,7 @@
   - **列集計**: `aggregateColumn`（可視行のみ対象）。
   - **検索＆置換**: `replaceAll(query, replacement, options)`（マッチセルの編集テキストを undo 一括置換）＋ 純関数 `replaceInText`（literal/regex/wholeCell/caseSensitive、無効 regex は無変更）。
   - 全体 **1724テスト・100%カバレッジ**。typecheck/lint/build クリーン。UI 結線（フィルタドロップダウン/列非表示メニュー/ステータスバー）は Phase B-UI / C で実施。
+- 2026-06-07: **Phase B-UI 完了**（headless API への UI 結線）。
+  - 列ヘッダーに**フィルタボタン（▽, `lattica-filter-<col>`）**。クリックで**ファセット・チェックリストのフィルタパネル**（`columnFacets` の一意値、空セルは `(blank)`）。Apply で `setColumnSetFilter`（全チェック時はクリア）、Clear でフィルタ解除、バックドロップで閉じる。
+  - 列ヘッダーの**コンテキストメニューに「Hide column」「Show all columns」**を追加（`hideColumn`/`showAllColumns` 結線）。
+  - 全体 **1731テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase C（数値書式・条件付き書式ビジュアル・ステータスバー）。

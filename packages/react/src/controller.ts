@@ -297,6 +297,12 @@ export class GridController {
     return this.view.cols.isHidden(physicalCol);
   }
 
+  /** Reveal every hidden column. */
+  showAllColumns(): void {
+    this.view.cols.setHidden(this.view.cols.getHidden(), false);
+    this.refreshColumns();
+  }
+
   /** Move `count` columns from one visual position to another. */
   moveColumn(fromVisual: number, toVisual: number, count = 1): void {
     this.view.cols.move(fromVisual, count, toVisual);
