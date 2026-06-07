@@ -1732,6 +1732,142 @@ def('UNICODE', (args, evaluate) => {
   return t.codePointAt(0)!;
 });
 
+// ── Dynamic arrays (Phase 12c — spill) ───────────────────────────────────────
+// These functions return a {@link Matrix}; when used as a top-level cell formula
+// the engine spills the result into the adjacent cells.
+
+/** A stable, type-aware key for a cell value (for row de-duplication). */
+function scalarKey(cell: CellScalar | FormulaError): string {
+  if (FormulaError.is(cell)) return `e:${cell.type}`;
+  if (cell === null) return 'z:';
+  return `${typeof cell}:${String(cell)}`;
+}
+
+def('TRANSPOSE', (args, evaluate) => {
+  const err = expectArgs(args, 1);
+  if (err) return err;
+  const m = argMatrix(args[0]!, evaluate);
+  const rows = m.length;
+  // argMatrix always yields at least a 1×1 grid, so rows ≥ 1 and cols ≥ 1.
+  const cols = m[0]!.length;
+  const out: Matrix = [];
+  for (let c = 0; c < cols; c++) {
+    const line: (CellScalar | FormulaError)[] = [];
+    for (let r = 0; r < rows; r++) {
+      // Matrices from ranges/array functions are rectangular, so the slot exists.
+      line.push(m[r]![c]!);
+    }
+    out.push(line);
+  }
+  return out;
+});
+
+def('SEQUENCE', (args, evaluate) => {
+  const err = expectArgs(args, 1, 4);
+  if (err) return err;
+  const rowsArg = argNumber(args[0], evaluate);
+  if (FormulaError.is(rowsArg)) return rowsArg;
+  const rows = Math.trunc(rowsArg);
+  let cols = 1;
+  if (args.length >= 2) {
+    const c = argNumber(args[1], evaluate);
+    if (FormulaError.is(c)) return c;
+    cols = Math.trunc(c);
+  }
+  let start = 1;
+  if (args.length >= 3) {
+    const s = argNumber(args[2], evaluate);
+    if (FormulaError.is(s)) return s;
+    start = s;
+  }
+  let step = 1;
+  if (args.length >= 4) {
+    const st = argNumber(args[3], evaluate);
+    if (FormulaError.is(st)) return st;
+    step = st;
+  }
+  if (rows < 1 || cols < 1) return VALUE;
+  const out: Matrix = [];
+  let n = start;
+  for (let r = 0; r < rows; r++) {
+    const line: (CellScalar | FormulaError)[] = [];
+    for (let c = 0; c < cols; c++) {
+      line.push(n);
+      n += step;
+    }
+    out.push(line);
+  }
+  return out;
+});
+
+def('UNIQUE', (args, evaluate) => {
+  const err = expectArgs(args, 1);
+  if (err) return err;
+  const m = argMatrix(args[0]!, evaluate);
+  const seen = new Set<string>();
+  const out: Matrix = [];
+  for (const row of m) {
+    const key = row.map(scalarKey).join(' ');
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push([...row]);
+    }
+  }
+  // argMatrix always yields at least one row, so `out` is non-empty.
+  return out;
+});
+
+def('SORT', (args, evaluate) => {
+  const err = expectArgs(args, 1, 3);
+  if (err) return err;
+  const m = argMatrix(args[0]!, evaluate);
+  let idx = 1;
+  if (args.length >= 2) {
+    const i = argNumber(args[1], evaluate);
+    if (FormulaError.is(i)) return i;
+    idx = Math.trunc(i);
+  }
+  let order = 1;
+  if (args.length >= 3) {
+    const o = argNumber(args[2], evaluate);
+    if (FormulaError.is(o)) return o;
+    order = o;
+  }
+  // argMatrix always yields at least a 1×1 grid, so the first row exists.
+  const cols = m[0]!.length;
+  if (idx < 1 || idx > cols) return VALUE;
+  const sign = order < 0 ? -1 : 1;
+  const rows = m.map((r) => [...r]);
+  rows.sort((a, b) => {
+    const av = a[idx - 1]!;
+    const bv = b[idx - 1]!;
+    // Errors sort as equal (stable) rather than throwing.
+    if (FormulaError.is(av) || FormulaError.is(bv)) return 0;
+    return sign * compareScalars(av, bv);
+  });
+  return rows;
+});
+
+def('FILTER', (args, evaluate) => {
+  const err = expectArgs(args, 2, 3);
+  if (err) return err;
+  const m = argMatrix(args[0]!, evaluate);
+  const include = flatten(argMatrix(args[1]!, evaluate));
+  // The include vector must have one entry per row of the array.
+  if (include.length !== m.length) return VALUE;
+  const out: Matrix = [];
+  for (let i = 0; i < m.length; i++) {
+    const keep = toBoolean(include[i]!);
+    if (FormulaError.is(keep)) return keep;
+    if (keep) out.push([...m[i]!]);
+  }
+  if (out.length === 0) {
+    // Excel returns #CALC!; we surface the optional fallback or #N/A.
+    return args.length === 3 ? [[scalarize(evaluate(args[2]!))]] : NA;
+  }
+  return out;
+});
+
 /** Build the default function registry. */
 export function createDefaultFunctions(): FunctionRegistry {
   return new Map(registry);

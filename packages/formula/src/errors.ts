@@ -11,6 +11,7 @@ export const ERROR_TYPES = [
   '#N/A',
   '#NUM!',
   '#CYCLE!',
+  '#SPILL!',
   '#ERROR!',
 ] as const;
 
@@ -39,6 +40,7 @@ export const NAME = new FormulaError('#NAME?');
 export const NA = new FormulaError('#N/A');
 export const NUM = new FormulaError('#NUM!');
 export const CYCLE = new FormulaError('#CYCLE!');
+export const SPILL = new FormulaError('#SPILL!');
 
 /** Map a raw `#...!` token text to a FormulaError, or null if unrecognized. */
 export function errorFromText(text: string): FormulaError | null {

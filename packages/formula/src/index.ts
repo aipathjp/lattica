@@ -11,6 +11,7 @@ export {
   NA,
   NUM,
   CYCLE,
+  SPILL,
   type ErrorType,
 } from './errors.js';
 export { tokenize, LexError } from './lexer.js';

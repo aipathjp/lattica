@@ -81,6 +81,7 @@ function toErrorType(text: string): import('./errors.js').ErrorType {
     case '#N/A':
     case '#NUM!':
     case '#CYCLE!':
+    case '#SPILL!':
       return text;
     default:
       return '#ERROR!';
