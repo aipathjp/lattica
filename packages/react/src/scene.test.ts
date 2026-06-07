@@ -169,3 +169,21 @@ describe('buildScene visual conditional formatting', () => {
     expect(scene.cells[0]!.cfStyle?.background).toBe('#ffd6d6');
   });
 });
+
+describe('buildScene sparklines', () => {
+  it('populates the sparkline shape from the accessor', () => {
+    const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
+    const scene = buildScene({
+      geom: geom(),
+      scrollLeft: 0,
+      scrollTop: 0,
+      clientWidth: 200,
+      clientHeight: 100,
+      selection: sel,
+      getDisplay: () => '',
+      getSparkline: (r, c) => (c === 0 ? { kind: 'line', points: [{ x: 1, y: 1 }] } : null),
+    });
+    expect(scene.cells.find((k) => k.col === 0)!.sparkline).toEqual({ kind: 'line', points: [{ x: 1, y: 1 }] });
+    expect(scene.cells.find((k) => k.col === 1)!.sparkline).toBeUndefined();
+  });
+});

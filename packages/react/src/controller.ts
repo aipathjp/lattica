@@ -21,8 +21,11 @@ import {
   distinctValues,
   formatNumber,
   computeCellVisual,
+  computeSparkline,
   type CfVisualRule,
   type CellVisual,
+  type SparklineKind,
+  type SparklineShape,
   type AggregateFn,
   type Validator,
   type MergeArea,
@@ -138,6 +141,8 @@ export class GridController {
   private readonly columnFormats = new Map<number, string>();
   /** Visual conditional-format rules (color scale / data bar / icon set) per physical column. */
   private readonly columnVisualRules = new Map<number, CfVisualRule>();
+  /** In-cell sparkline series per physical cell ("row,col"). */
+  private readonly cellSparklines = new Map<string, { values: number[]; kind: SparklineKind }>();
   /** View transform (sort/filter) mapping visual↔physical indices. */
   readonly view: DataView;
   private readonly sortModel = new SortModel();
@@ -580,6 +585,22 @@ export class GridController {
     if (this.columnVisualRules.delete(col)) {
       this.emitter.emit('change', undefined);
     }
+  }
+
+  /** Attach an in-cell sparkline series to a (physical) cell. */
+  setCellSparkline(row: number, col: number, values: number[], kind: SparklineKind = 'line'): void {
+    this.cellSparklines.set(`${row},${col}`, { values, kind });
+    this.emitter.emit('change', undefined);
+  }
+
+  /** Compute the drawable sparkline for a (visual) cell at the given size, or null. */
+  getCellSparkline(visualRow: number, visualCol: number, width: number, height: number): SparklineShape | null {
+    const p = this.toPhysical(visualRow, visualCol);
+    const spec = this.cellSparklines.get(`${p.row},${p.col}`);
+    if (spec === undefined) {
+      return null;
+    }
+    return computeSparkline(spec.values, width, height, spec.kind);
   }
 
   /**

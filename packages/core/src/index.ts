@@ -86,6 +86,13 @@ export {
   type PivotResult,
 } from './pivot.js';
 export {
+  computeSparkline,
+  type SparklineKind,
+  type SparklineShape,
+  type SparklinePoint,
+  type SparklineBar,
+} from './sparkline.js';
+export {
   toNumberOrNull,
   summarize,
   summarizeColumn,

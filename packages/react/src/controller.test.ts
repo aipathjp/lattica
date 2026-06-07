@@ -779,3 +779,19 @@ describe('Phase C-2 — visual conditional formatting', () => {
     expect(() => c.clearColumnVisual(0)).not.toThrow();
   });
 });
+
+describe('Phase E-2 — sparklines', () => {
+  it('computes a line sparkline shape sized to the cell', () => {
+    const c = make();
+    c.setCellSparkline(0, 0, [1, 5, 2], 'line');
+    const s = c.getCellSparkline(0, 0, 50, 20);
+    expect(s?.kind).toBe('line');
+    expect(s?.points).toHaveLength(3);
+  });
+  it('computes bar sparklines and returns null without a spec', () => {
+    const c = make();
+    expect(c.getCellSparkline(0, 0, 50, 20)).toBeNull();
+    c.setCellSparkline(0, 0, [3, 1], 'bar');
+    expect(c.getCellSparkline(0, 0, 50, 20)?.kind).toBe('bar');
+  });
+});

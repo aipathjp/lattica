@@ -183,3 +183,8 @@
 - 2026-06-07: **Phase E-1 完了**（ピボットテーブル）。
   - core `pivot.ts`: `pivot(records, config)`（純粋）— 行/列フィールドでクロス集計し、値フィールドを `aggregate`（sum/avg/count/min/max/median）で集計。行/列/総計付き。`matrixToRecordsForPivot`（ヘッダ＋行列→レコード）と `pivotToMatrix`（結果→表示行列）も提供。キーはソート済み、欠損は空キー/`null`。
   - 全体 **1828テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E-2（スパークライン）。
+- 2026-06-07: **Phase E-2 完了**（セル内スパークライン）。
+  - core `sparkline.ts`: `computeSparkline(values, w, h, kind)`（純粋）— **line / bar / winloss** のセルローカル座標を算出（min/max 正規化・単点中央・全ゼロ/フラットのガード）。
+  - `GridController`: `setCellSparkline`/`getCellSparkline`（セル寸法を渡して形状を計算）。
+  - `scene.ts`/`painter.ts`: `CellPaint.sparkline` を追加。**line は stroke、bar/winloss は fillRect**（正=活性色/負=赤）でセル原点へ平行移動して描画。
+  - 全体 **1839テスト・100%カバレッジ**。typecheck/lint/build クリーン。残: Phase E-3（マスターディテール/サーバサイド行モデル等）。
