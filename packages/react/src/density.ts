@@ -60,6 +60,28 @@ export function getDensity(name: Density): DensityTokens {
   return densityPresets[name];
 }
 
+/** The controller-sizing fields a density contributes. */
+export interface DensitySizing {
+  defaultRowHeight: number;
+  defaultColWidth: number;
+  rowHeaderWidth: number;
+  colHeaderHeight: number;
+}
+
+/**
+ * Controller sizing options derived from a density, for spreading into
+ * `useGridController({ rowCount, colCount, ...densityOptions('compact') })`.
+ */
+export function densityOptions(density: Density | DensityTokens): DensitySizing {
+  const t = typeof density === 'string' ? densityPresets[density] : density;
+  return {
+    defaultRowHeight: t.defaultRowHeight,
+    defaultColWidth: t.defaultColWidth,
+    rowHeaderWidth: t.rowHeaderWidth,
+    colHeaderHeight: t.colHeaderHeight,
+  };
+}
+
 /**
  * Scale a density's spacing by a factor (keeps font size, rounds metrics) —
  * a fine-grained "row spacing" knob on top of the named presets.
