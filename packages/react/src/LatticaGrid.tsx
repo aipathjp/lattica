@@ -518,6 +518,26 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
               color: theme.headerTextColor,
             }}
           >
+            {controller.isRowParent(h.row) && (
+              <span
+                role="button"
+                aria-label={`toggle row group ${h.row}`}
+                data-testid={`lattica-rowgroup-${h.row}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  controller.toggleRowGroup(h.row);
+                  force();
+                }}
+                style={{
+                  marginLeft: 2 + controller.getRowDepth(h.row) * 8,
+                  marginRight: 2,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                {controller.isRowCollapsed(h.row) ? '▸' : '▾'}
+              </span>
+            )}
             {h.label}
           </div>
         ))}
