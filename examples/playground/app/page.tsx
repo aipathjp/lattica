@@ -52,6 +52,14 @@ export default function Page() {
   return (
     <main style={{ padding: 16 }}>
       <h1>Lattica Playground</h1>
+      <nav style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+        <a href="/kitchen-sink" data-testid="nav-kitchen-sink">
+          Kitchen Sink
+        </a>
+        <a href="/spill" data-testid="nav-spill">
+          Dynamic Arrays (spill)
+        </a>
+      </nav>
       <button onClick={exportXlsx}>Export XLSX</button>
       <div style={{ marginTop: 12, border: '1px solid #cbd2d9' }}>
         <LatticaGrid controller={controller} columns={columns} width={800} height={480} />
