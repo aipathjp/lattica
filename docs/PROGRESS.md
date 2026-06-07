@@ -131,3 +131,8 @@
   - 性能ベンチ（packages/react/bench, カバレッジ対象外）＋ `docs/PERFORMANCE.md`：100万行×1000列で buildScene+paintScene ≈0.12ms/frame・約8000fps を実測。
   - React: ヘッダークリックのソートUI（▲/▼/⇅・Shiftで複数列、`PositionedHeader.col` 追加）。
   - 全体 **1625テスト・100%カバレッジ**。typecheck/lint/build クリーン。
+- 2026-06-07: **Wave 13 完了**（数式関数 130＋kitchen-sinkデモ＋ネスト行UI）。
+  - 数式関数 115→**130**（MODE/GEOMEAN/HARMEAN/VARP/STDEVP/SUMSQ/AVERAGEA/PERCENTILE/QUARTILE・MAXIFS/MINIFS・REPLACE/FIXED/UNICHAR/UNICODE）。
+  - examples/playground に kitchen-sink デモ（ソート/フィルタ/結合/検索/CSV・XLSX/AI を一画面）。
+  - React: ネスト行（折りたたみ）をグリッド統合（行ガター ▾/▸ トグル、列フィルタと hidden 合成）。
+  - 全体 **1643テスト・100%カバレッジ**。typecheck/lint/build クリーン。
