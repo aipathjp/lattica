@@ -29,6 +29,7 @@ export {
   type StyledWorkbook,
   type XlsxMerge,
 } from './xlsx-style.js';
+export { tableToPdf, type PdfTableOptions } from './pdf.js';
 export { inflateRaw } from './inflate.js';
 export { readXlsx, type ReadSheet, type ReadWorkbook } from './xlsx-read.js';
 export {
