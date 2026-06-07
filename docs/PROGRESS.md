@@ -121,3 +121,8 @@
   - 全データアクセス/サイズを visual↔physical 写像経由に（既定アイデンティティで既存挙動不変）。`toggleSort`/`setColumnFilter`/`clearView`/`getSortDirection` 追加。ソート時に行高が物理行へ追従、編集は正しい物理セルへ書込み。
   - Phase 6/7 が可視反映まで到達（モデル→GridController 結線）。
   - 全体 **1590テスト・100%カバレッジ**。typecheck/lint/build クリーン。
+- 2026-06-07: **Wave 11 完了**（数式関数拡張＋ドキュメント＋結合セル描画）。
+  - 数式関数 97→**115**（DATE/EDATE/EOMONTH/WEEKDAY/DATEDIF/DATEVALUE・PMT/FV/PV/NPV・MROUND/EVEN/ODD/ISEVEN/ISODD、UTCシリアル・クリーンルーム）。
+  - ドキュメント: 全8パッケージ README ＋ `docs/USAGE.md`（API は index.ts 突合で検証済）。
+  - React: 結合セル描画（`mergeSelection`/`unmerge`・アンカースパン・被覆スキップ）。
+  - 全体 **1610テスト・100%カバレッジ**。typecheck/lint/build クリーン。
