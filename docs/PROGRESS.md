@@ -206,3 +206,7 @@
   - `GridController`: `details`・`toggleDetail`/`isDetailExpanded`/`getPhysicalRow`・`setDetailHeight`/`getDetailHeight`。展開行は `rebuildViewSizes` で detailHeight 分だけ高くなる（ソート/フィルタを跨いで物理キーで保持）。
   - `<LatticaGrid renderDetail={...}>`：展開中の可視行の下部に DOM ディテールパネルをオーバーレイ（`lattica-detail-<physicalRow>`）。
   - 全体 **1900テスト・100%カバレッジ**。typecheck/lint/build クリーン。**Phase E 完了（E-1〜E-7）**。残るは構造化参照（Table[Col]・lexer/parser 拡張）のみ。
+- 2026-06-07: **Phase E-8 完了**（構造化参照 `Table[Col]`）。
+  - `structured-refs.ts`: `expandStructuredRefs(formula, resolve)` — **パース前に `Table[Col]` を A1 範囲へ展開**（`[Col]`/`[[Col]]`/`[@Col]`/`[@[Col]]` 対応、未知・特殊項目は `#REF!`）。lexer/parser/evaluator/値型は不変更で、依存追跡・再計算・全関数がそのまま機能。
+  - `SheetEngine`: `defineTable`/`removeTable`/`getTables`。formula は元の `Table[Col]` 表記を `source` に保持し往復可能。
+  - 全体 **1909テスト・100%カバレッジ**・**150 関数**。typecheck/lint/build クリーン。**ギャップ分析ロードマップの全項目（Phase A〜E＋構造化参照）完了。**

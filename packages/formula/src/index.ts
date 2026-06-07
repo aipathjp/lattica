@@ -42,5 +42,7 @@ export {
   SheetEngine,
   type SheetEngineOptions,
   type CellContent,
+  type TableDef,
 } from './engine.js';
+export { expandStructuredRefs, type TableRangeResolver } from './structured-refs.js';
 export { a1ToR1C1, r1c1ToA1, isR1C1 } from './r1c1.js';
