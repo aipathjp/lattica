@@ -181,6 +181,80 @@ describe('paintScene', () => {
   });
 });
 
+describe('paintScene cell-meta font weight (P0-1)', () => {
+  /** Record the ctx font active at each fillText call. */
+  const trackFonts = (ctx: ReturnType<typeof createMockContext>) => {
+    const fonts: { text: unknown; font: string }[] = [];
+    const original = ctx.fillText.bind(ctx);
+    ctx.fillText = (text: string, x: number, y: number) => {
+      fonts.push({ text, font: ctx.font });
+      original(text, x, y);
+    };
+    return fonts;
+  };
+  const themeFont = `${defaultTheme.fontSize}px ${defaultTheme.fontFamily}`;
+
+  it('paints bold text with a bold font, then restores the theme font for later cells', () => {
+    const ctx = createMockContext();
+    const fonts = trackFonts(ctx);
+    paintScene(
+      ctx,
+      scene({
+        cells: [
+          { row: 0, col: 0, rect: { x: 0, y: 0, width: 50, height: 20 }, text: 'total', selected: false, active: false, fontWeight: 'bold' },
+          { row: 0, col: 1, rect: { x: 50, y: 0, width: 50, height: 20 }, text: 'plain', selected: false, active: false },
+        ],
+        activeRect: null,
+      }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    expect(fonts).toEqual([
+      { text: 'total', font: `bold ${themeFont}` },
+      { text: 'plain', font: themeFont },
+    ]);
+  });
+
+  it("fontWeight 'normal' keeps the theme font (no swap)", () => {
+    const ctx = createMockContext();
+    const fonts = trackFonts(ctx);
+    paintScene(
+      ctx,
+      scene({
+        cells: [
+          { row: 0, col: 0, rect: { x: 0, y: 0, width: 50, height: 20 }, text: 'n', selected: false, active: false, fontWeight: 'normal' },
+        ],
+        activeRect: null,
+      }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    expect(fonts).toEqual([{ text: 'n', font: themeFont }]);
+  });
+
+  it('paints every wrapped line bold and restores the font afterwards', () => {
+    const ctx = createMockContext();
+    const fonts = trackFonts(ctx);
+    paintScene(
+      ctx,
+      scene({
+        cells: [
+          { row: 0, col: 0, rect: { x: 0, y: 0, width: 50, height: 40 }, text: 'foo bar', lines: ['foo', 'bar'], selected: false, active: false, fontWeight: 'bold' },
+          { row: 1, col: 0, rect: { x: 0, y: 40, width: 50, height: 20 }, text: 'after', selected: false, active: false },
+        ],
+        activeRect: null,
+      }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    expect(fonts).toEqual([
+      { text: 'foo', font: `bold ${themeFont}` },
+      { text: 'bar', font: `bold ${themeFont}` },
+      { text: 'after', font: themeFont },
+    ]);
+  });
+});
+
 describe('paintScene visual conditional formatting', () => {
   it('draws an in-cell data bar (fillRect with the ratio width)', () => {
     const ctx = createMockContext();

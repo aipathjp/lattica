@@ -31,7 +31,14 @@ import {
   type GridStateSnapshot,
   type SummaryRowSpec,
 } from '@ai-path/tb-core';
-import type { CellCommitEvent, DisplayOverride, GridController, EditState, InputRejectEvent } from './controller.js';
+import type {
+  CellCommitEvent,
+  CellMetaProvider,
+  DisplayOverride,
+  GridController,
+  EditState,
+  InputRejectEvent,
+} from './controller.js';
 import {
   DEFAULT_HEADER_LINE_HEIGHT,
   DEFAULT_HEADER_PADDING_Y,
@@ -142,6 +149,19 @@ export interface LatticaGridProps {
    * controller.
    */
   displayValue?: DisplayOverride | null;
+  /**
+   * Per-cell meta provider (Handsontable `cells()` 相当), wired to
+   * {@link GridController.setCellMetaProvider}. Called with the physical
+   * (data) coordinates on every paint; return `{ background, color,
+   * fontWeight, readOnly }` or null. Styles paint above conditional formats
+   * and below the selection visuals; `readOnly` OR-composes with
+   * `setCellReadOnly` / `setColumnEditable`. External state the provider
+   * reads (e.g. a pending-save Map) is re-applied each frame — call
+   * `controller.refreshCellMeta()` after mutating it to force a repaint.
+   * Pass `null` to clear a provider set earlier; leave undefined to keep any
+   * provider set directly on the controller.
+   */
+  cellMeta?: CellMetaProvider | null;
   /** Controlled visual cell anchor for a root-local overlay. */
   cellOverlay?: { row: number; col: number } | null;
   /** Render a controlled overlay anchored to `cellOverlay`. */
@@ -221,6 +241,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     onCellOverlayClose,
     editors,
     displayValue,
+    cellMeta,
     cellTooltip,
   } = props;
   const theme = resolveTheme(props.theme);
@@ -421,6 +442,17 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     return () => controller.setDisplayOverride(null);
   }, [controller, displayValue]);
 
+  // Wire the cellMeta prop to the controller's cell-meta provider. Same
+  // contract as displayValue: setting emits a controller change (repaint), and
+  // an undefined prop leaves providers set directly on the controller alone.
+  useEffect(() => {
+    if (cellMeta === undefined) {
+      return;
+    }
+    controller.setCellMetaProvider(cellMeta);
+    return () => controller.setCellMetaProvider(null);
+  }, [controller, cellMeta]);
+
   useEffect(() => {
     if (onCellCommit === undefined) {
       return;
@@ -540,6 +572,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       getValue: (r, c) => controller.getValue(r, c),
       getBaseStyle,
       getCfStyle: (r, c) => controller.getCellStyle(r, c),
+      getCellMeta: (r, c) => controller.getCellMeta(r, c),
       getVisual: (r, c) => controller.getCellVisual(r, c),
       getSparkline: (r, c, w, h) => controller.getCellSparkline(r, c, w, h),
       getMerge: (r, c) => controller.getMerge(r, c),

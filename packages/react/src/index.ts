@@ -30,6 +30,8 @@ export {
   type SetCellTextOptions,
   type ColumnInputOptions,
   type DisplayOverride,
+  type CellMeta,
+  type CellMetaProvider,
   type ColumnTypeOptions,
   type InputRejectEvent,
 } from './controller.js';

@@ -1782,6 +1782,85 @@ describe('displayValue prop', () => {
   });
 });
 
+describe('cellMeta prop (P0-1)', () => {
+  it('wires the prop to the controller provider and clears it via null and on unmount', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    const provider = (row: number, col: number) =>
+      row === 0 && col === 0 ? { background: '#dbeafe', readOnly: true } : null;
+    const { rerender, unmount } = renderGrid(c, undefined, { cellMeta: provider });
+    expect(c.getCellMetaProvider()).toBe(provider);
+    expect(c.getCellMeta(0, 0)).toEqual({ background: '#dbeafe', readOnly: true });
+    expect(c.isCellEditable(0, 0)).toBe(false);
+    expect(c.isCellEditable(0, 1)).toBe(true);
+    rerender(<LatticaGrid controller={c} width={400} height={200} cellMeta={null} />);
+    expect(c.getCellMetaProvider()).toBeNull();
+    expect(c.isCellEditable(0, 0)).toBe(true);
+    rerender(<LatticaGrid controller={c} width={400} height={200} cellMeta={provider} />);
+    expect(c.getCellMetaProvider()).toBe(provider);
+    unmount();
+    expect(c.getCellMetaProvider()).toBeNull();
+  });
+
+  it('leaves a controller-set provider alone when the prop is undefined', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    const provider = () => ({ readOnly: true });
+    act(() => c.setCellMetaProvider(provider));
+    const { unmount } = renderGrid(c);
+    expect(c.getCellMetaProvider()).toBe(provider);
+    unmount();
+    expect(c.getCellMetaProvider()).toBe(provider);
+  });
+
+  it('paints external-Map meta each frame and re-paints after refreshCellMeta', () => {
+    const shared = createMockContext();
+    const fills: { style: string; args: unknown[] }[] = [];
+    const originalFillRect = shared.fillRect.bind(shared);
+    shared.fillRect = (...args: [number, number, number, number]) => {
+      fills.push({ style: shared.fillStyle, args });
+      originalFillRect(...args);
+    };
+    const spy = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation(() => shared as unknown as CanvasRenderingContext2D);
+    try {
+      const c = new GridController({ rowCount: 3, colCount: 2 });
+      // Conditional format on every cell — cellMeta must paint over it.
+      c.conditionalFormat.addRule({ kind: 'empty', style: { background: '#eeeeee' } });
+      const pending = new Map<string, string>();
+      renderGrid(c, undefined, {
+        cellMeta: (row, col) => {
+          const background = pending.get(`${row},${col}`);
+          return background === undefined ? null : { background };
+        },
+      });
+      expect(fills.some((f) => f.style === '#dbeafe')).toBe(false);
+
+      // Mark cell (0,0) pending (blue) → refresh → the canvas repaints blue.
+      fills.length = 0;
+      pending.set('0,0', '#dbeafe');
+      act(() => c.refreshCellMeta());
+      expect(fills.some((f) => f.style === '#dbeafe')).toBe(true);
+      expect(fills.some((f) => f.style === '#eeeeee')).toBe(true); // cf still paints other cells
+
+      // Flip the same cell to the audit-diff color → refresh → repaint again.
+      fills.length = 0;
+      pending.set('0,0', '#fecaca');
+      act(() => c.refreshCellMeta());
+      expect(fills.some((f) => f.style === '#fecaca')).toBe(true);
+      expect(fills.some((f) => f.style === '#dbeafe')).toBe(false);
+
+      // Clearing the Map restores the conditional-format-only painting.
+      fills.length = 0;
+      pending.delete('0,0');
+      act(() => c.refreshCellMeta());
+      expect(fills.some((f) => f.style === '#fecaca')).toBe(false);
+      expect(fills.some((f) => f.style === '#eeeeee')).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe('LatticaGrid tooltips', () => {
   // Default geometry: rowHeaderWidth 48, colHeaderHeight 24, rows 24px, cols 100px.
   // Cell (0,0) spans x∈[48,148), y∈[24,48); cell (1,0) spans y∈[48,72).
