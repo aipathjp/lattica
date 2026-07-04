@@ -25,6 +25,18 @@ export interface ColumnDef {
   readonly headerName: string;
   /** Fixed pixel width (consumed by the renderer, opaque here). */
   readonly width?: number;
+  /** Consumer-defined column type (stored only in core). */
+  readonly type?: string;
+  /** Whether UI editing should be allowed for this column. */
+  readonly editable?: boolean;
+  /** Preferred text alignment. */
+  readonly align?: 'left' | 'center' | 'right';
+  /** Excel-style number format pattern. */
+  readonly format?: string;
+  /** Dropdown/autocomplete option list. */
+  readonly options?: readonly string[];
+  /** Maximum edit length for default text input handling. */
+  readonly maxLength?: number;
   readonly showWhen?: ShowWhen;
 }
 

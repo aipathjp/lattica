@@ -41,6 +41,126 @@ describe('GridController basics', () => {
     expect(c.geometry().frozenCols).toBe(2);
     expect(c.colHeaderHeight).toBe(40);
   });
+
+  it('resizes row and column counts dynamically', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    const listener = vi.fn();
+    c.on('change', listener);
+    c.selection.setActive({ row: 2, col: 1 });
+    c.rowSizes.setSize(2, 40);
+    c.colSizes.setSize(1, 140);
+
+    c.setRowCount(5);
+    c.setColCount(4);
+    expect(c.getRowCount()).toBe(5);
+    expect(c.getColCount()).toBe(4);
+    expect(c.geometry().rowSizes.getCount()).toBe(5);
+    expect(c.geometry().colSizes.getCount()).toBe(4);
+    expect(c.rowSizes.getSize(4)).toBe(24);
+    expect(c.colSizes.getSize(3)).toBe(100);
+
+    c.setRowCount(2);
+    c.setColCount(1);
+    expect(c.getRowCount()).toBe(2);
+    expect(c.getColCount()).toBe(1);
+    expect(c.selection.getState().active).toEqual({ row: 1, col: 0 });
+    expect(c.rowSizes.getOverrides().has(2)).toBe(false);
+    expect(c.colSizes.getOverrides().has(1)).toBe(false);
+
+    listener.mockClear();
+    c.setRowCount(2);
+    c.setColCount(1);
+    expect(listener).not.toHaveBeenCalled();
+    expect(() => c.setRowCount(-1)).toThrow(RangeError);
+    expect(() => c.setColCount(-1)).toThrow(RangeError);
+  });
+});
+
+describe('bulk data loading', () => {
+  it('sets matrix data with resize, type conversion, full replacement, and no cellcommit', () => {
+    const c = new GridController({ rowCount: 3, colCount: 4 });
+    const changes = vi.fn();
+    const commits = vi.fn();
+    c.on('change', changes);
+    c.on('cellcommit', commits);
+    c.setCellText(0, 0, 'old');
+    expect(c.undo.canUndo()).toBe(true);
+    changes.mockClear();
+
+    c.setData([
+      ['Name', 'Qty', 'Active'],
+      ['Apple', 3, true],
+      ['Pear', null, false],
+    ]);
+
+    expect(c.getRowCount()).toBe(3);
+    expect(c.getColCount()).toBe(3);
+    expect(c.getDisplay(1, 1)).toBe('3');
+    expect(c.getDisplay(1, 2)).toBe('TRUE');
+    expect(c.getDisplay(2, 1)).toBe('');
+    expect(c.getDisplay(2, 2)).toBe('FALSE');
+    expect(c.undo.canUndo()).toBe(false);
+    c.undoLast();
+    expect(c.getDisplay(0, 0)).toBe('Name');
+    expect(commits).not.toHaveBeenCalled();
+    expect(changes).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads without resizing and clears cells outside the matrix', () => {
+    const c = new GridController({ rowCount: 2, colCount: 3 });
+    c.setCellText(0, 2, 'stale');
+    c.setCellText(1, 0, 'stale');
+    c.setData([['=1+2']], { resize: false });
+    expect(c.getRowCount()).toBe(2);
+    expect(c.getColCount()).toBe(3);
+    expect(c.getDisplay(0, 0)).toBe('3');
+    expect(c.getEditText(0, 0)).toBe('=1+2');
+    expect(c.getDisplay(0, 2)).toBe('');
+    expect(c.getDisplay(1, 0)).toBe('');
+  });
+
+  it('loads records by field order', () => {
+    const c = new GridController({ rowCount: 1, colCount: 1 });
+    c.setRecords(
+      [
+        { item: 'Apple', qty: 3 },
+        { item: 'Pear', qty: { nested: true } },
+      ],
+      ['item', 'qty'],
+    );
+    expect(c.getRowCount()).toBe(2);
+    expect(c.getColCount()).toBe(2);
+    expect(c.getDisplay(0, 0)).toBe('Apple');
+    expect(c.getDisplay(0, 1)).toBe('3');
+    expect(c.getDisplay(1, 1)).toBe('[object Object]');
+  });
+
+  it('ignores rich column definitions beyond the physical column count', () => {
+    const c = new GridController({ rowCount: 1, colCount: 1 });
+    expect(() =>
+      c.applyColumnDefs([
+        { headerName: 'A', width: 120 },
+        { headerName: 'B', width: 240, type: 'number' },
+      ]),
+    ).not.toThrow();
+    expect(c.getColumnWidth(0)).toBe(120);
+    expect(c.getColCount()).toBe(1);
+  });
+
+  it('does not override explicit column input options with ColumnDef maxLength', () => {
+    const c = new GridController({ rowCount: 1, colCount: 1 });
+    c.setColumnInput(0, { maxLength: 2 });
+    c.applyColumnDefs([{ headerName: 'Code', maxLength: 5 }]);
+    c.beginEdit(0, 0, '');
+    c.updateDraft('abcdef');
+    expect(c.getEdit()?.draft).toBe('ab');
+    c.cancelEdit();
+
+    c.setColumnInput(0, null);
+    c.beginEdit(0, 0, '');
+    c.updateDraft('abcdef');
+    expect(c.getEdit()?.draft).toBe('abcdef');
+  });
 });
 
 describe('cell content and parsing', () => {

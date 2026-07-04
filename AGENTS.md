@@ -41,29 +41,38 @@ Peer deps: `react`/`react-dom` ≥ 18 (tested on 19). ESM + CJS are both shipped
 
 ```tsx
 'use client';
-import { useEffect } from 'react';
-import { LatticaGrid, useGridController } from '@lattica/react';
-import type { ColumnNode } from '@lattica/core';
+import { useState } from 'react';
+import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
+import type { ColumnNode } from '@ai-path/lattica-core';
 
 const columns: ColumnNode[] = [
-  { headerName: 'Item' }, { headerName: 'Qty' }, { headerName: 'Total' },
+  { headerName: 'Item', field: 'item', width: 180, type: 'text' },
+  { headerName: 'Qty', field: 'qty', width: 80, type: 'number', align: 'right' },
+  { headerName: 'Total', field: 'total', width: 120, type: 'number', format: '#,##0' },
 ];
 
 export default function Demo() {
-  const controller = useGridController({ rowCount: 100, colCount: 3 });
-  useEffect(() => {
-    controller.setCellText(0, 0, 'Apple');
-    controller.setCellText(0, 1, '3');
-    controller.setCellText(0, 2, '=B1*100'); // formulas use A1 refs
-  }, [controller]);
-  return <LatticaGrid controller={controller} columns={columns} width={800} height={480} />;
+  const controller = useGridController({ rowCount: 1, colCount: 1 });
+  const [rows] = useState([
+    { item: 'Apple', qty: 3, total: '=B1*100' },
+    { item: 'Pear', qty: 2, total: '=B2*120' },
+  ]);
+  return <LatticaGrid controller={controller} rows={rows} columns={columns} width={800} height={480} />;
 }
 ```
 
 - `useGridController(options)` returns a stable headless `GridController`.
-- `<LatticaGrid controller columns width height theme renderDetail contextMenu onCellCommit editSelection />`.
+- `<LatticaGrid controller rows columns width height theme renderDetail contextMenu onCellCommit editSelection />`.
 - `columns` are optional multi-level header defs (`ColumnNode` = leaf `{headerName}`
-  or group `{headerName, children, collapsible?, showWhen?}`). Omit for A,B,C… letters.
+  or group `{headerName, children, collapsible?, showWhen?}`). Leaf defs may carry
+  rich metadata such as `field`, `width`, `type`, `editable`, `align`, `format`,
+  `options`, and `maxLength`. Omit for A,B,C… letters.
+- `rows` is controlled record data. Leaf `field` values define the extraction order;
+  a fieldless leaf receives empty cells. When `rows` changes, the controller resizes
+  and replaces grid data without adding undo history.
+- The imperative API remains available for edits and programmatic writes:
+  `controller.setCellText(0, 0, 'Apple')`, `controller.setData(matrix)`, and
+  `controller.setRecords(records, fields)`.
 
 ## The coordinate model (important)
 
@@ -81,6 +90,9 @@ getDisplay(row, col): string          // formatted value
 getValue(row, col): unknown           // raw value (error → '#DIV/0!' string)
 getEditText(row, col): string         // original input (=formula or literal)
 getRowCount() / getColCount()
+setRowCount(n) / setColCount(n)       // resize view; engine content outside range is retained
+setData(matrix, { resize? })          // full data replacement, no undo history
+setRecords(records, fields, opts)     // record → matrix helper used by <LatticaGrid rows>
 
 // selection / edit / clipboard / undo
 selection.setActive({row,col}); selection.extendTo({row,col})
