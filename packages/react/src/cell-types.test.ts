@@ -6,6 +6,7 @@ import {
   numberRenderer,
   booleanRenderer,
   barRenderer,
+  linkRenderer,
   parseBarValue,
   truncateWithEllipsis,
   builtinRenderers,
@@ -352,11 +353,81 @@ describe('barRenderer × mergeCells (pseudo-Gantt)', () => {
   });
 });
 
+describe('linkRenderer', () => {
+  const underline = (ctx: MockContext) => {
+    const moveTo = ctx.calls.find((k) => k.method === 'moveTo');
+    const lineTo = ctx.calls.find((k) => k.method === 'lineTo');
+    return { moveTo, lineTo };
+  };
+
+  it('renders empty cells like plain text (nothing drawn)', () => {
+    const { ctx, c } = ctxOf({ text: '', value: null });
+    linkRenderer(c);
+    expect(methods(ctx)).not.toContain('fillText');
+    expect(methods(ctx)).not.toContain('stroke');
+  });
+
+  it('draws accent-colored text with a measured underline (left align)', () => {
+    const { ctx, c } = ctxOf({ text: 'ab', align: 'left' });
+    linkRenderer(c);
+    expect(ctx.fillStyle).toBe(defaultTheme.activeBorder);
+    expect(ctx.strokeStyle).toBe(defaultTheme.activeBorder);
+    const { moveTo, lineTo } = underline(ctx);
+    // mock measure: 7px/char → width 14; y = 20/2 + 13/2 = 16.5
+    expect(moveTo!.args).toEqual([defaultTheme.cellPaddingX, 16.5]);
+    expect(lineTo!.args).toEqual([defaultTheme.cellPaddingX + 14, 16.5]);
+  });
+
+  it('right-aligns the underline against the inner right edge', () => {
+    const { ctx, c } = ctxOf({ text: 'ab', align: 'right' });
+    linkRenderer(c);
+    const { moveTo, lineTo } = underline(ctx);
+    expect(moveTo!.args).toEqual([80 - defaultTheme.cellPaddingX - 14, 16.5]);
+    expect(lineTo!.args).toEqual([80 - defaultTheme.cellPaddingX, 16.5]);
+  });
+
+  it('centers the underline for center alignment', () => {
+    const { ctx, c } = ctxOf({ text: 'ab', align: 'center' });
+    linkRenderer(c);
+    const { moveTo, lineTo } = underline(ctx);
+    expect(moveTo!.args).toEqual([40 - 7, 16.5]);
+    expect(lineTo!.args).toEqual([40 + 7, 16.5]);
+  });
+
+  it('clamps the underline to the padded cell width for long text', () => {
+    const { ctx, c } = ctxOf({ text: 'a'.repeat(20), align: 'left' }); // 140px > 68px
+    linkRenderer(c);
+    const { moveTo, lineTo } = underline(ctx);
+    expect(moveTo!.args).toEqual([6, 16.5]);
+    expect(lineTo!.args).toEqual([6 + (80 - 12), 16.5]);
+  });
+
+  it('approximates the underline width without measureText support', () => {
+    const { ctx, c } = ctxOf({ text: 'ab', align: 'left' });
+    const bare = { ...ctx, measureText: undefined } as unknown as typeof ctx;
+    linkRenderer({ ...c, ctx: bare });
+    const { moveTo, lineTo } = underline(ctx);
+    // fallback: 2 chars × 13px × 0.6 = 15.6
+    expect(moveTo!.args).toEqual([6, 16.5]);
+    expect(lineTo!.args[0]).toBeCloseTo(6 + 15.6);
+    expect(lineTo!.args[1]).toBe(16.5);
+  });
+
+  it('skips the underline when the padded width is zero or negative', () => {
+    const { ctx, c } = ctxOf({ text: 'ab', rect: { x: 0, y: 0, width: 10, height: 20 } });
+    linkRenderer(c);
+    expect(methods(ctx)).toContain('fillText');
+    expect(methods(ctx)).not.toContain('moveTo');
+    expect(methods(ctx)).not.toContain('stroke');
+  });
+});
+
 describe('CellTypeRegistry', () => {
   it('resolves built-ins and defaults to text', () => {
     const r = new CellTypeRegistry();
     expect(r.resolve('number')).toBe(numberRenderer);
     expect(r.resolve('checkbox')).toBe(booleanRenderer);
+    expect(r.resolve('link')).toBe(linkRenderer);
     expect(r.resolve(undefined)).toBe(textRenderer);
     expect(r.resolve('unknown-type')).toBe(textRenderer);
   });
