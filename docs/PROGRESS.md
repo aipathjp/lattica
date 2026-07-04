@@ -58,6 +58,10 @@
 ## 変更履歴
 - 2026-07-05: **React SSR-safe import / first render**。
   - `@ai-path/lattica-react` の public module graph と `LatticaGrid` / `LatticaColumnSettings` / `LatticaStatusBar` / `LatticaFormulaBar` の node 環境 SSR を回帰テスト化。App Router で `next/dynamic({ ssr:false })` 不要の方針を明文化。
+- 2026-07-05: **Static table print API**。
+  - `@ai-path/lattica-react` に `renderStaticTable` / `staticTablePrintCss` を追加。現在の controller view（sort/filter/hide/move、列幅、表示値、配置）から SSR/印刷向けの素の HTML table を生成可能にした。
+  - multi-level header は `computeHeaderLayout` を流用し、`colSpan`/`rowSpan` を再現。行番号、caption、maxRows 超過時の `tfoot` に対応。
+  - playground `/print` を追加し、同じ controller から canvas grid と print preview を並置表示するデモを結線。
 - 2026-07-05: **Momotani Wave 1 編集ライフサイクル / 入力制御**。
   - `cellcommit` イベントを追加。edit/paste/fill/delete/undo/redo の committed changes を raw 編集テキストの prev/next と visual/physical 座標で通知し、`<LatticaGrid onCellCommit>` から購読可能にした。
   - UI 編集向け read-only 制御を追加。`setColumnEditable` / `setCellReadOnly` / `isCellEditable` と、テーマの `readOnlyCellBackground` / `editableCellBackground` を低優先度セル背景として結線。
