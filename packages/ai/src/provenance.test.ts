@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Command } from '@lattica/core';
+import type { Command } from '@ai-path/lattica-core';
 import { withProvenance, type Provenance } from './provenance.js';
 
 const provenance: Provenance = {

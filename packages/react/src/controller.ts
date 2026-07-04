@@ -42,7 +42,7 @@ import {
   fillRegion,
   toA1,
   parseA1,
-} from '@lattica/core';
+} from '@ai-path/lattica-core';
 import {
   DataView,
   SortModel,
@@ -52,8 +52,8 @@ import {
   type SortDirection,
   type FilterCondition,
   type NestedRowNode,
-} from '@lattica/data';
-import { SheetEngine, FormulaError, type CellContent } from '@lattica/formula';
+} from '@ai-path/lattica-data';
+import { SheetEngine, FormulaError, type CellContent } from '@ai-path/lattica-formula';
 import type { GridGeometry } from './geometry.js';
 import type { CellAlign } from './cell-types.js';
 import { editorKindForType, type EditorKind } from './editors.js';

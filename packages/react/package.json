@@ -1,11 +1,13 @@
 {
-  "name": "@lattica/react",
-  "version": "0.1.0",
+  "name": "@ai-path/lattica-react",
+  "version": "0.1.1",
   "description": "React bindings for Lattica: a canvas-rendered, virtualized data grid with DOM editing overlay, multi-level grouping headers, and IME-aware editing.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -21,9 +23,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@lattica/core": "workspace:*",
-    "@lattica/data": "workspace:*",
-    "@lattica/formula": "workspace:*"
+    "@ai-path/lattica-core": "workspace:*",
+    "@ai-path/lattica-data": "workspace:*",
+    "@ai-path/lattica-formula": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18",

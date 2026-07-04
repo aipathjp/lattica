@@ -1,4 +1,4 @@
-/** @lattica/mcp — expose a Lattica grid to AI agents via a tool registry. */
+/** @ai-path/lattica-mcp — expose a Lattica grid to AI agents via a tool registry. */
 
 export {
   createGridTools,

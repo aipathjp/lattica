@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, waitFor, act } from '@testing-library/react';
 import { LatticaGrid } from './LatticaGrid.js';
 import { GridController } from './controller.js';
-import type { ColumnNode } from '@lattica/core';
+import type { ColumnNode } from '@ai-path/lattica-core';
 
 afterEach(cleanup);
 

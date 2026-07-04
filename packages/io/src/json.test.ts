@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { CellValue } from '@lattica/core';
+import type { CellValue } from '@ai-path/lattica-core';
 import {
   matrixToJson,
   jsonToMatrix,

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useReducer } from 'react';
-import { LatticaGrid, useGridController } from '@lattica/react';
-import type { ColumnNode } from '@lattica/core';
+import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
+import type { ColumnNode } from '@ai-path/lattica-core';
 
 const columns: readonly ColumnNode[] = [
   { headerName: 'Order' },

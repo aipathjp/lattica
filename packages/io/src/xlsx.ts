@@ -8,7 +8,7 @@
  * writer in {@link ./zip}, so no third-party code is involved.
  */
 
-import { columnIndexToLabel } from '@lattica/core';
+import { columnIndexToLabel } from '@ai-path/lattica-core';
 import { buildZip, type ZipEntry } from './zip.js';
 
 export type XlsxCell = string | number | boolean | null;

@@ -19,7 +19,7 @@
  * recalculate when the anchor's array changes.
  */
 
-import { addressKey, toA1, type CellAddress } from '@lattica/core';
+import { addressKey, toA1, type CellAddress } from '@ai-path/lattica-core';
 import type { AstNode } from './ast.js';
 import { parseFormula } from './parser.js';
 import { expandStructuredRefs } from './structured-refs.js';

@@ -12,7 +12,7 @@ import {
   type CellVisual,
   type IconMark,
   type SparklineShape,
-} from '@lattica/core';
+} from '@ai-path/lattica-core';
 import { cellRect, type GridGeometry, type Rect } from './geometry.js';
 
 export interface CellPaint {

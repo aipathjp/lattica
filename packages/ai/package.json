@@ -1,5 +1,5 @@
 {
-  "name": "@lattica/ai",
+  "name": "@ai-path/lattica-ai",
   "version": "0.1.0",
   "description": "AI-native spreadsheet primitives for Lattica: provider-agnostic AI client, undoable AICommand with provenance, NL<->formula, AI columns, smart fill, schema inference, semantic search.",
   "license": "MIT",
@@ -11,6 +11,6 @@
   "types": "./dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" } },
   "scripts": { "build": "tsup", "typecheck": "tsc --noEmit" },
-  "dependencies": { "@lattica/core": "workspace:*", "@lattica/formula": "workspace:*", "@lattica/data": "workspace:*" },
+  "dependencies": { "@ai-path/lattica-core": "workspace:*", "@ai-path/lattica-formula": "workspace:*", "@ai-path/lattica-data": "workspace:*" },
   "publishConfig": { "access": "public" }
 }

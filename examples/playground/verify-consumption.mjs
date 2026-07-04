@@ -4,10 +4,10 @@
  * after `pnpm build` with `node scripts/verify-consumption.mjs`.
  */
 import assert from 'node:assert/strict';
-import { SheetEngine } from '@lattica/formula';
-import { matrixToXlsx, serializeTsv, parseTsv } from '@lattica/io';
-import { CollabSession, InMemoryNetwork, keyBetween } from '@lattica/collab';
-import { columnIndexToLabel } from '@lattica/core';
+import { SheetEngine } from '@ai-path/lattica-formula';
+import { matrixToXlsx, serializeTsv, parseTsv } from '@ai-path/lattica-io';
+import { CollabSession, InMemoryNetwork, keyBetween } from '@ai-path/lattica-collab';
+import { columnIndexToLabel } from '@ai-path/lattica-core';
 
 // core
 assert.equal(columnIndexToLabel(26), 'AA');

@@ -1,4 +1,4 @@
-/** @lattica/collab — realtime collaboration primitives for Lattica. */
+/** @ai-path/lattica-collab — realtime collaboration primitives for Lattica. */
 
 export { keyBetween, keysBetween, isOrderKey } from './order-key.js';
 export {

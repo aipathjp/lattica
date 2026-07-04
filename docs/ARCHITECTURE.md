@@ -134,10 +134,10 @@ ColumnDef      = { field, headerName, width?, ... }
 
 | パッケージ | 役割 | 依存 |
 |-----------|------|------|
-| `@lattica/core` | データモデル・座標・仮想化・選択・コマンド/undo・多段ヘッダー平坦化 | なし |
-| `@lattica/formula` | 数式 lexer/parser/AST/evaluator/依存DAG/関数ライブラリ | core |
-| `@lattica/react` | Canvas レンダラ・編集オーバーレイ・ヘッダー・ARIA・フック | core, formula, react |
-| `@lattica/io` | CSV/TSV・xlsx(OOXML) 入出力・クリップボード | core |
-| `@lattica/collab` | 表特化 CRDT・プレゼンス・トランスポート抽象 | core |
+| `@ai-path/lattica-core` | データモデル・座標・仮想化・選択・コマンド/undo・多段ヘッダー平坦化 | なし |
+| `@ai-path/lattica-formula` | 数式 lexer/parser/AST/evaluator/依存DAG/関数ライブラリ | core |
+| `@ai-path/lattica-react` | Canvas レンダラ・編集オーバーレイ・ヘッダー・ARIA・フック | core, formula, react |
+| `@ai-path/lattica-io` | CSV/TSV・xlsx(OOXML) 入出力・クリップボード | core |
+| `@ai-path/lattica-collab` | 表特化 CRDT・プレゼンス・トランスポート抽象 | core |
 
 依存方向は一方向（core が最下層）。循環なし。

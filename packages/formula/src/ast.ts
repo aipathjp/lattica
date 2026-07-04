@@ -1,6 +1,6 @@
 /** Abstract syntax tree for parsed formulas. */
 
-import type { A1Reference } from '@lattica/core';
+import type { A1Reference } from '@ai-path/lattica-core';
 
 export type BinaryOperator =
   | '+'

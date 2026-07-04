@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { LatticaGrid, LatticaStatusBar, useGridController } from '@lattica/react';
-import type { ColumnNode, IconSet } from '@lattica/core';
+import { LatticaGrid, LatticaStatusBar, useGridController } from '@ai-path/lattica-react';
+import type { ColumnNode, IconSet } from '@ai-path/lattica-core';
 
 const columns: readonly ColumnNode[] = [
   { headerName: 'Currency' },

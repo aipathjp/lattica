@@ -16,7 +16,7 @@
  * by `null`.
  */
 
-import { columnLabelToIndex } from '@lattica/core';
+import { columnLabelToIndex } from '@ai-path/lattica-core';
 import { inflateRaw } from './inflate.js';
 
 /** A single decoded worksheet: its name and a dense row-major value matrix. */

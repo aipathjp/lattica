@@ -1,5 +1,5 @@
 {
-  "name": "@lattica/io",
+  "name": "@ai-path/lattica-io",
   "version": "0.1.0",
   "description": "Import/export for Lattica: CSV/TSV parsing & serialization, clipboard (TSV + HTML) interop, and dependency-free XLSX (OOXML) export.",
   "license": "MIT",
@@ -21,7 +21,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@lattica/core": "workspace:*"
+    "@ai-path/lattica-core": "workspace:*"
   },
   "publishConfig": {
     "access": "public"

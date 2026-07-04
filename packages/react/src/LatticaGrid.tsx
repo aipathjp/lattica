@@ -21,7 +21,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react';
-import { HeaderModel, type ColumnNode } from '@lattica/core';
+import { HeaderModel, type ColumnNode } from '@ai-path/lattica-core';
 import type { GridController, EditState } from './controller.js';
 import { resolveTheme, type GridTheme } from './theme.js';
 import { buildScene } from './scene.js';
@@ -51,6 +51,10 @@ export interface LatticaGridProps {
   contextMenu?: (target: HitResult) => MenuItemSpec[];
   /** Render the detail panel for an expanded master row (by physical row index). */
   renderDetail?: (physicalRow: number) => ReactNode;
+  /** セル領域クリック時（選択更新後） */
+  onCellClick?: (hit: { row: number; col: number }, event: ReactMouseEvent<HTMLDivElement>) => void;
+  /** スクロール位置が変わったとき */
+  onScrollChange?: (scroll: ScrollOffset) => void;
 }
 
 interface MenuState {
@@ -60,7 +64,7 @@ interface MenuState {
 }
 
 export function LatticaGrid(props: LatticaGridProps): ReactElement {
-  const { controller, columns } = props;
+  const { controller, columns, onCellClick, onScrollChange } = props;
   const theme = resolveTheme(props.theme);
   const fill = props.fill ?? false;
   const fixedWidth = props.width ?? 640;
@@ -128,6 +132,10 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       }
     }
   }, [edit]);
+
+  useEffect(() => {
+    onScrollChange?.(scroll);
+  }, [scroll, onScrollChange]);
 
   // Paint on every render (cheap: only visible cells).
   useEffect(() => {
@@ -287,6 +295,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
           } else {
             controller.selection.setActive({ row: hit.row, col: hit.col });
           }
+          onCellClick?.({ row: hit.row, col: hit.col }, e);
           // Begin a drag-select from this cell.
           draggingRef.current = true;
           break;
@@ -302,7 +311,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       }
       rootRef.current?.focus();
     },
-    [controller, scroll, contentEdge],
+    [controller, scroll, contentEdge, onCellClick],
   );
 
   const onMouseMove = useCallback(

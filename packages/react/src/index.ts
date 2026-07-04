@@ -1,4 +1,4 @@
-/** @lattica/react — canvas-rendered, virtualized React data grid. */
+/** @ai-path/lattica-react — canvas-rendered, virtualized React data grid. */
 
 export { LatticaGrid, type LatticaGridProps } from './LatticaGrid.js';
 export { LatticaStatusBar, type LatticaStatusBarProps } from './StatusBar.js';

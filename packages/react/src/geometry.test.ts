@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SizeManager } from '@lattica/core';
+import { SizeManager } from '@ai-path/lattica-core';
 import {
   columnX,
   rowY,

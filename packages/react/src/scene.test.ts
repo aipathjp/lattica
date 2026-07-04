@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SizeManager, SelectionModel } from '@lattica/core';
+import { SizeManager, SelectionModel } from '@ai-path/lattica-core';
 import { buildScene, visibleIndices } from './scene.js';
 import type { GridGeometry } from './geometry.js';
 

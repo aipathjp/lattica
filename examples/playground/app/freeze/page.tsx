@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { LatticaGrid, useGridController } from '@lattica/react';
-import type { ColumnNode } from '@lattica/core';
+import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
+import type { ColumnNode } from '@ai-path/lattica-core';
 
 const columns: readonly ColumnNode[] = Array.from({ length: 20 }, (_, i) => ({
   headerName: i === 0 ? 'Label' : `Col ${i}`,

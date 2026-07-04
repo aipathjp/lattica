@@ -5,17 +5,17 @@
  * the Lattica public API so reviewers can see the headless {@link GridController}
  * features (formulas, column types/alignment, conditional formatting, sort,
  * filter, merge, search), the canvas {@link LatticaGrid} view, the
- * {@link serializeDelimited}/{@link matrixToXlsx} export paths from `@lattica/io`,
- * and the provider-agnostic NL→formula helper from `@lattica/ai` driven by a
+ * {@link serializeDelimited}/{@link matrixToXlsx} export paths from `@ai-path/lattica-io`,
+ * and the provider-agnostic NL→formula helper from `@ai-path/lattica-ai` driven by a
  * deterministic {@link MockProvider}. It is consumer code only — it imports the
- * published `@lattica/*` packages and never reaches into their internals.
+ * published `@ai-path/lattica-*` packages and never reaches into their internals.
  */
 
 import { useEffect, useState } from 'react';
-import { LatticaGrid, LatticaFormulaBar, useGridController } from '@lattica/react';
-import type { ColumnNode } from '@lattica/core';
-import { serializeDelimited, matrixToXlsx } from '@lattica/io';
-import { AIClient, MockProvider, nlToFormula } from '@lattica/ai';
+import { LatticaGrid, LatticaFormulaBar, useGridController } from '@ai-path/lattica-react';
+import type { ColumnNode } from '@ai-path/lattica-core';
+import { serializeDelimited, matrixToXlsx } from '@ai-path/lattica-io';
+import { AIClient, MockProvider, nlToFormula } from '@ai-path/lattica-ai';
 
 const columns: readonly ColumnNode[] = [
   { headerName: 'Score', field: 'score' },

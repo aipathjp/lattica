@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { LatticaGrid, LatticaChart, useGridController } from '@lattica/react';
-import type { ColumnNode } from '@lattica/core';
+import { LatticaGrid, LatticaChart, useGridController } from '@ai-path/lattica-react';
+import type { ColumnNode } from '@ai-path/lattica-core';
 
 const categories = ['Q1', 'Q2', 'Q3', 'Q4'];
 const series = [

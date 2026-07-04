@@ -16,8 +16,8 @@
  */
 
 import { performance } from 'node:perf_hooks';
-import { SizeManager, SelectionModel } from '@lattica/core';
-import { buildScene, paintScene } from '@lattica/react';
+import { SizeManager, SelectionModel } from '@ai-path/lattica-core';
+import { buildScene, paintScene } from '@ai-path/lattica-react';
 
 /** A no-op, recording-free Canvas2D mock: every method is empty, props settable. */
 function createNoopContext() {
@@ -69,7 +69,7 @@ for (let i = 0; i < 100; i++) {
   colSizes.setSize((i * 13) % COLS, 110 + (i % 5) * 20);
 }
 
-/** @type {import('@lattica/react').GridGeometry} */
+/** @type {import('@ai-path/lattica-react').GridGeometry} */
 const geom = {
   rowSizes,
   colSizes,
