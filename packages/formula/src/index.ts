@@ -1,4 +1,4 @@
-/** @lattica/formula — clean-room Excel-compatible formula engine. */
+/** @ai-path/lattica-formula — clean-room Excel-compatible formula engine. */
 
 export {
   FormulaError,

@@ -1,4 +1,4 @@
-# @lattica/ai
+# @ai-path/lattica-ai
 
 AI-native spreadsheet primitives for Lattica. Every feature is built on a
 provider-agnostic `AIProvider` interface and a governance layer (`AIClient`)
@@ -12,7 +12,7 @@ detection, text operations, and a HITL workflow planner/runner.
 ## Install
 
 ```sh
-pnpm add @lattica/ai
+pnpm add @ai-path/lattica-ai
 ```
 
 ## API overview
@@ -20,7 +20,7 @@ pnpm add @lattica/ai
 ### Provider & client
 
 ```ts
-import { MockProvider, AIClient } from '@lattica/ai';
+import { MockProvider, AIClient } from '@ai-path/lattica-ai';
 
 const provider = new MockProvider({ texts: ['=A1+B1'], objects: [{ formula: 'A1+B1' }] });
 const client = new AIClient(provider, { maxCalls: 50, maxOutputTokens: 512 });
@@ -33,10 +33,10 @@ client.getCallCount();
 ### Natural language → formula
 
 `nlToFormula` returns a validated `NlFormulaResult` (the formula is parsed by
-`@lattica/formula`, so `valid`/`error` reflect real syntax checks).
+`@ai-path/lattica-formula`, so `valid`/`error` reflect real syntax checks).
 
 ```ts
-import { nlToFormula, explainFormula, fixFormula } from '@lattica/ai';
+import { nlToFormula, explainFormula, fixFormula } from '@ai-path/lattica-ai';
 
 const result = await nlToFormula(client, 'sum of column A', { context: 'A1:A20 is sales' });
 result.formula; // e.g. '=SUM(A1:A20)'
@@ -49,7 +49,7 @@ await fixFormula(client, '=SUM(A1:A', 'unexpected end of input');
 ### Generate a column & smart fill
 
 ```ts
-import { generateColumn, smartFill } from '@lattica/ai';
+import { generateColumn, smartFill } from '@ai-path/lattica-ai';
 
 const cells = await generateColumn(
   client,
@@ -70,7 +70,7 @@ const filled = await smartFill(
 ### Semantic search
 
 ```ts
-import { SemanticIndex, cosineSimilarity, type Embedder } from '@lattica/ai';
+import { SemanticIndex, cosineSimilarity, type Embedder } from '@ai-path/lattica-ai';
 
 const embedder: Embedder = (text) => /* your embedding model */ embed(text);
 const index = new SemanticIndex(embedder);
@@ -87,7 +87,7 @@ and `WorkflowRunner` executes approved steps with a HITL approval callback and a
 audit trail.
 
 ```ts
-import { nlToOperation, planWorkflow, WorkflowRunner } from '@lattica/ai';
+import { nlToOperation, planWorkflow, WorkflowRunner } from '@ai-path/lattica-ai';
 
 const op = await nlToOperation(client, 'sort by revenue descending', ['name', 'revenue']);
 // e.g. { op: 'sort', col: 1, direction: 'desc' }

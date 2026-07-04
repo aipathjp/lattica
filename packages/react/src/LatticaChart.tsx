@@ -1,12 +1,12 @@
 /**
  * LatticaChart — a small canvas chart component (line / bar / pie). It computes
- * the layout with `@lattica/core`'s `layoutChart` and paints it via
+ * the layout with `@ai-path/lattica-core`'s `layoutChart` and paints it via
  * {@link paintChart}. Standalone and theme-aware; consumers place it anywhere
  * (e.g. next to a grid driven by the same data).
  */
 
 import { useEffect, useRef, type ReactElement } from 'react';
-import { layoutChart, type ChartSpec } from '@lattica/core';
+import { layoutChart, type ChartSpec } from '@ai-path/lattica-core';
 import { resolveTheme, type GridTheme } from './theme.js';
 import { paintChart } from './chart-painter.js';
 import type { Canvas2D } from './painter.js';

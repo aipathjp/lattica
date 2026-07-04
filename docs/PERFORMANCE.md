@@ -14,8 +14,8 @@ runnable Node ESM script (intentionally **not** a `*.ts` under `src/**`, so it i
 excluded from coverage and from Vitest). It exercises the real published API,
 resolved from each package's built `dist`:
 
-- `SizeManager`, `SelectionModel` from `@lattica/core`
-- `buildScene`, `paintScene` from `@lattica/react`
+- `SizeManager`, `SelectionModel` from `@ai-path/lattica-core`
+- `buildScene`, `paintScene` from `@ai-path/lattica-react`
 
 ### Methodology
 

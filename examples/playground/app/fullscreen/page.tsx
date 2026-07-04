@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { LatticaGrid, LatticaFormulaBar, LatticaStatusBar, useGridController } from '@lattica/react';
-import type { ColumnNode } from '@lattica/core';
+import { LatticaGrid, LatticaFormulaBar, LatticaStatusBar, useGridController } from '@ai-path/lattica-react';
+import type { ColumnNode } from '@ai-path/lattica-core';
 
 type Mode = 'fitWidth' | 'fullScreen' | 'resizable' | 'fixed';
 

@@ -17,7 +17,7 @@ import {
   type CellScalar,
   type FormulaValue,
   type SheetEngine,
-} from '@lattica/formula';
+} from '@ai-path/lattica-formula';
 
 /** Upper bound on cells a single `get_range` call may materialize. */
 export const MAX_RANGE_CELLS = 100_000;

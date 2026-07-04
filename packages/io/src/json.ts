@@ -13,7 +13,7 @@
  * single failure mode regardless of how the input was wrong.
  */
 
-import type { CellValue } from '@lattica/core';
+import type { CellValue } from '@ai-path/lattica-core';
 
 /** True when `value` is a valid {@link CellValue} (string, number, boolean, or null). */
 function isCellValue(value: unknown): value is CellValue {

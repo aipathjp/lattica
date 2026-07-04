@@ -1,4 +1,4 @@
-/** @lattica/ai — AI-native spreadsheet primitives for Lattica. */
+/** @ai-path/lattica-ai — AI-native spreadsheet primitives for Lattica. */
 
 export {
   MockProvider,

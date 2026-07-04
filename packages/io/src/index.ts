@@ -1,4 +1,4 @@
-/** @lattica/io — import/export and clipboard interop for Lattica. */
+/** @ai-path/lattica-io — import/export and clipboard interop for Lattica. */
 
 export {
   parseDelimited,

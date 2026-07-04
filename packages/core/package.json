@@ -1,5 +1,5 @@
 {
-  "name": "@lattica/core",
+  "name": "@ai-path/lattica-core",
   "version": "0.1.0",
   "description": "Framework-agnostic core engine for the Lattica data grid: data model, coordinate system, selection, virtualization math, command/undo-redo.",
   "license": "MIT",

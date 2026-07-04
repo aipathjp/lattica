@@ -6,12 +6,12 @@
  * canvas {@link LatticaGrid} shows results spilling from an anchor into the
  * adjacent cells, and a deliberate collision shows the `#SPILL!` guard.
  *
- * Consumer code only: it imports the published `@lattica/*` packages.
+ * Consumer code only: it imports the published `@ai-path/lattica-*` packages.
  */
 
 import { useEffect, useState } from 'react';
-import { LatticaGrid, useGridController } from '@lattica/react';
-import type { ColumnNode } from '@lattica/core';
+import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
+import type { ColumnNode } from '@ai-path/lattica-core';
 
 const columns: readonly ColumnNode[] = [
   { headerName: 'A' },

@@ -1,8 +1,8 @@
-# @lattica/mcp
+# @ai-path/lattica-mcp
 
 Exposes a Lattica grid to AI agents as a transport-agnostic tool registry. Each
 `GridTool` bundles a stable name, a description, a JSON-schema input definition,
-and a synchronous handler over a `@lattica/formula` `SheetEngine` — the handlers
+and a synchronous handler over a `@ai-path/lattica-formula` `SheetEngine` — the handlers
 know nothing about MCP wire framing or networking. The `ToolDispatcher` wraps a
 tool list with name lookup and a uniform `{ ok, output | error }` result, so a
 thin MCP server (or any agent loop) can marshal calls without bespoke glue.
@@ -10,7 +10,7 @@ thin MCP server (or any agent loop) can marshal calls without bespoke glue.
 ## Install
 
 ```sh
-pnpm add @lattica/mcp
+pnpm add @ai-path/lattica-mcp
 ```
 
 ## API overview
@@ -22,8 +22,8 @@ pnpm add @lattica/mcp
 `ToolDispatcher` to list and call tools safely.
 
 ```ts
-import { SheetEngine } from '@lattica/formula';
-import { createGridTools, ToolDispatcher } from '@lattica/mcp';
+import { SheetEngine } from '@ai-path/lattica-formula';
+import { createGridTools, ToolDispatcher } from '@ai-path/lattica-mcp';
 
 const engine = new SheetEngine();
 const dispatcher = new ToolDispatcher(createGridTools(engine));

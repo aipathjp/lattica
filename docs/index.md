@@ -39,11 +39,11 @@ features:
 
 Lattica is a pnpm monorepo of focused, framework-agnostic packages:
 
-- [`@lattica/core`](/packages/core) — engine: A1 coords, virtualization math, sparse data store, selection, command/undo, header flattening.
-- [`@lattica/formula`](/packages/formula) — clean-room Excel-compatible formula engine (~55 functions).
-- [`@lattica/react`](/packages/react) — React bindings: canvas grid, DOM editing overlay, grouping headers, `GridController`.
-- [`@lattica/io`](/packages/io) — CSV/TSV, clipboard, dependency-free XLSX export.
-- [`@lattica/data`](/packages/data) — data layer utilities.
-- [`@lattica/collab`](/packages/collab) — realtime LWW CRDT, fractional indexing, presence, transport abstraction.
-- [`@lattica/ai`](/packages/ai) — provider-agnostic AI helpers (NL→formula).
-- [`@lattica/mcp`](/packages/mcp) — Model Context Protocol surface for agent-driven grids.
+- [`@ai-path/lattica-core`](/packages/core) — engine: A1 coords, virtualization math, sparse data store, selection, command/undo, header flattening.
+- [`@ai-path/lattica-formula`](/packages/formula) — clean-room Excel-compatible formula engine (~55 functions).
+- [`@ai-path/lattica-react`](/packages/react) — React bindings: canvas grid, DOM editing overlay, grouping headers, `GridController`.
+- [`@ai-path/lattica-io`](/packages/io) — CSV/TSV, clipboard, dependency-free XLSX export.
+- [`@ai-path/lattica-data`](/packages/data) — data layer utilities.
+- [`@ai-path/lattica-collab`](/packages/collab) — realtime LWW CRDT, fractional indexing, presence, transport abstraction.
+- [`@ai-path/lattica-ai`](/packages/ai) — provider-agnostic AI helpers (NL→formula).
+- [`@ai-path/lattica-mcp`](/packages/mcp) — Model Context Protocol surface for agent-driven grids.

@@ -1,4 +1,4 @@
-# @lattica/collab
+# @ai-path/lattica-collab
 
 Realtime collaboration primitives for Lattica. It provides a last-writer-wins
 CRDT for cell values (`TableDocument`), a presence registry for remote cursors
@@ -10,7 +10,7 @@ stable ordering of inserted rows/columns.
 ## Install
 
 ```sh
-pnpm add @lattica/collab
+pnpm add @ai-path/lattica-collab
 ```
 
 ## API overview
@@ -21,7 +21,7 @@ A `CollabSession` applies and broadcasts local edits and merges remote ones. The
 `InMemoryNetwork` connects multiple sessions in-process — ideal for tests.
 
 ```ts
-import { CollabSession, InMemoryNetwork } from '@lattica/collab';
+import { CollabSession, InMemoryNetwork } from '@ai-path/lattica-collab';
 
 const network = new InMemoryNetwork();
 const alice = new CollabSession('alice', network.connect(), { name: 'Alice', color: '#e11' });
@@ -41,7 +41,7 @@ alice.leave();
 another document's ops.
 
 ```ts
-import { TableDocument } from '@lattica/collab';
+import { TableDocument } from '@ai-path/lattica-collab';
 
 const doc = new TableDocument('site-1');
 const op = doc.setLocal('A1', 42);
@@ -55,7 +55,7 @@ other.applyRemote(op);
 ### Presence
 
 ```ts
-import { PresenceRegistry, type PresenceState } from '@lattica/collab';
+import { PresenceRegistry, type PresenceState } from '@ai-path/lattica-collab';
 
 const presence = new PresenceRegistry();
 presence.set({ site: 'bob', name: 'Bob', cursor: 'C3' } as PresenceState);
@@ -68,7 +68,7 @@ presence.remove('bob');
 inserted items; `isOrderKey` validates them.
 
 ```ts
-import { keyBetween } from '@lattica/collab';
+import { keyBetween } from '@ai-path/lattica-collab';
 
 const k = keyBetween(null, null);  // first key
 const k2 = keyBetween(k, null);    // sorts after k

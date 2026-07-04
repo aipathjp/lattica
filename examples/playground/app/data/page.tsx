@@ -8,14 +8,14 @@
  * columns are right-aligned, and a conditional-format rule highlights high
  * revenue. Toolbar buttons drive sort / filter / search / CSV+XLSX export.
  *
- * Consumer code only — imports the published `@lattica/*` packages plus a
+ * Consumer code only — imports the published `@ai-path/lattica-*` packages plus a
  * fetch() to the app's own API.
  */
 
 import { useEffect, useState } from 'react';
-import { LatticaGrid, useGridController } from '@lattica/react';
-import type { ColumnNode } from '@lattica/core';
-import { serializeDelimited, matrixToXlsx } from '@lattica/io';
+import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
+import type { ColumnNode } from '@ai-path/lattica-core';
+import { serializeDelimited, matrixToXlsx } from '@ai-path/lattica-io';
 
 interface SaleRow {
   id: number;

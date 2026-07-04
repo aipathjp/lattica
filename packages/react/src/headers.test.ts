@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SizeManager, computeHeaderLayout, type ColumnNode } from '@lattica/core';
+import { SizeManager, computeHeaderLayout, type ColumnNode } from '@ai-path/lattica-core';
 import { columnHeaderCells, rowHeaderCells } from './headers.js';
 import type { GridGeometry } from './geometry.js';
 

@@ -1,4 +1,4 @@
-# @lattica/react
+# @ai-path/lattica-react
 
 The canvas-rendered, virtualized React data grid for Lattica. `<LatticaGrid>` is
 a thin view over a headless `GridController` that owns the formula engine,
@@ -10,7 +10,7 @@ tested modules (geometry, scene, painter, keyboard, scroll, measure).
 ## Install
 
 ```sh
-pnpm add @lattica/react
+pnpm add @ai-path/lattica-react
 ```
 
 ## API overview
@@ -20,7 +20,7 @@ pnpm add @lattica/react
 Create a controller with `useGridController` and pass it to `<LatticaGrid>`.
 
 ```tsx
-import { LatticaGrid, useGridController } from '@lattica/react';
+import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
 
 function Sheet() {
   const controller = useGridController({ rowCount: 1000, colCount: 26 });
@@ -53,7 +53,7 @@ The `CellTypeRegistry` maps a column type name to a `CellRenderer`.
 (`builtinRenderers`); register your own and assign it to a column.
 
 ```ts
-import { defaultCellTypes, drawCellText, type CellRenderer } from '@lattica/react';
+import { defaultCellTypes, drawCellText, type CellRenderer } from '@ai-path/lattica-react';
 
 const badge: CellRenderer = (ctx) => drawCellText({ ...ctx, align: 'center' });
 defaultCellTypes.register('badge', badge);
@@ -63,7 +63,7 @@ controller.setColumnType(2, 'badge'); // physical column index
 ### Theming & presets
 
 ```ts
-import { resolveTheme, themePresets, getPreset, darkTheme } from '@lattica/react';
+import { resolveTheme, themePresets, getPreset, darkTheme } from '@ai-path/lattica-react';
 
 const theme = resolveTheme({ ...darkTheme });
 const preset = getPreset('highContrast'); // from themePresets

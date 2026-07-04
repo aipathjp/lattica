@@ -1,7 +1,7 @@
 /** Tests for the ToolDispatcher, exercised against real grid tools. */
 
 import { describe, it, expect } from 'vitest';
-import { SheetEngine } from '@lattica/formula';
+import { SheetEngine } from '@ai-path/lattica-formula';
 import { createGridTools } from './tools.js';
 import { ToolDispatcher } from './dispatcher.js';
 

@@ -62,25 +62,25 @@ importers:
 
   examples/playground:
     dependencies:
-      '@lattica/ai':
+      '@ai-path/lattica-ai':
         specifier: workspace:*
         version: link:../../packages/ai
-      '@lattica/collab':
+      '@ai-path/lattica-collab':
         specifier: workspace:*
         version: link:../../packages/collab
-      '@lattica/core':
+      '@ai-path/lattica-core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@lattica/data':
+      '@ai-path/lattica-data':
         specifier: workspace:*
         version: link:../../packages/data
-      '@lattica/formula':
+      '@ai-path/lattica-formula':
         specifier: workspace:*
         version: link:../../packages/formula
-      '@lattica/io':
+      '@ai-path/lattica-io':
         specifier: workspace:*
         version: link:../../packages/io
-      '@lattica/react':
+      '@ai-path/lattica-react':
         specifier: workspace:*
         version: link:../../packages/react
       '@neondatabase/serverless':
@@ -105,19 +105,19 @@ importers:
 
   packages/ai:
     dependencies:
-      '@lattica/core':
+      '@ai-path/lattica-core':
         specifier: workspace:*
         version: link:../core
-      '@lattica/data':
+      '@ai-path/lattica-data':
         specifier: workspace:*
         version: link:../data
-      '@lattica/formula':
+      '@ai-path/lattica-formula':
         specifier: workspace:*
         version: link:../formula
 
   packages/collab:
     dependencies:
-      '@lattica/core':
+      '@ai-path/lattica-core':
         specifier: workspace:*
         version: link:../core
 
@@ -125,37 +125,37 @@ importers:
 
   packages/data:
     dependencies:
-      '@lattica/core':
+      '@ai-path/lattica-core':
         specifier: workspace:*
         version: link:../core
 
   packages/formula:
     dependencies:
-      '@lattica/core':
+      '@ai-path/lattica-core':
         specifier: workspace:*
         version: link:../core
 
   packages/io:
     dependencies:
-      '@lattica/core':
+      '@ai-path/lattica-core':
         specifier: workspace:*
         version: link:../core
 
   packages/mcp:
     dependencies:
-      '@lattica/formula':
+      '@ai-path/lattica-formula':
         specifier: workspace:*
         version: link:../formula
 
   packages/react:
     dependencies:
-      '@lattica/core':
+      '@ai-path/lattica-core':
         specifier: workspace:*
         version: link:../core
-      '@lattica/data':
+      '@ai-path/lattica-data':
         specifier: workspace:*
         version: link:../data
-      '@lattica/formula':
+      '@ai-path/lattica-formula':
         specifier: workspace:*
         version: link:../formula
       react:

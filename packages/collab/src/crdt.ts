@@ -11,7 +11,7 @@
  * idempotent).
  */
 
-import type { CellValue } from '@lattica/core';
+import type { CellValue } from '@ai-path/lattica-core';
 
 export type SiteId = string;
 
