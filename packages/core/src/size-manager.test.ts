@@ -56,6 +56,19 @@ describe('variable sizing with overrides', () => {
     expect(sm.getOffset(6)).toBe(140);
   });
 
+  it('exposes overrides as an immutable snapshot copy', () => {
+    const sm = make(10, 20);
+    sm.setSize(2, 50);
+    sm.setSize(5, 10);
+    const overrides = sm.getOverrides();
+    expect([...overrides.entries()]).toEqual([
+      [2, 50],
+      [5, 10],
+    ]);
+    (overrides as Map<number, number>).set(2, 999);
+    expect(sm.getSize(2)).toBe(50);
+  });
+
   it('maps offsets through overridden regions', () => {
     const sm = make(5, 20);
     sm.setSize(0, 100);

@@ -83,6 +83,16 @@ describe('IndexMapper', () => {
       m.setHidden([4, 0, 2], true);
       expect(m.getHidden()).toEqual([0, 2, 4]);
     });
+
+    it('getOrder returns the full visual order including hidden indices as a copy', () => {
+      const m = new IndexMapper(5);
+      m.setHidden([2], true);
+      m.move(0, 1, 4);
+      const order = m.getOrder();
+      expect(order).toEqual([1, 2, 3, 4, 0]);
+      order[0] = 99;
+      expect(m.getOrder()).toEqual([1, 2, 3, 4, 0]);
+    });
   });
 
   describe('round-trips after hide + move', () => {

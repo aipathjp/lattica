@@ -37,6 +37,7 @@ import {
   type SearchOptions,
   type CellValue,
   type FillDirection,
+  type GridStateSnapshot,
   forEachCell,
   normalizeRange,
   fillRegion,
@@ -78,6 +79,7 @@ export interface EditState {
 interface ControllerEvents {
   change: void;
   edit: EditState | null;
+  viewstate: GridStateSnapshot;
 }
 
 /** Format an engine value for display in a cell. */
@@ -97,6 +99,46 @@ export function formatValue(value: ReturnType<SheetEngine['getValue']>): string 
 /** Escape a string for use as a literal inside a RegExp. */
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function mapToRecord(map: ReadonlyMap<number, number>): Record<number, number> | undefined {
+  if (map.size === 0) {
+    return undefined;
+  }
+  const record: Record<number, number> = {};
+  for (const [key, value] of map) {
+    record[key] = value;
+  }
+  return record;
+}
+
+function nonEmptyArray<T>(items: T[]): T[] | undefined {
+  return items.length === 0 ? undefined : items;
+}
+
+function isIdentityOrder(order: readonly number[]): boolean {
+  return order.every((physical, visual) => physical === visual);
+}
+
+function validIndex(index: number, count: number): boolean {
+  return Number.isInteger(index) && index >= 0 && index < count;
+}
+
+function sparseOrder(order: readonly number[], count: number): number[] {
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const index of order) {
+    if (validIndex(index, count) && !seen.has(index)) {
+      seen.add(index);
+      out.push(index);
+    }
+  }
+  for (let index = 0; index < count; index++) {
+    if (!seen.has(index)) {
+      out.push(index);
+    }
+  }
+  return out;
 }
 
 // Optional sign, optional currency symbol, grouped or plain digits, optional
@@ -310,6 +352,7 @@ export class GridController {
   toggleSort(visualCol: number, additive = false): void {
     this.sortModel.toggle(this.view.cols.getPhysicalIndex(visualCol), additive);
     this.refreshView();
+    this.emitViewState();
   }
 
   /** Replace the filter on a (visual) column. Empty conditions clear it. */
@@ -328,6 +371,7 @@ export class GridController {
     this.sortModel.clear();
     this.filterModel.clear();
     this.refreshView();
+    this.emitViewState();
   }
 
   /** Current sort direction for a (visual) column, or null. */
@@ -349,12 +393,14 @@ export class GridController {
   hideColumn(visualCol: number): void {
     this.view.cols.setHidden([this.view.cols.getPhysicalIndex(visualCol)], true);
     this.refreshColumns();
+    this.emitViewState();
   }
 
   /** Show a previously-hidden (physical) column. */
   showColumn(physicalCol: number): void {
     this.view.cols.setHidden([physicalCol], false);
     this.refreshColumns();
+    this.emitViewState();
   }
 
   /** Is the given physical column currently hidden? */
@@ -366,6 +412,7 @@ export class GridController {
   showAllColumns(): void {
     this.view.cols.setHidden(this.view.cols.getHidden(), false);
     this.refreshColumns();
+    this.emitViewState();
   }
 
   // ── Master / detail ────────────────────────────────────────────────────────
@@ -393,6 +440,21 @@ export class GridController {
   /** Physical (data) row index for a visual row. */
   getPhysicalRow(visualRow: number): number {
     return this.view.rows.getPhysicalIndex(visualRow);
+  }
+
+  /** Physical (data) column index for a visual column. */
+  getPhysicalCol(visualCol: number): number {
+    return this.view.cols.getPhysicalIndex(visualCol);
+  }
+
+  /** Current width of a visible column. */
+  getColumnWidth(visualCol: number): number {
+    return this.viewColSizes.getSize(visualCol);
+  }
+
+  /** Current height of a visible row. */
+  getRowHeight(visualRow: number): number {
+    return this.viewRowSizes.getSize(visualRow);
   }
 
   // ── Formula bar support ────────────────────────────────────────────────────
@@ -447,6 +509,87 @@ export class GridController {
   moveColumn(fromVisual: number, toVisual: number, count = 1): void {
     this.view.cols.move(fromVisual, count, toVisual);
     this.refreshColumns();
+    this.emitViewState();
+  }
+
+  /** Snapshot the current user-customizable view state. */
+  captureViewState(): GridStateSnapshot {
+    const columnOrder = this.view.cols.getOrder();
+    const sort = this.sortModel.getConfigs();
+    const snapshot: GridStateSnapshot = { version: 1 };
+    const columnWidths = mapToRecord(this.colSizes.getOverrides());
+    const rowHeights = mapToRecord(this.rowSizes.getOverrides());
+    if (columnWidths !== undefined) snapshot.columnWidths = columnWidths;
+    if (rowHeights !== undefined) snapshot.rowHeights = rowHeights;
+    const hiddenColumns = nonEmptyArray(this.view.cols.getHidden());
+    const hiddenRows = nonEmptyArray(this.view.rows.getHidden());
+    if (hiddenColumns !== undefined) snapshot.hiddenColumns = hiddenColumns;
+    if (hiddenRows !== undefined) snapshot.hiddenRows = hiddenRows;
+    if (!isIdentityOrder(columnOrder)) snapshot.columnOrder = columnOrder;
+    if (sort.length > 0) snapshot.sort = sort;
+    if (this.frozenRows !== 0) snapshot.frozenRows = this.frozenRows;
+    if (this.frozenCols !== 0) snapshot.frozenCols = this.frozenCols;
+    return snapshot;
+  }
+
+  /** Apply a captured view state. Out-of-range entries are ignored. */
+  applyViewState(snapshot: GridStateSnapshot): void {
+    if (snapshot.columnWidths !== undefined) {
+      for (const col of this.colSizes.getOverrides().keys()) {
+        this.colSizes.resetSize(col);
+      }
+      for (const [key, size] of Object.entries(snapshot.columnWidths)) {
+        const col = Number(key);
+        if (validIndex(col, this.colCount)) {
+          this.colSizes.setSize(col, size);
+        }
+      }
+    }
+    if (snapshot.rowHeights !== undefined) {
+      for (const row of this.rowSizes.getOverrides().keys()) {
+        this.rowSizes.resetSize(row);
+      }
+      for (const [key, size] of Object.entries(snapshot.rowHeights)) {
+        const row = Number(key);
+        if (validIndex(row, this.rowCount)) {
+          this.rowSizes.setSize(row, size);
+        }
+      }
+    }
+
+    if (snapshot.hiddenColumns !== undefined) {
+      this.view.cols.setHidden(this.view.cols.getHidden(), false);
+      this.view.cols.setHidden(snapshot.hiddenColumns.filter((col) => validIndex(col, this.colCount)), true);
+    }
+    if (snapshot.hiddenRows !== undefined) {
+      this.view.rows.setHidden(this.view.rows.getHidden(), false);
+      this.view.rows.setHidden(snapshot.hiddenRows.filter((row) => validIndex(row, this.rowCount)), true);
+    }
+
+    if (snapshot.columnOrder !== undefined) {
+      this.view.cols.setOrder(sparseOrder(snapshot.columnOrder, this.colCount));
+    }
+
+    if (snapshot.sort !== undefined) {
+      const sort = snapshot.sort.filter((config) => validIndex(config.col, this.colCount));
+      this.sortModel.setConfigs(sort);
+      this.view.applySort(this.engineGet, sort);
+    }
+
+    if (snapshot.frozenRows !== undefined) {
+      this.frozenRows = Math.max(0, Math.min(snapshot.frozenRows, this.rowCount));
+    }
+    if (snapshot.frozenCols !== undefined) {
+      this.frozenCols = Math.max(0, Math.min(snapshot.frozenCols, this.colCount));
+    }
+
+    this.rebuildViewSizes();
+    this.selection.setDimensions(this.view.getRowCount(), this.view.getColCount());
+    this.emitter.emit('change', undefined);
+  }
+
+  private emitViewState(): void {
+    this.emitter.emit('viewstate', this.captureViewState());
   }
 
   // ── Faceted (set) filter & aggregation ─────────────────────────────────────
@@ -1030,10 +1173,12 @@ export class GridController {
     this.rowSizes.setSize(this.view.rows.getPhysicalIndex(row), height);
     this.rebuildViewSizes();
     this.emitter.emit('change', undefined);
+    this.emitViewState();
   }
   resizeCol(col: number, width: number): void {
     this.colSizes.setSize(this.view.cols.getPhysicalIndex(col), width);
     this.rebuildViewSizes();
     this.emitter.emit('change', undefined);
+    this.emitViewState();
   }
 }

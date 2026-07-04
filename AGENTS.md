@@ -182,6 +182,21 @@ const c = useGridController({ rowCount: 100, colCount: 8, ...densityOptions('com
 Palettes: `light dark highContrast midnight sepia solarizedLight solarizedDark`.
 Densities: `compact comfortable spacious`. `buildTheme({ palette, density, fontFamily, overrides })`.
 
+**View-state persistence (per-user / org-wide)**
+```tsx
+import { deserializeState, serializeState } from '@ai-path/lattica-core';
+const controller = useGridController({ rowCount: 1000, colCount: 20 });
+useEffect(() => {
+  if (orgDefaultJson) controller.applyViewState(deserializeState(orgDefaultJson));
+  const saved = localStorage.getItem(`lattica:view:${userId}`);
+  if (saved) controller.applyViewState(deserializeState(saved));
+}, [controller, orgDefaultJson, userId]);
+<LatticaGrid
+  controller={controller}
+  onViewStateChange={(s) => localStorage.setItem(`lattica:view:${userId}`, serializeState(s))}
+/>
+```
+
 **Export**
 ```ts
 import { serializeDelimited, matrixToXlsx, writeStyledXlsx, tableToPdf } from '@lattica/io';

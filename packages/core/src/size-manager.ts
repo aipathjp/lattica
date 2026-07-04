@@ -67,6 +67,11 @@ export class SizeManager {
     return this.overrides.get(index) ?? this.defaultSize;
   }
 
+  /** Sparse per-index size overrides. Returns a copy so callers cannot mutate internals. */
+  getOverrides(): ReadonlyMap<number, number> {
+    return new Map(this.overrides);
+  }
+
   /** Override the size of one index (clamped to minSize). */
   setSize(index: number, size: number): void {
     if (index < 0 || index >= this.count) {
