@@ -1,6 +1,6 @@
 {
   "name": "@ai-path/tb-data",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Index mapping (physical<->visual) and data-source binding for Taible: the foundation for hiding, moving, sorting, filtering, trimming, and grouping.",
   "homepage": "https://github.com/aipathjp/lattica#readme",
   "bugs": {

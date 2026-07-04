@@ -1,6 +1,6 @@
 {
   "name": "@ai-path/tb-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Expose a Taible grid to AI agents: a transport-agnostic tool registry (get_cell/set_cell/get_range/evaluate/define_name) with handler-validated inputs and a result-enveloped dispatcher.",
   "license": "MIT",
   "type": "module",

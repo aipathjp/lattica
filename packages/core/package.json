@@ -1,6 +1,6 @@
 {
   "name": "@ai-path/tb-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Framework-agnostic core engine for the Taible data grid: data model, coordinate system, selection, virtualization math, command/undo-redo.",
   "repository": {
     "type": "git",

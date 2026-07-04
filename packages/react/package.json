@@ -1,6 +1,6 @@
 {
   "name": "@ai-path/tb-react",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "React bindings for Taible: a canvas-rendered, virtualized data grid with DOM editing overlay, multi-level grouping headers, and IME-aware editing.",
   "license": "MIT",
   "repository": {
