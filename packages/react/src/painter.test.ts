@@ -428,3 +428,79 @@ describe('paintScene comment markers', () => {
     expect(ctx.calls.some((c) => c.method === 'moveTo' && c.args[0] === 44 && c.args[1] === 0)).toBe(false);
   });
 });
+
+describe('paintScene summary (footer) cells', () => {
+  const summaryScene = (over: Partial<Scene> = {}): Scene =>
+    scene({
+      cells: [
+        { row: 5, col: 0, rect: { x: 0, y: 60, width: 50, height: 20 }, text: 'body', selected: false, active: false },
+      ],
+      activeRect: { x: 0, y: 60, width: 50, height: 20 },
+      summaryCells: [
+        { row: 0, col: 0, rect: { x: 0, y: 80, width: 50, height: 20 }, text: 'Total', selected: false, active: false, summary: true },
+        { row: 1, col: 1, rect: { x: 50, y: 100, width: 50, height: 20 }, text: '1,234', selected: false, active: false, summary: true, align: 'right' },
+      ],
+      ...over,
+    });
+
+  it('paints summary cells last, after body cells and the active border', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, summaryScene(), defaultTheme, { width: 200, height: 120 });
+    const texts = ctx.calls.filter((c) => c.method === 'fillText').map((c) => c.args[0]);
+    expect(texts).toEqual(['body', 'Total', '1,234']);
+    const strokeRectIdx = ctx.calls.findIndex((c) => c.method === 'strokeRect');
+    const totalIdx = ctx.calls.findIndex((c) => c.method === 'fillText' && c.args[0] === 'Total');
+    expect(strokeRectIdx).toBeGreaterThanOrEqual(0);
+    expect(totalIdx).toBeGreaterThan(strokeRectIdx); // after the active border
+  });
+
+  it('fills an opaque background for every summary cell', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, summaryScene(), defaultTheme, { width: 200, height: 120 });
+    const bases = ctx.calls.filter(
+      (c) => c.method === 'fillRect' && (c.args[1] === 80 || c.args[1] === 100) && c.args[3] === 20,
+    );
+    expect(bases.length).toBe(2);
+  });
+
+  it('honors summaryRowBackground / summaryRowTextColor theme tokens', () => {
+    const ctx = createMockContext();
+    paintScene(
+      ctx,
+      summaryScene(),
+      { ...defaultTheme, summaryRowBackground: '#eef2ff', summaryRowTextColor: '#1e3a8a' },
+      { width: 200, height: 120 },
+    );
+    const texts = ctx.calls.filter((c) => c.method === 'fillText').map((c) => c.args[0]);
+    expect(texts).toContain('Total');
+  });
+
+  it('paints frozen-column summary cells after scrolled summary cells', () => {
+    const ctx = createMockContext();
+    paintScene(
+      ctx,
+      summaryScene({
+        cells: [],
+        activeRect: null,
+        summaryCells: [
+          { row: 0, col: 0, rect: { x: 0, y: 80, width: 50, height: 20 }, text: 'pinned', selected: false, active: false, summary: true, frozen: true },
+          { row: 0, col: 3, rect: { x: 100, y: 80, width: 50, height: 20 }, text: 'scrolled', selected: false, active: false, summary: true },
+        ],
+      }),
+      defaultTheme,
+      { width: 200, height: 120 },
+    );
+    const texts = ctx.calls.filter((c) => c.method === 'fillText').map((c) => c.args[0]);
+    expect(texts).toEqual(['scrolled', 'pinned']);
+  });
+
+  it('draws the top separator only on the band-leading summary row', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, summaryScene({ cells: [], activeRect: null }), defaultTheme, { width: 200, height: 120 });
+    // The separator is a stroke along y = rect.y + 0.5 of the first band row.
+    const separator = ctx.calls.filter((c) => c.method === 'moveTo' && c.args[1] === 80.5);
+    expect(separator.length).toBe(1);
+    const secondRowSeparator = ctx.calls.filter((c) => c.method === 'moveTo' && c.args[1] === 100.5);
+    expect(secondRowSeparator.length).toBe(0);
+  });
+});

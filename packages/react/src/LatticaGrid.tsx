@@ -23,7 +23,14 @@ import {
   type MouseEvent as ReactMouseEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react';
-import { HeaderModel, isGroup, type ColumnDef, type ColumnNode, type GridStateSnapshot } from '@ai-path/tb-core';
+import {
+  HeaderModel,
+  isGroup,
+  type ColumnDef,
+  type ColumnNode,
+  type GridStateSnapshot,
+  type SummaryRowSpec,
+} from '@ai-path/tb-core';
 import type { CellCommitEvent, DisplayOverride, GridController, EditState } from './controller.js';
 import {
   DEFAULT_HEADER_LINE_HEIGHT,
@@ -34,7 +41,7 @@ import {
 import { buildScene } from './scene.js';
 import { canvasMeasurer } from './measure.js';
 import { paintScene, type Canvas2D } from './painter.js';
-import { cellRect, columnX, hitTest, type GridGeometry, type HitResult } from './geometry.js';
+import { cellRect, columnX, hitTest, summaryBandHeight, type GridGeometry, type HitResult } from './geometry.js';
 import { interpretKey, type KeyInput } from './keyboard.js';
 import { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
 import { columnHeaderCells, computeHeaderRowHeights, rowHeaderCells } from './headers.js';
@@ -69,6 +76,9 @@ export interface LatticaGridProps {
   contextMenu?: (target: HitResult) => MenuItemSpec[];
   /** Render the detail panel for an expanded master row (by physical row index). */
   renderDetail?: (physicalRow: number) => ReactNode;
+  /** Pinned summary (footer) rows aggregated over the visible rows. Always
+   *  drawn at the grid's bottom edge; read-only and outside the selection. */
+  summaryRows?: readonly SummaryRowSpec[];
   /** Show the auto-numbered row header gutter. Defaults to true. */
   showRowNumbers?: boolean;
   /** Enable the header sort UI. Defaults to true. */
@@ -174,6 +184,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     controller,
     columns,
     rows,
+    summaryRows,
     onCellClick,
     onScrollChange,
     onColumnResize,
@@ -251,7 +262,9 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     controller.setHeaderHeight(headerHeights.total);
   }, [controller, headerHeights.total]);
   const contentWidth = geom.rowHeaderWidth + geom.colSizes.getTotalSize();
-  const contentHeight = geom.colHeaderHeight + geom.rowSizes.getTotalSize();
+  // The pinned summary band adds to the content height so `autoSize` grids
+  // show every data row above the footer.
+  const contentHeight = geom.colHeaderHeight + geom.rowSizes.getTotalSize() + summaryBandHeight(geom);
   // Sizing priority: autoSize='content' ignores width/height/fill, then fill,
   // then fixed width/height. Clamped auto-size keeps normal scrolling active.
   const width =
@@ -302,6 +315,15 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     const fields = leafColumnDefs(columns).map((def) => def.field ?? '');
     controller.setRecords(rows, fields);
   }, [columns, controller, rows]);
+
+  // Bind the controlled summary-row specs. Leaving the prop unset keeps any
+  // rows installed imperatively via `controller.setSummaryRows`.
+  useEffect(() => {
+    if (summaryRows === undefined) {
+      return;
+    }
+    controller.setSummaryRows(summaryRows);
+  }, [controller, summaryRows]);
 
   useEffect(() => {
     if (columns === undefined) {
@@ -461,6 +483,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       font: `${theme.fontSize}px ${theme.fontFamily}`,
       wrapPaddingX: theme.cellPaddingX,
       hasComment: (r, c) => controller.hasComment(r, c),
+      getSummaryDisplay: (s, c) => controller.getSummaryDisplay(s, c),
     });
     paintScene(ctx, scene, theme, { width, height, dpr });
   });
@@ -592,11 +615,15 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
    */
   const contentEdge = useCallback((): { right: number; bottom: number } => {
     const g = geom;
+    const bandH = summaryBandHeight(g);
+    const bottom = g.colHeaderHeight + g.rowSizes.getTotalSize() - scroll.top;
     return {
       right: g.rowHeaderWidth + g.colSizes.getTotalSize() - scroll.left,
-      bottom: g.colHeaderHeight + g.rowSizes.getTotalSize() - scroll.top,
+      // The pinned summary band is chrome, not cells: pointer interactions
+      // stop above it, exactly like the space past the last row.
+      bottom: bandH === 0 ? bottom : Math.min(bottom, height - bandH),
     };
-  }, [geom, scroll]);
+  }, [geom, scroll, height]);
 
   const onMouseDown = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -873,6 +900,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
           },
     getCfStyle: (r, c) => controller.getCellStyle(r, c),
     getMerge: (r, c) => controller.getMerge(r, c),
+    getSummaryDisplay: (s, c) => controller.getSummaryDisplay(s, c),
   });
   const colHeaders = columnHeaderCells(
     geom,

@@ -1897,3 +1897,58 @@ describe('LatticaGrid tooltips', () => {
     expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
   });
 });
+
+describe('summary (footer) rows', () => {
+  it('binds the summaryRows prop to the controller', async () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setData([
+      ['A', 10],
+      ['B', 20],
+      ['C', 30],
+    ]);
+    renderGrid(
+      c,
+      [
+        { headerName: 'Item', field: 'item' },
+        { headerName: 'Qty', field: 'qty' },
+      ],
+      { summaryRows: [{ label: '合計', cells: { qty: 'sum' } }] },
+    );
+    await waitFor(() => expect(c.getSummaryRowCount()).toBe(1));
+    expect(c.getSummaryDisplay(0, 1)).toBe('60');
+    expect(c.getSummaryDisplay(0, 0)).toBe('合計');
+    expect(c.geometry().summaryRows).toBe(1);
+  });
+
+  it('rebinds when the summaryRows prop changes', async () => {
+    const c = new GridController({ rowCount: 2, colCount: 2 });
+    const { rerender } = renderGrid(c, undefined, {
+      summaryRows: [{ cells: { 1: 'sum' } }],
+    });
+    await waitFor(() => expect(c.getSummaryRowCount()).toBe(1));
+    rerender(
+      <LatticaGrid
+        controller={c}
+        width={400}
+        height={200}
+        summaryRows={[{ cells: { 1: 'sum' } }, { label: 'avg', cells: { 1: 'avg' } }]}
+      />,
+    );
+    await waitFor(() => expect(c.getSummaryRowCount()).toBe(2));
+  });
+
+  it('keeps clicks on the pinned band away from selection and editing', async () => {
+    const c = new GridController({ rowCount: 50, colCount: 3 });
+    renderGrid(c, undefined, { summaryRows: [{ cells: { 1: 'count' } }] });
+    await waitFor(() => expect(c.getSummaryRowCount()).toBe(1));
+    const grid = screen.getByTestId('lattica-grid');
+    // Band top = 200 - 24 = 176; a click below it must not move the selection.
+    fireEvent.mouseDown(grid, { clientX: 100, clientY: 190 });
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 0 });
+    fireEvent.doubleClick(grid, { clientX: 100, clientY: 190 });
+    expect(c.getEdit()).toBeNull();
+    // A click above the band still selects normally.
+    fireEvent.mouseDown(grid, { clientX: 100, clientY: 100 });
+    expect(c.selection.getState().active).not.toEqual({ row: 0, col: 0 });
+  });
+});

@@ -23,6 +23,10 @@ export interface GridTheme {
   editableCellBackground?: string;
   /** Color of the comment marker triangle in a cell's top-right corner. */
   commentMarkerColor?: string;
+  /** Background of pinned summary (footer) rows; header background when unset. */
+  summaryRowBackground?: string;
+  /** Text color of pinned summary (footer) rows; the base text color when unset. */
+  summaryRowTextColor?: string;
   cellPaddingX: number;
   rowHeaderWidth: number;
   colHeaderHeight: number;
@@ -63,6 +67,8 @@ export const defaultTheme: GridTheme = {
   readOnlyCellBackground: undefined,
   editableCellBackground: undefined,
   commentMarkerColor: DEFAULT_COMMENT_MARKER_COLOR,
+  summaryRowBackground: undefined,
+  summaryRowTextColor: undefined,
   cellPaddingX: 6,
   rowHeaderWidth: 48,
   colHeaderHeight: 24,
@@ -114,6 +120,8 @@ export function buildTheme(options: BuildThemeOptions = {}): GridTheme {
     headerLineHeight: DEFAULT_HEADER_LINE_HEIGHT,
     headerPaddingY: DEFAULT_HEADER_PADDING_Y,
     commentMarkerColor: DEFAULT_COMMENT_MARKER_COLOR,
+    summaryRowBackground: undefined,
+    summaryRowTextColor: undefined,
     ...palette,
     ...options.overrides,
   };

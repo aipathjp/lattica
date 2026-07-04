@@ -89,3 +89,13 @@ describe('comment marker token', () => {
     expect(resolveTheme({ commentMarkerColor: '#0a0a0a' }).commentMarkerColor).toBe('#0a0a0a');
   });
 });
+
+describe('summary row tokens', () => {
+  it('are unset by default and settable through overrides', () => {
+    expect(defaultTheme.summaryRowBackground).toBeUndefined();
+    expect(defaultTheme.summaryRowTextColor).toBeUndefined();
+    const theme = buildTheme({ overrides: { summaryRowBackground: '#eef2ff', summaryRowTextColor: '#1e3a8a' } });
+    expect(theme.summaryRowBackground).toBe('#eef2ff');
+    expect(theme.summaryRowTextColor).toBe('#1e3a8a');
+  });
+});

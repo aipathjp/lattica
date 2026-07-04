@@ -317,3 +317,102 @@ describe('buildScene comments', () => {
     expect(scene.cells.find((k) => k.row === 0 && k.col === 1)!.comment).toBeUndefined();
   });
 });
+
+describe('buildScene summary (footer) cells', () => {
+  const sel = () => new SelectionModel({ rowCount: 100, colCount: 100 });
+  const base = {
+    scrollLeft: 0,
+    scrollTop: 0,
+    clientWidth: 240,
+    clientHeight: 120,
+    getDisplay: () => '',
+  };
+
+  it('omits summaryCells when the geometry declares no summary rows', () => {
+    const scene = buildScene({ ...base, geom: geom(), selection: sel() });
+    expect(scene.summaryCells).toBeUndefined();
+  });
+
+  it('omits summaryCells without a getSummaryDisplay accessor', () => {
+    const scene = buildScene({
+      ...base,
+      geom: geom({ summaryRows: 1, summaryRowHeight: 20 }),
+      selection: sel(),
+    });
+    expect(scene.summaryCells).toBeUndefined();
+  });
+
+  it('pins the band to the viewport bottom when content overflows', () => {
+    const scene = buildScene({
+      ...base,
+      geom: geom({ summaryRows: 2, summaryRowHeight: 20 }),
+      selection: sel(),
+      getSummaryDisplay: (s, c) => `S${s}:${c}`,
+    });
+    const cells = scene.summaryCells!;
+    expect(cells.length).toBeGreaterThan(0);
+    // 100 rows x 20px overflow a 120px viewport -> band top = 120 - 40 = 80.
+    const first = cells.find((c) => c.row === 0 && c.col === 0)!;
+    expect(first.rect).toMatchObject({ x: 40, y: 80, width: 50, height: 20 });
+    expect(first.text).toBe('S0:0');
+    expect(first.summary).toBe(true);
+    expect(first.selected).toBe(false);
+    expect(first.active).toBe(false);
+    const second = cells.find((c) => c.row === 1 && c.col === 0)!;
+    expect(second.rect.y).toBe(100);
+    expect(second.text).toBe('S1:0');
+  });
+
+  it('sits directly below the last data row when content is short', () => {
+    const scene = buildScene({
+      ...base,
+      geom: geom({
+        rowSizes: new SizeManager({ count: 2, defaultSize: 20 }),
+        summaryRows: 1,
+        summaryRowHeight: 20,
+      }),
+      selection: sel(),
+      getSummaryDisplay: () => 'total',
+    });
+    // content bottom = 20 (header) + 40 (2 rows) = 60 < 120 - 20.
+    expect(scene.summaryCells![0]!.rect.y).toBe(60);
+  });
+
+  it('marks frozen-column summary cells and keeps them at their pinned x', () => {
+    const scene = buildScene({
+      ...base,
+      scrollLeft: 100,
+      geom: geom({ frozenCols: 1, summaryRows: 1, summaryRowHeight: 20 }),
+      selection: sel(),
+      getSummaryDisplay: () => '',
+    });
+    const cells = scene.summaryCells!;
+    const frozen = cells.find((c) => c.col === 0)!;
+    expect(frozen.frozen).toBe(true);
+    expect(frozen.rect.x).toBe(40); // pinned despite scrollLeft
+    expect(cells.find((c) => c.col === 2)!.frozen).toBe(false);
+  });
+
+  it('resolves column alignment through getAlign', () => {
+    const scene = buildScene({
+      ...base,
+      geom: geom({ summaryRows: 1, summaryRowHeight: 20 }),
+      selection: sel(),
+      getSummaryDisplay: () => '1',
+      getAlign: (_r, c) => (c === 1 ? 'right' : undefined),
+    });
+    const cells = scene.summaryCells!;
+    expect(cells.find((c) => c.col === 1)!.align).toBe('right');
+    expect(cells.find((c) => c.col === 0)!.align).toBeUndefined();
+  });
+
+  it('treats a missing summaryRowHeight as zero-height rows', () => {
+    const scene = buildScene({
+      ...base,
+      geom: geom({ summaryRows: 1 }),
+      selection: sel(),
+      getSummaryDisplay: () => '',
+    });
+    expect(scene.summaryCells![0]!.rect.height).toBe(0);
+  });
+});

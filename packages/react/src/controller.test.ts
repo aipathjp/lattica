@@ -1561,3 +1561,143 @@ describe('GridController comments', () => {
     expect(c.comments.list()).toEqual([{ row: 0, col: 0, text: 'top' }]);
   });
 });
+
+describe('summary (footer) rows', () => {
+  const seed = () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    c.setData([
+      ['Apple', 10, 100],
+      ['Pear', 20, 200],
+      ['Peach', 30, 300],
+      ['Plum', 40, 400],
+    ]);
+    return c;
+  };
+
+  it('stores specs, reports the count, and emits change', () => {
+    const c = seed();
+    const onChange = vi.fn();
+    c.on('change', onChange);
+    c.setSummaryRows([{ label: '合計', cells: { 1: 'sum' } }]);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(c.getSummaryRowCount()).toBe(1);
+    expect(c.getSummaryRows()[0]!.label).toBe('合計');
+    c.setSummaryRows(null);
+    expect(c.getSummaryRowCount()).toBe(0);
+    expect(c.getSummaryRows()).toEqual([]);
+  });
+
+  it('exposes the band through geometry()', () => {
+    const c = seed();
+    expect(c.geometry().summaryRows).toBe(0);
+    c.setSummaryRows([{ cells: {} }, { cells: {} }]);
+    const g = c.geometry();
+    expect(g.summaryRows).toBe(2);
+    expect(g.summaryRowHeight).toBe(24);
+  });
+
+  it('computes built-in aggregates per column keyed by index', () => {
+    const c = seed();
+    c.setSummaryRows([{ cells: { 1: 'sum', 2: 'avg' } }]);
+    expect(c.getSummaryDisplay(0, 1)).toBe('100');
+    expect(c.getSummaryDisplay(0, 2)).toBe('250');
+  });
+
+  it('applies the column number format to aggregate results', () => {
+    const c = seed();
+    c.setColumnFormat(2, '#,##0');
+    c.setSummaryRows([{ cells: { 2: 'sum' } }]);
+    expect(c.getSummaryDisplay(0, 2)).toBe('1,000');
+  });
+
+  it('does not apply the column format to custom rules', () => {
+    const c = seed();
+    c.setColumnFormat(1, '#,##0.00');
+    c.setSummaryRows([{ cells: { 1: (values) => `${values.length} rows` } }]);
+    expect(c.getSummaryDisplay(0, 1)).toBe('4 rows');
+  });
+
+  it('resolves field-name keys through applied column defs', () => {
+    const c = seed();
+    c.applyColumnDefs([
+      { headerName: 'Item', field: 'item' },
+      { headerName: 'Qty', field: 'qty' },
+      { headerName: 'Total', field: '' },
+    ]);
+    c.setSummaryRows([{ cells: { qty: 'max' } }]);
+    expect(c.getSummaryDisplay(0, 1)).toBe('40');
+    expect(c.getSummaryDisplay(0, 0)).toBe('');
+  });
+
+  it('ignores unresolvable keys (unknown fields and out-of-range indices)', () => {
+    const c = seed();
+    c.setSummaryRows([{ cells: { nope: 'sum', 99: 'sum' } }]);
+    expect(c.getSummaryDisplay(0, 0)).toBe('');
+    expect(c.getSummaryDisplay(0, 1)).toBe('');
+    expect(c.getSummaryDisplay(0, 2)).toBe('');
+  });
+
+  it('shows the label in the first visible column by default', () => {
+    const c = seed();
+    c.setSummaryRows([{ label: 'Total', cells: { 1: 'sum' } }]);
+    expect(c.getSummaryDisplay(0, 0)).toBe('Total');
+    expect(c.getSummaryDisplay(0, 2)).toBe('');
+  });
+
+  it('shows the label in an explicit label column (index or field)', () => {
+    const c = seed();
+    c.applyColumnDefs([{ headerName: 'Item', field: 'item' }, { headerName: 'Qty', field: 'qty' }]);
+    c.setSummaryRows([
+      { label: 'ByIndex', labelCol: 2, cells: {} },
+      { label: 'ByField', labelCol: 'item', cells: {} },
+    ]);
+    expect(c.getSummaryDisplay(0, 2)).toBe('ByIndex');
+    expect(c.getSummaryDisplay(0, 0)).toBe('');
+    expect(c.getSummaryDisplay(1, 0)).toBe('ByField');
+    expect(c.getSummaryDisplay(1, 2)).toBe('');
+  });
+
+  it('falls back to the first column when the label column cannot resolve', () => {
+    const c = seed();
+    c.setSummaryRows([{ label: 'Fallback', labelCol: 99, cells: {} }]);
+    expect(c.getSummaryDisplay(0, 0)).toBe('Fallback');
+  });
+
+  it('a cell rule beats the label on the same column', () => {
+    const c = seed();
+    c.setSummaryRows([{ label: 'Total', cells: { 0: 'count' } }]);
+    expect(c.getSummaryDisplay(0, 0)).toBe('4');
+  });
+
+  it('returns empty text for an out-of-range summary row', () => {
+    const c = seed();
+    c.setSummaryRows([{ cells: {} }]);
+    expect(c.getSummaryDisplay(5, 0)).toBe('');
+  });
+
+  it('aggregates only the filter-visible rows and tracks filter changes', () => {
+    const c = seed();
+    c.setSummaryRows([{ cells: { 1: 'sum' } }]);
+    expect(c.getSummaryDisplay(0, 1)).toBe('100');
+    c.setColumnFilter(1, [{ kind: 'gt', value: 15 }]);
+    expect(c.getSummaryDisplay(0, 1)).toBe('90');
+    c.clearView();
+    expect(c.getSummaryDisplay(0, 1)).toBe('100');
+  });
+
+  it('recomputes after an edit commit', () => {
+    const c = seed();
+    c.setSummaryRows([{ cells: { 1: 'sum' } }]);
+    c.beginEdit(0, 1, '50');
+    c.commitEdit();
+    expect(c.getSummaryDisplay(0, 1)).toBe('140');
+  });
+
+  it('follows column moves (visual indices) while keys stay physical', () => {
+    const c = seed();
+    c.setSummaryRows([{ cells: { 1: 'sum' } }]);
+    c.moveColumn(1, 0);
+    expect(c.getSummaryDisplay(0, 0)).toBe('100');
+    expect(c.getSummaryDisplay(0, 1)).toBe('');
+  });
+});

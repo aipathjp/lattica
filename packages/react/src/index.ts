@@ -71,6 +71,7 @@ export {
   columnAt,
   rowAt,
   maxScroll,
+  summaryBandHeight,
   type GridGeometry,
   type HitResult,
   type Region,
