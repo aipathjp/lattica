@@ -2205,3 +2205,259 @@ describe('column placeholders (P0-4)', () => {
     expect(c.hasPlaceholderColumns()).toBe(true);
   });
 });
+
+describe('GridController row insert/remove', () => {
+  const makeSeeded = () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    c.setData([
+      ['a1', 'b1', 'c1'],
+      ['a2', 'b2', 'c2'],
+      ['a3', 'b3', 'c3'],
+      ['a4', 'b4', 'c4'],
+    ]);
+    return c;
+  };
+
+  it('inserts an empty row and shifts data down', () => {
+    const c = makeSeeded();
+    const onChange = vi.fn();
+    const onRows = vi.fn();
+    const onCommit = vi.fn();
+    c.on('change', onChange);
+    c.on('rowschange', onRows);
+    c.on('cellcommit', onCommit);
+    c.insertRow(1);
+    expect(c.getRowCount()).toBe(5);
+    expect(c.getDisplay(0, 0)).toBe('a1');
+    expect(c.getDisplay(1, 0)).toBe('');
+    expect(c.getDisplay(1, 2)).toBe('');
+    expect(c.getDisplay(2, 0)).toBe('a2');
+    expect(c.getDisplay(4, 2)).toBe('c4');
+    expect(onChange).toHaveBeenCalled();
+    expect(onRows).toHaveBeenCalledTimes(1);
+    expect(onRows).toHaveBeenCalledWith({ kind: 'insert', index: 1, count: 1 });
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it('appends a row at index === rowCount', () => {
+    const c = makeSeeded();
+    c.insertRow(4, ['x']);
+    expect(c.getRowCount()).toBe(5);
+    expect(c.getDisplay(4, 0)).toBe('x');
+    expect(c.getDisplay(3, 0)).toBe('a4');
+  });
+
+  it('coerces positional values of every shape and truncates overflow', () => {
+    const c = new GridController({ rowCount: 1, colCount: 6 });
+    c.insertRow(0, ['t', 42, true, null, undefined, { toString: () => 'obj' }]);
+    expect(c.getValue(0, 0)).toBe('t');
+    expect(c.getValue(0, 1)).toBe(42);
+    expect(c.getDisplay(0, 2)).toBe('TRUE');
+    expect(c.getDisplay(0, 3)).toBe('');
+    expect(c.getDisplay(0, 4)).toBe('');
+    expect(c.getDisplay(0, 5)).toBe('obj');
+    // Longer than colCount: extra entries are dropped.
+    const small = new GridController({ rowCount: 1, colCount: 2 });
+    small.insertRow(0, ['p', 'q', 'overflow']);
+    expect(small.getDisplay(0, 1)).toBe('q');
+    expect(small.getColCount()).toBe(2);
+    // Shorter than colCount: remaining columns stay empty.
+    small.insertRow(0, ['only']);
+    expect(small.getDisplay(0, 0)).toBe('only');
+    expect(small.getDisplay(0, 1)).toBe('');
+  });
+
+  it('resolves Record values via applyColumnDefs field mapping', () => {
+    const c = new GridController({ rowCount: 2, colCount: 3 });
+    c.applyColumnDefs([
+      { headerName: 'A', field: 'a' },
+      { headerName: 'B', field: 'b' },
+      { headerName: 'C' },
+    ]);
+    c.insertRow(0, { a: 'va', b: 7, zzz: 'ignored' });
+    expect(c.getValue(0, 0)).toBe('va');
+    expect(c.getValue(0, 1)).toBe(7);
+    expect(c.getDisplay(0, 2)).toBe('');
+  });
+
+  it('resolves Record values via setRecords field learning (skipping empty fields)', () => {
+    const c = new GridController({ rowCount: 1, colCount: 3 });
+    c.setRecords([{ x: 1, y: 2 }], ['x', 'y', '']);
+    c.insertRow(1, { x: 'nx', y: 'ny' });
+    expect(c.getValue(1, 0)).toBe('nx');
+    expect(c.getValue(1, 1)).toBe('ny');
+  });
+
+  it('ignores learned fields whose column fell out of range', () => {
+    const c = new GridController({ rowCount: 2, colCount: 3 });
+    c.applyColumnDefs([
+      { headerName: 'A', field: 'a' },
+      { headerName: 'B', field: 'b' },
+      { headerName: 'C', field: 'c' },
+    ]);
+    c.setColCount(2);
+    c.insertRow(0, { c: 'gone', a: 'kept' });
+    expect(c.getValue(0, 0)).toBe('kept');
+    expect(c.getColCount()).toBe(2);
+  });
+
+  it('removes a row, shifting later rows up and clearing the tail', () => {
+    const c = makeSeeded();
+    const onRows = vi.fn();
+    const onCommit = vi.fn();
+    c.on('rowschange', onRows);
+    c.on('cellcommit', onCommit);
+    c.removeRow(1);
+    expect(c.getRowCount()).toBe(3);
+    expect(c.getDisplay(0, 0)).toBe('a1');
+    expect(c.getDisplay(1, 0)).toBe('a3');
+    expect(c.getDisplay(2, 0)).toBe('a4');
+    expect(onRows).toHaveBeenCalledTimes(1);
+    expect(onRows).toHaveBeenCalledWith({ kind: 'remove', index: 1, count: 1 });
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it('throws RangeError on invalid indices', () => {
+    const c = makeSeeded();
+    expect(() => c.insertRow(-1)).toThrow(RangeError);
+    expect(() => c.insertRow(1.5)).toThrow(RangeError);
+    expect(() => c.insertRow(5)).toThrow(RangeError);
+    expect(() => c.removeRow(-1)).toThrow(RangeError);
+    expect(() => c.removeRow(4)).toThrow(RangeError);
+    expect(() => c.removeRow(0.5)).toThrow(RangeError);
+  });
+
+  it('undoes and redoes an insert as one command, emitting rowschange', () => {
+    const c = makeSeeded();
+    const onRows = vi.fn();
+    c.on('rowschange', onRows);
+    c.insertRow(1, ['x1', 'x2', 'x3']);
+    expect(c.getDisplay(1, 1)).toBe('x2');
+    c.undoLast();
+    expect(c.getRowCount()).toBe(4);
+    expect(c.getDisplay(1, 0)).toBe('a2');
+    expect(onRows).toHaveBeenLastCalledWith({ kind: 'remove', index: 1, count: 1 });
+    c.redoLast();
+    expect(c.getRowCount()).toBe(5);
+    expect(c.getDisplay(1, 0)).toBe('x1');
+    expect(onRows).toHaveBeenLastCalledWith({ kind: 'insert', index: 1, count: 1 });
+  });
+
+  it('undoes a remove restoring content and all row metadata', () => {
+    const c = makeSeeded();
+    c.setComment(1, 0, 'note');
+    c.setCellReadOnly(1, 1, true);
+    c.setCellSparkline(1, 2, [1, 2, 3], 'bar');
+    c.resizeRow(1, 55);
+    c.toggleDetail(1);
+    c.merges.add({ row: 1, col: 0, rowspan: 1, colspan: 2 });
+    c.removeRow(1);
+    // The single-row merge anchored on the removed row is dropped.
+    expect(c.merges.list()).toEqual([]);
+    expect(c.getComment(0, 0)).toBeNull();
+    c.undoLast();
+    expect(c.getRowCount()).toBe(4);
+    expect(c.getDisplay(1, 0)).toBe('a2');
+    expect(c.getComment(1, 0)).toBe('note');
+    expect(c.isCellEditable(1, 1)).toBe(false);
+    expect(c.getCellSparkline(1, 2, 20, 10)).not.toBeNull();
+    expect(c.rowSizes.getSize(1)).toBe(55);
+    expect(c.isDetailExpanded(1)).toBe(true);
+    expect(c.merges.list()).toEqual([{ row: 1, col: 0, rowspan: 1, colspan: 2 }]);
+  });
+
+  it('shifts row-keyed metadata with an insert and keeps earlier rows in place', () => {
+    const c = makeSeeded();
+    c.setComment(0, 0, 'stay');
+    c.setComment(2, 0, 'move');
+    c.setCellReadOnly(2, 1, true);
+    c.setCellSparkline(2, 2, [4, 5]);
+    c.resizeRow(2, 60);
+    c.toggleDetail(2);
+    c.insertRow(1);
+    expect(c.getComment(0, 0)).toBe('stay');
+    expect(c.getComment(3, 0)).toBe('move');
+    expect(c.getComment(2, 0)).toBeNull();
+    expect(c.isCellEditable(3, 1)).toBe(false);
+    expect(c.isCellEditable(2, 1)).toBe(true);
+    expect(c.getCellSparkline(3, 2, 20, 10)).not.toBeNull();
+    expect(c.getCellSparkline(2, 2, 20, 10)).toBeNull();
+    expect(c.rowSizes.getSize(3)).toBe(60);
+    expect(c.isDetailExpanded(3)).toBe(true);
+    expect(c.isDetailExpanded(2)).toBe(false);
+  });
+
+  it('shifts merges on insert: below moves, spanning grows, above unchanged', () => {
+    const c = new GridController({ rowCount: 6, colCount: 3 });
+    c.merges.add({ row: 0, col: 0, rowspan: 1, colspan: 2 });
+    c.merges.add({ row: 2, col: 0, rowspan: 2, colspan: 1 });
+    c.merges.add({ row: 5, col: 1, rowspan: 1, colspan: 2 });
+    c.insertRow(3);
+    expect(c.merges.list()).toEqual([
+      { row: 0, col: 0, rowspan: 1, colspan: 2 },
+      { row: 2, col: 0, rowspan: 3, colspan: 1 },
+      { row: 6, col: 1, rowspan: 1, colspan: 2 },
+    ]);
+  });
+
+  it('shifts merges on remove: below moves up, spanning shrinks, above unchanged', () => {
+    const c = new GridController({ rowCount: 6, colCount: 3 });
+    c.merges.add({ row: 0, col: 0, rowspan: 1, colspan: 2 });
+    c.merges.add({ row: 2, col: 0, rowspan: 2, colspan: 1 });
+    c.merges.add({ row: 5, col: 1, rowspan: 1, colspan: 2 });
+    c.removeRow(3);
+    expect(c.merges.list()).toEqual([
+      { row: 0, col: 0, rowspan: 1, colspan: 2 },
+      { row: 2, col: 0, rowspan: 1, colspan: 1 },
+      { row: 4, col: 1, rowspan: 1, colspan: 2 },
+    ]);
+  });
+
+  it('clamps a selection that pointed at the removed bottom row', () => {
+    const c = makeSeeded();
+    c.selection.setActive({ row: 3, col: 2 });
+    c.removeRow(3);
+    expect(c.getActiveCell()).toEqual({ row: 2, col: 2 });
+  });
+
+  it('clamps frozenRows when the row count drops below it', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2, frozenRows: 3 });
+    c.removeRow(0);
+    expect(c.frozenRows).toBe(2);
+  });
+
+  it('treats the index as physical and re-sorts the view after an insert', () => {
+    const c = new GridController({ rowCount: 3, colCount: 1 });
+    c.setData([['b'], ['c'], ['a']]);
+    c.toggleSort(0); // asc → visual a, b, c
+    expect(c.getDisplay(0, 0)).toBe('a');
+    c.insertRow(1, ['zz']); // physical [b, zz, c, a]
+    expect(c.getRowCount()).toBe(4);
+    expect(c.getDisplay(0, 0)).toBe('a');
+    expect(c.getDisplay(3, 0)).toBe('zz');
+    expect(c.getPhysicalRow(3)).toBe(1);
+  });
+
+  it('re-applies filters after insert and remove', () => {
+    const c = new GridController({ rowCount: 3, colCount: 1 });
+    c.setData([['keep1'], ['drop'], ['keep2']]);
+    c.setColumnFilter(0, [{ kind: 'contains', text: 'keep' }]);
+    expect(c.getRowCount()).toBe(2);
+    c.insertRow(0, ['dropX']); // hidden by the filter immediately
+    expect(c.getRowCount()).toBe(2);
+    c.removeRow(2); // physical 'drop' (shifted down by the insert)
+    expect(c.getRowCount()).toBe(2);
+    expect(c.getDisplay(0, 0)).toBe('keep1');
+    expect(c.getDisplay(1, 0)).toBe('keep2');
+  });
+
+  it('removes the last remaining row', () => {
+    const c = new GridController({ rowCount: 1, colCount: 2 });
+    c.setCellText(0, 0, 'solo');
+    c.removeRow(0);
+    expect(c.getRowCount()).toBe(0);
+    c.undoLast();
+    expect(c.getRowCount()).toBe(1);
+    expect(c.getDisplay(0, 0)).toBe('solo');
+  });
+});

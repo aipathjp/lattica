@@ -38,6 +38,7 @@ import type {
   GridController,
   EditState,
   InputRejectEvent,
+  RowsChangeEvent,
 } from './controller.js';
 import {
   DEFAULT_HEADER_LINE_HEIGHT,
@@ -170,6 +171,8 @@ export interface LatticaGridProps {
    * Empty cells and non-`link` columns never fire.
    */
   onCellAction?: (event: CellActionEvent) => void;
+  /** Fired after `controller.insertRow` / `removeRow` (and their undo/redo) mutate the row set. */
+  onRowsChange?: (event: RowsChangeEvent) => void;
   /** How to place the text cursor when editing begins. Defaults to selecting all text. */
   editSelection?: 'all' | 'end' | 'preserve';
   /**
@@ -309,6 +312,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     onCellCommit,
     onInputReject,
     onCellAction,
+    onRowsChange,
     cellOverlay,
     renderCellOverlay,
     onCellOverlayClose,
@@ -583,6 +587,13 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     }
     return controller.on('inputreject', onInputReject);
   }, [controller, onInputReject]);
+
+  useEffect(() => {
+    if (onRowsChange === undefined) {
+      return;
+    }
+    return controller.on('rowschange', onRowsChange);
+  }, [controller, onRowsChange]);
 
   // Focus the editor when an edit begins. `<select>` has no select() method.
   useEffect(() => {
