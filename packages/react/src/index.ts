@@ -5,6 +5,11 @@ export { LatticaStatusBar, type LatticaStatusBarProps } from './StatusBar.js';
 export { LatticaFormulaBar, type LatticaFormulaBarProps } from './FormulaBar.js';
 export { LatticaColumnSettings, type LatticaColumnSettingsProps } from './ColumnSettings.js';
 export { LatticaChart, type LatticaChartProps } from './LatticaChart.js';
+export {
+  renderStaticTable,
+  staticTablePrintCss,
+  type StaticTableOptions,
+} from './static-table.js';
 export { paintChart, type ChartPaintOptions } from './chart-painter.js';
 export { useGridController } from './useGridController.js';
 export {

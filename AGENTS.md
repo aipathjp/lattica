@@ -269,6 +269,21 @@ writeStyledXlsx({ sheets:[{ name:'S', rows: styledCells, merges }] }); // numFmt
 tableToPdf(rows, { title:'Report' });     // Uint8Array (PDF, Latin-1)
 ```
 
+**Print / SSR static table**
+```tsx
+import { renderStaticTable, staticTablePrintCss } from '@ai-path/lattica-react';
+
+<style>{staticTablePrintCss}</style>
+{renderStaticTable(controller, columns, {
+  includeRowNumbers: true,
+  maxRows: 500,
+  caption: 'Printable view',
+})}
+```
+`renderStaticTable` reads the current controller view (sort/filter/hide/move,
+column widths, displayed values, and column alignment) and returns a plain React
+`<table>` element for `renderToStaticMarkup`, SSR, or browser printing.
+
 **Async / server-side rows**
 ```ts
 import { AsyncRowModel } from '@lattica/data';
