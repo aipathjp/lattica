@@ -1,4 +1,4 @@
-/** @ai-path/lattica-ai — AI-native spreadsheet primitives for Lattica. */
+/** @ai-path/tb-ai — AI-native spreadsheet primitives for Taible. */
 
 export {
   MockProvider,

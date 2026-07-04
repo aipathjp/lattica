@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
-import { pivot, pivotToMatrix, type AggregateFn, type CellValue } from '@ai-path/lattica-core';
-import type { ColumnNode } from '@ai-path/lattica-core';
+import { LatticaGrid, useGridController } from '@ai-path/tb-react';
+import { pivot, pivotToMatrix, type AggregateFn, type CellValue } from '@ai-path/tb-core';
+import type { ColumnNode } from '@ai-path/tb-core';
 
 const RECORDS: Record<string, CellValue>[] = [
   { region: 'East', product: 'A', units: 10 },

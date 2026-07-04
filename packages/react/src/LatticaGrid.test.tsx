@@ -3,7 +3,7 @@ import { render, cleanup, fireEvent, screen, waitFor, act } from '@testing-libra
 import { createRef } from 'react';
 import { LatticaGrid } from './LatticaGrid.js';
 import { GridController } from './controller.js';
-import type { ColumnNode } from '@ai-path/lattica-core';
+import type { ColumnNode } from '@ai-path/tb-core';
 import type { LatticaGridHandle, LatticaGridProps } from './LatticaGrid.js';
 
 afterEach(cleanup);

@@ -5,7 +5,7 @@
  * object the UI layer interacts with for realtime editing.
  */
 
-import type { CellValue } from '@ai-path/lattica-core';
+import type { CellValue } from '@ai-path/tb-core';
 import { TableDocument, type CellOp } from './crdt.js';
 import { PresenceRegistry, type PresenceState } from './presence.js';
 import type { CollabTransport } from './transport.js';

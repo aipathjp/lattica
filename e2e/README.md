@@ -1,4 +1,4 @@
-# Lattica E2E (Playwright)
+# Taible E2E (Playwright)
 
 End-to-end browser tests live here, separate from the Vitest unit suite under
 `packages/*/src`. They run against a **served** instance of the playground app

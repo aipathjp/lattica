@@ -1,10 +1,10 @@
-# AGENTS.md — Using Lattica (for AI coding agents)
+# AGENTS.md — Using Taible (for AI coding agents)
 
-This file tells coding agents (Claude Code, Cursor, etc.) how to use **Lattica**
+This file tells coding agents (Claude Code, Cursor, etc.) how to use **Taible**
 correctly. It is task-oriented and copy-paste friendly. For human prose see
 `docs/USAGE.md`; for the full feature log see `docs/PROGRESS.md`.
 
-## What Lattica is
+## What Taible is
 
 A clean-room, **MIT-licensed** data grid + spreadsheet engine for **React /
 Next.js**. No GPL/Handsontable/HyperFormula code. Canvas rendering + DOM editing
@@ -15,25 +15,25 @@ Monorepo (pnpm). Eight published packages:
 
 | Package | Import from | Purpose |
 |---|---|---|
-| `@lattica/core` | `@lattica/core` | Headless models: sizes, selection, undo, merge, validation, conditional format (value + visual), number format, aggregate, pivot, sparkline, chart layout, detail, fill, coords. No React/DOM. |
-| `@lattica/formula` | `@lattica/formula` | `SheetEngine`, parser, 150 functions, dependency graph, spill, named ranges, R1C1, structured refs. |
-| `@lattica/data` | `@lattica/data` | Visual↔physical index mapping, sort/filter models, nested rows, `DataView`, `AsyncRowModel`. |
-| `@lattica/react` | `@lattica/react` | `<LatticaGrid>`, `<LatticaStatusBar>`, `<LatticaChart>`, `useGridController`, themes/palette/density. |
-| `@lattica/io` | `@lattica/io` | CSV/TSV, XLSX read + plain/`writeStyledXlsx`, JSON, clipboard, `tableToPdf`. |
-| `@lattica/collab` | `@lattica/collab` | CRDT (LWW), fractional index keys, presence, transport. |
-| `@lattica/ai` | `@lattica/ai` | Provider-agnostic NL→formula/operation, smart fill, anomaly, etc. (MockProvider for tests). |
-| `@lattica/mcp` | `@lattica/mcp` | Grid tool registry + `ToolDispatcher` for AI agents. |
+| `@ai-path/tb-core` | `@ai-path/tb-core` | Headless models: sizes, selection, undo, merge, validation, conditional format (value + visual), number format, aggregate, pivot, sparkline, chart layout, detail, fill, coords. No React/DOM. |
+| `@ai-path/tb-formula` | `@ai-path/tb-formula` | `SheetEngine`, parser, 150 functions, dependency graph, spill, named ranges, R1C1, structured refs. |
+| `@ai-path/tb-data` | `@ai-path/tb-data` | Visual↔physical index mapping, sort/filter models, nested rows, `DataView`, `AsyncRowModel`. |
+| `@ai-path/tb-react` | `@ai-path/tb-react` | `<LatticaGrid>`, `<LatticaStatusBar>`, `<LatticaChart>`, `useGridController`, themes/palette/density. |
+| `@ai-path/tb-io` | `@ai-path/tb-io` | CSV/TSV, XLSX read + plain/`writeStyledXlsx`, JSON, clipboard, `tableToPdf`. |
+| `@ai-path/tb-collab` | `@ai-path/tb-collab` | CRDT (LWW), fractional index keys, presence, transport. |
+| `@ai-path/tb-ai` | `@ai-path/tb-ai` | Provider-agnostic NL→formula/operation, smart fill, anomaly, etc. (MockProvider for tests). |
+| `@ai-path/tb-mcp` | `@ai-path/tb-mcp` | Grid tool registry + `ToolDispatcher` for AI agents. |
 
 ## Install
 
 ```bash
-pnpm add @lattica/react @lattica/core @lattica/formula
-# add @lattica/io @lattica/data @lattica/ai @lattica/mcp @lattica/collab as needed
+pnpm add @ai-path/tb-react @ai-path/tb-core @ai-path/tb-formula
+# add @ai-path/tb-io @ai-path/tb-data @ai-path/tb-ai @ai-path/tb-mcp @ai-path/tb-collab as needed
 ```
 
 Peer deps: `react`/`react-dom` ≥ 18 (tested on 19). ESM + CJS are both shipped.
 
-> **Import rule:** consumers import from the package name (`@lattica/react`).
+> **Import rule:** consumers import from the package name (`@ai-path/tb-react`).
 > The `.js` suffix you see on *internal* relative imports (`./foo.js`) is a
 > source convention for NodeNext ESM — do **not** add it to package imports.
 
@@ -42,8 +42,8 @@ Peer deps: `react`/`react-dom` ≥ 18 (tested on 19). ESM + CJS are both shipped
 ```tsx
 'use client';
 import { useState } from 'react';
-import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
-import type { ColumnNode } from '@ai-path/lattica-core';
+import { LatticaGrid, useGridController } from '@ai-path/tb-react';
+import type { ColumnNode } from '@ai-path/tb-core';
 
 const columns: ColumnNode[] = [
   { headerName: 'Item', field: 'item', width: 180, type: 'text' },
@@ -169,7 +169,7 @@ The underlying formula engine is `controller.engine` (a `SheetEngine`).
 ## Formula engine headless (no React)
 
 ```ts
-import { SheetEngine } from '@lattica/formula';
+import { SheetEngine } from '@ai-path/tb-formula';
 const e = new SheetEngine();
 e.setContent({ row: 0, col: 0 }, 10);
 e.setContent({ row: 0, col: 1 }, '=A1*2');
@@ -210,7 +210,7 @@ controller.setColumnType(2, 'time');           // accepts 930/1330/9:30 and stor
 **Cell-anchored overlays** — use the public ref handle for viewport rects, or the controlled overlay API for React popovers anchored inside the grid:
 ```tsx
 import { useRef, useState } from 'react';
-import { LatticaGrid, type LatticaGridHandle } from '@ai-path/lattica-react';
+import { LatticaGrid, type LatticaGridHandle } from '@ai-path/tb-react';
 
 const gridRef = useRef<LatticaGridHandle>(null);
 const [overlay, setOverlay] = useState<{ row: number; col: number } | null>(null);
@@ -238,21 +238,21 @@ or drive headlessly via `setColumnSetFilter` / `hideColumn` / `moveColumn`.
 
 **Pivot table**
 ```ts
-import { pivot, pivotToMatrix } from '@lattica/core';
+import { pivot, pivotToMatrix } from '@ai-path/tb-core';
 const r = pivot(records, { rows:['region'], columns:['product'], value:'units', agg:'sum' });
 const matrix = pivotToMatrix(r); // header + body + totals; write into a grid
 ```
 
 **Charts & sparklines**
 ```tsx
-import { LatticaChart } from '@lattica/react';
+import { LatticaChart } from '@ai-path/tb-react';
 <LatticaChart spec={{ kind:'bar', categories:['Q1','Q2'], series:[{name:'N', values:[3,5]}] }} width={320} height={200} />
 controller.setCellSparkline(0, 1, [3,5,4,7], 'line');
 ```
 
 **Themes & density**
 ```ts
-import { buildTheme, densityMetrics, densityOptions } from '@lattica/react';
+import { buildTheme, densityMetrics, densityOptions } from '@ai-path/tb-react';
 const theme = buildTheme({ palette: 'midnight', density: 'spacious' });
 const editTheme = buildTheme({ overrides: { readOnlyCellBackground: '#f4f4f5' } });
 const c = useGridController({ rowCount: 100, colCount: 8, ...densityOptions('compact') });
@@ -272,7 +272,7 @@ row height, column width, filtering, hiding, and detail expansion changes.
 
 **Column settings panel**
 ```tsx
-import { LatticaColumnSettings } from '@lattica/react';
+import { LatticaColumnSettings } from '@ai-path/tb-react';
 
 <LatticaColumnSettings
   controller={controller}
@@ -291,7 +291,7 @@ number inputs for physical column widths, plus a reset button. Props:
 
 **View-state persistence (per-user / org-wide)**
 ```tsx
-import { deserializeState, serializeState } from '@ai-path/lattica-core';
+import { deserializeState, serializeState } from '@ai-path/tb-core';
 const controller = useGridController({ rowCount: 1000, colCount: 20 });
 useEffect(() => {
   if (orgDefaultJson) controller.applyViewState(deserializeState(orgDefaultJson));
@@ -306,7 +306,7 @@ useEffect(() => {
 
 **Export**
 ```ts
-import { serializeDelimited, matrixToXlsx, writeStyledXlsx, tableToPdf } from '@lattica/io';
+import { serializeDelimited, matrixToXlsx, writeStyledXlsx, tableToPdf } from '@ai-path/tb-io';
 serializeDelimited(rows);                 // CSV (string)
 matrixToXlsx(rows, 'Sheet1');             // Uint8Array (values)
 writeStyledXlsx({ sheets:[{ name:'S', rows: styledCells, merges }] }); // numFmt/fills/bold/merge
@@ -315,7 +315,7 @@ tableToPdf(rows, { title:'Report' });     // Uint8Array (PDF, Latin-1)
 
 **Print / SSR static table**
 ```tsx
-import { renderStaticTable, staticTablePrintCss } from '@ai-path/lattica-react';
+import { renderStaticTable, staticTablePrintCss } from '@ai-path/tb-react';
 
 <style>{staticTablePrintCss}</style>
 {renderStaticTable(controller, columns, {
@@ -330,7 +330,7 @@ column widths, displayed values, and column alignment) and returns a plain React
 
 **Async / server-side rows**
 ```ts
-import { AsyncRowModel } from '@lattica/data';
+import { AsyncRowModel } from '@ai-path/tb-data';
 const m = new AsyncRowModel({ blockSize: 50, fetcher: (offset, limit) => fetchPage(offset, limit) });
 await m.ensureRange(start, end); m.getRow(i); m.getTotal(); m.subscribe(rerender);
 ```
@@ -340,7 +340,7 @@ await m.ensureRange(start, end); m.getRow(i); m.getTotal(); m.subscribe(rerender
 
 ## Conventions & gotchas
 
-- **Headless first.** All logic lives in `@lattica/core`/`@lattica/data`/`@lattica/formula`;
+- **Headless first.** All logic lives in `@ai-path/tb-core`/`@ai-path/tb-data`/`@ai-path/tb-formula`;
   React is a thin view. Prefer driving the `GridController`, not DOM.
 - **Visual vs physical** indices (see above). Don't pass physical indices to public
   controller methods or vice-versa.
@@ -353,7 +353,7 @@ await m.ensureRange(start, end); m.getRow(i); m.getTotal(); m.subscribe(rerender
 
 ## SSR/Next.js: dynamic import not required (server-safe import guaranteed)
 
-`@ai-path/lattica-react` must import and server-render in Next.js App Router without `next/dynamic({ ssr: false })`; keep browser globals in effects/event handlers or behind `typeof` guards, and preserve the node-environment SSR test.
+`@ai-path/tb-react` must import and server-render in Next.js App Router without `next/dynamic({ ssr: false })`; keep browser globals in effects/event handlers or behind `typeof` guards, and preserve the node-environment SSR test.
 
 ## If you modify this repo
 

@@ -1,5 +1,5 @@
 import { type ReactElement } from 'react';
-import { columnIndexToLabel, computeHeaderLayout, type ColumnNode } from '@ai-path/lattica-core';
+import { columnIndexToLabel, computeHeaderLayout, type ColumnNode } from '@ai-path/tb-core';
 import type { GridController } from './controller.js';
 import type { CellAlign } from './cell-types.js';
 

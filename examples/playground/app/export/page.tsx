@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect } from 'react';
-import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
+import { LatticaGrid, useGridController } from '@ai-path/tb-react';
 import {
   serializeDelimited,
   matrixToXlsx,
   writeStyledXlsx,
   tableToPdf,
   type StyledCell,
-} from '@ai-path/lattica-io';
-import type { ColumnNode } from '@ai-path/lattica-core';
+} from '@ai-path/tb-io';
+import type { ColumnNode } from '@ai-path/tb-core';
 
 const columns: readonly ColumnNode[] = [
   { headerName: 'Item' },

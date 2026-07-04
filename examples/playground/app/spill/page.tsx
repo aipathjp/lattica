@@ -6,12 +6,12 @@
  * canvas {@link LatticaGrid} shows results spilling from an anchor into the
  * adjacent cells, and a deliberate collision shows the `#SPILL!` guard.
  *
- * Consumer code only: it imports the published `@ai-path/lattica-*` packages.
+ * Consumer code only: it imports the published `@ai-path/tb-*` packages.
  */
 
 import { useEffect, useState } from 'react';
-import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
-import type { ColumnNode } from '@ai-path/lattica-core';
+import { LatticaGrid, useGridController } from '@ai-path/tb-react';
+import type { ColumnNode } from '@ai-path/tb-core';
 
 const columns: readonly ColumnNode[] = [
   { headerName: 'A' },
@@ -60,7 +60,7 @@ export default function SpillPage(): React.ReactElement {
 
   return (
     <main style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <h1 style={{ margin: 0 }}>Lattica — Dynamic Arrays (spill)</h1>
+      <h1 style={{ margin: 0 }}>Taible — Dynamic Arrays (spill)</h1>
       <p style={{ margin: 0, color: '#52606d' }}>
         <code>=SEQUENCE(3,3)</code> at D1, <code>=TRANSPOSE(A1:A3)</code> at A6,
         <code> =SORT(A1:A3)</code> at A10, <code>=UNIQUE(B1:B3)</code> at C10.

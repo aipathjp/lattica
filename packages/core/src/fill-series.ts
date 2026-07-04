@@ -18,7 +18,7 @@
 
 import type { CellValue } from './types.js';
 
-/** The kinds of fill series Lattica can detect from a seed selection. */
+/** The kinds of fill series Taible can detect from a seed selection. */
 export type SeriesKind = 'numeric' | 'date' | 'weekday' | 'copy';
 
 /** Canonical weekday labels, Monday-first, used for output. */

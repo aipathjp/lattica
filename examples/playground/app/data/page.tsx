@@ -8,14 +8,14 @@
  * columns are right-aligned, and a conditional-format rule highlights high
  * revenue. Toolbar buttons drive sort / filter / search / CSV+XLSX export.
  *
- * Consumer code only — imports the published `@ai-path/lattica-*` packages plus a
+ * Consumer code only — imports the published `@ai-path/tb-*` packages plus a
  * fetch() to the app's own API.
  */
 
 import { useEffect, useState } from 'react';
-import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
-import type { ColumnNode } from '@ai-path/lattica-core';
-import { serializeDelimited, matrixToXlsx } from '@ai-path/lattica-io';
+import { LatticaGrid, useGridController } from '@ai-path/tb-react';
+import type { ColumnNode } from '@ai-path/tb-core';
+import { serializeDelimited, matrixToXlsx } from '@ai-path/tb-io';
 
 interface SaleRow {
   id: number;
@@ -152,11 +152,11 @@ export default function DataPage(): React.ReactElement {
 
   return (
     <main style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <h1 style={{ margin: 0 }}>Lattica — Live Neon Data</h1>
+      <h1 style={{ margin: 0 }}>Taible — Live Neon Data</h1>
       <p style={{ margin: 0, color: '#52606d' }}>
         Dummy <code>sales_records</code> from a Neon Postgres database, loaded
         over <code>/api/sales</code>. The <strong>Revenue</strong> column is a{' '}
-        <code>=Units*UnitPrice</code> formula evaluated by Lattica; high-revenue
+        <code>=Units*UnitPrice</code> formula evaluated by Taible; high-revenue
         cells (&gt; 5000) are highlighted.
       </p>
 

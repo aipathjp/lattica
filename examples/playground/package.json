@@ -1,9 +1,9 @@
 {
-  "name": "@ai-path/lattica-example-playground",
+  "name": "@ai-path/tb-example-playground",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Next.js (App Router) example consuming the published Lattica packages.",
+  "description": "Next.js (App Router) example consuming the published Taible packages.",
   "scripts": {
     "dev": "next dev -p 4310",
     "build": "next build",
@@ -12,13 +12,13 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
-    "@ai-path/lattica-ai": "workspace:*",
-    "@ai-path/lattica-core": "workspace:*",
-    "@ai-path/lattica-data": "workspace:*",
-    "@ai-path/lattica-formula": "workspace:*",
-    "@ai-path/lattica-io": "workspace:*",
-    "@ai-path/lattica-collab": "workspace:*",
-    "@ai-path/lattica-react": "workspace:*",
+    "@ai-path/tb-ai": "workspace:*",
+    "@ai-path/tb-core": "workspace:*",
+    "@ai-path/tb-data": "workspace:*",
+    "@ai-path/tb-formula": "workspace:*",
+    "@ai-path/tb-io": "workspace:*",
+    "@ai-path/tb-collab": "workspace:*",
+    "@ai-path/tb-react": "workspace:*",
     "next": "^15.1.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

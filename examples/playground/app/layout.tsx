@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 
 export const metadata = {
-  title: 'Lattica Playground',
-  description: 'Interactive showcase of every Lattica feature.',
+  title: 'Taible Playground',
+  description: 'Interactive showcase of every Taible feature.',
 };
 
 const NAV: { href: string; label: string }[] = [
@@ -40,7 +40,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             zIndex: 100,
           }}
         >
-          <strong style={{ marginRight: 12 }}>Lattica</strong>
+          <strong style={{ marginRight: 12 }}>Taible</strong>
           {NAV.map((n) => (
             <a
               key={n.href}

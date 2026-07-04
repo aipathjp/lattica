@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Representative end-to-end smoke for the Lattica canvas grid, driven against a
+ * Representative end-to-end smoke for the Taible canvas grid, driven against a
  * served instance of `examples/playground` (its kitchen-sink page).
  *
  * Selectors are kept in sync with:
@@ -13,14 +13,14 @@ import { test, expect } from '@playwright/test';
  * This requires a server at `baseURL` (see playwright.config.ts webServer note).
  * Run with:  pnpm exec playwright test
  */
-test.describe('Lattica kitchen-sink grid', () => {
+test.describe('Taible kitchen-sink grid', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/kitchen-sink');
   });
 
   test('renders the grid with role="grid"', async ({ page }) => {
     // The page heading confirms the kitchen-sink route loaded.
-    await expect(page.getByRole('heading', { name: 'Lattica Kitchen Sink' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Taible Kitchen Sink' })).toBeVisible();
 
     // The canvas grid exposes both an ARIA grid role and a stable testid.
     const grid = page.getByTestId('lattica-grid');
@@ -66,7 +66,7 @@ test.describe('Lattica kitchen-sink grid', () => {
  * in LatticaGrid.test.tsx covers the synthetic-event path, this covers a real
  * browser's modifier-click pipeline.
  */
-test.describe('Lattica range selection (formatting page)', () => {
+test.describe('Taible range selection (formatting page)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/formatting');
   });

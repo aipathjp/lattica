@@ -8,7 +8,7 @@
  * the `s` index Excel expects.
  */
 
-import { columnIndexToLabel } from '@ai-path/lattica-core';
+import { columnIndexToLabel } from '@ai-path/tb-core';
 import { buildZip, type ZipEntry } from './zip.js';
 import type { XlsxCell } from './xlsx.js';
 

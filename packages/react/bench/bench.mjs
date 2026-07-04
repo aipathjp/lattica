@@ -1,5 +1,5 @@
 /**
- * Lattica canvas-free hot-path benchmark.
+ * Taible canvas-free hot-path benchmark.
  *
  * This is a runnable Node ESM *script* (NOT a TypeScript source under `src/**`,
  * so it is excluded from the coverage `include` glob and from Vitest). It
@@ -16,8 +16,8 @@
  */
 
 import { performance } from 'node:perf_hooks';
-import { SizeManager, SelectionModel } from '@ai-path/lattica-core';
-import { buildScene, paintScene } from '@ai-path/lattica-react';
+import { SizeManager, SelectionModel } from '@ai-path/tb-core';
+import { buildScene, paintScene } from '@ai-path/tb-react';
 
 /** A no-op, recording-free Canvas2D mock: every method is empty, props settable. */
 function createNoopContext() {
@@ -69,7 +69,7 @@ for (let i = 0; i < 100; i++) {
   colSizes.setSize((i * 13) % COLS, 110 + (i % 5) * 20);
 }
 
-/** @type {import('@ai-path/lattica-react').GridGeometry} */
+/** @type {import('@ai-path/tb-react').GridGeometry} */
 const geom = {
   rowSizes,
   colSizes,
@@ -162,7 +162,7 @@ const nsPerLookup = (lookupElapsed * 1e6) / LOOKUPS;
 const lookupsPerSec = LOOKUPS / (lookupElapsed / 1000);
 
 // --- Report ----------------------------------------------------------------
-console.log('Lattica canvas-free hot-path benchmark');
+console.log('Taible canvas-free hot-path benchmark');
 console.log('======================================');
 console.log(`Sheet:            ${n(ROWS)} rows x ${n(COLS)} cols  (${n(ROWS * COLS)} cells)`);
 console.log(`Viewport:         ${CLIENT_WIDTH} x ${CLIENT_HEIGHT} px`);

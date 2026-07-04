@@ -6,13 +6,19 @@
 - 基準: **カバレッジ 100% 必達**（Lines/Branches/Functions/Statements）。typecheck/lint/build クリーン。クリーンルーム維持。
 - 公開: https://github.com/aipathjp/lattica
 
+## 2026-07-05 — Taible リネーム
+
+- 製品呼称を「Lattica」から「Taible」へ変更。npm パッケージ指定子は `@ai-path/tb-*` へ統一（root package.json は `taible-monorepo`）。
+- 公開契約は互換性維持のため変更なし: エクスポート名・型名（`LatticaGrid` / `LatticaColumnSettings` / `GridController` 等）、`data-testid="lattica-*"`、CSS class `lattica-static-table`。
+- 本文書以下の履歴記述は当時の呼称のまま保持する。
+
 ## サマリ
 
 | 区分 | 状態 |
 |---|---|
 | 基盤 (core/formula/react/io/collab) | ✅ 完了（581テスト・100%） |
 | Part A (Phase 1–18: HoT 超越) | 🚧 進行中（モデル層完成＋React統合に着手・**1272テスト・100%**） |
-| Part B (Phase A1–A12: AI ネイティブ) | ✅ **A1–A12 全完了**（@ai-path/lattica-ai ＋ @ai-path/lattica-mcp） |
+| Part B (Phase A1–A12: AI ネイティブ) | ✅ **A1–A12 全完了**（@ai-path/tb-ai ＋ @ai-path/tb-mcp） |
 
 > 🚧「中核」= フレームワーク非依存のモデル/ロジックは完成・100%。React 描画/UI 統合は後続の React 集中 wave で実施。
 > 🚧「関数」= Phase 12 のうち関数ライブラリ拡張（55→97関数）を完了。名前付き範囲/R1C1/配列スピルは後続。
@@ -22,7 +28,7 @@
 | Phase | 内容 | 状態 | テスト | カバレッジ | PR |
 |---|---|---|---|---|---|
 | 基盤 | core/formula/react/io/collab | ✅ | 581 | 100% | merged |
-| 1 | @ai-path/lattica-data: IndexMapper＋データバインド | ✅ | +62 | 100% | wave0 |
+| 1 | @ai-path/tb-data: IndexMapper＋データバインド | ✅ | +62 | 100% | wave0 |
 | 2 | セル型システム（レンダラ/エディタ） | 🚧 描画 | +? | 100% | wave4 |
 | 3 | 検証・read-only・配置・セルメタ | 🚧 中核 | +? | 100% | wave1 |
 | 4 | 対話UX（ドラッグ選択/フィル/リサイズ/移動） | 🚧 選択+系列+境界 | +? | 100% | wave6/7 |
@@ -50,16 +56,16 @@
 | A8 | 異常検知（z-score/IQR） | ✅ | +? | 100% | wave5 |
 | A9 | 検証ルール生成（型/正規表現/列挙） | ✅ | +? | 100% | wave5 |
 | A10 | 要約/翻訳/分類 | ✅ | +? | 100% | wave5 |
-| A11 | MCP公開（@ai-path/lattica-mcp: ツールレジストリ＋ディスパッチャ） | ✅ | +28 | 100% | wave6 |
+| A11 | MCP公開（@ai-path/tb-mcp: ツールレジストリ＋ディスパッチャ） | ✅ | +28 | 100% | wave6 |
 | A12 | エージェントワークフロー（計画→HITL承認→監査） | ✅ | +11 | 100% | wave6 |
 
 凡例: ✅完了 / 🚧進行中 / ⏳未着手
 
 ## 変更履歴
 - 2026-07-05: **React SSR-safe import / first render**。
-  - `@ai-path/lattica-react` の public module graph と `LatticaGrid` / `LatticaColumnSettings` / `LatticaStatusBar` / `LatticaFormulaBar` の node 環境 SSR を回帰テスト化。App Router で `next/dynamic({ ssr:false })` 不要の方針を明文化。
+  - `@ai-path/tb-react` の public module graph と `LatticaGrid` / `LatticaColumnSettings` / `LatticaStatusBar` / `LatticaFormulaBar` の node 環境 SSR を回帰テスト化。App Router で `next/dynamic({ ssr:false })` 不要の方針を明文化。
 - 2026-07-05: **Static table print API**。
-  - `@ai-path/lattica-react` に `renderStaticTable` / `staticTablePrintCss` を追加。現在の controller view（sort/filter/hide/move、列幅、表示値、配置）から SSR/印刷向けの素の HTML table を生成可能にした。
+  - `@ai-path/tb-react` に `renderStaticTable` / `staticTablePrintCss` を追加。現在の controller view（sort/filter/hide/move、列幅、表示値、配置）から SSR/印刷向けの素の HTML table を生成可能にした。
   - multi-level header は `computeHeaderLayout` を流用し、`colSpan`/`rowSpan` を再現。行番号、caption、maxRows 超過時の `tfoot` に対応。
   - playground `/print` を追加し、同じ controller から canvas grid と print preview を並置表示するデモを結線。
 - 2026-07-05: **宣言的データバインディング / リッチ列モデル**。
@@ -82,7 +88,7 @@
   - `<LatticaGrid>` に `onColumnResize` / `onViewStateChange` props を追加し、Freeze & Resize デモで localStorage 永続化と Reset saved view を結線。
 - 2026-06-06: 進捗報告書作成。100% カバレッジ基準を確立。Wave 0（Phase 1/9/11/12 の追加的モジュール）に着手。
 - 2026-06-06: **Wave 0 完了**（マルチエージェント・ハーネス: 実装4＋レビュー4 = 10エージェント並列）。
-  - Phase 1 完了: `@ai-path/lattica-data`（IndexMapper・DataSource）新規パッケージ。
+  - Phase 1 完了: `@ai-path/tb-data`（IndexMapper・DataSource）新規パッケージ。
   - Phase 9 中核: `MergeModel`（結合セルの重なり検出・anchor/covered 判定）。
   - Phase 11 中核: `searchGrid` / `SearchState`（正規表現安全・循環ナビ）。
   - Phase 12 関数: 数式関数 55→**97**（VLOOKUP/HLOOKUP/INDEX/MATCH/CHOOSE/SUMIFS/COUNTIFS/AVERAGEIF/LARGE/SMALL/RANK/STDEV/VAR/TEXT/SEARCH/EXACT/三角関数/GCD/LCM 等）。
@@ -108,7 +114,7 @@
   - **Part A のモデル/純粋ロジック層はほぼ完成**。残りは `<LatticaGrid>`/`GridController` への結線（React統合 wave・順次）と Phase 8(隠す/移動/ネストUI)・12c(R1C1/スピル)・18(性能/E2E)。
 - 2026-06-06: **Wave 4 完了**（React統合 + Part B AI を並行）。
   - React統合 Phase 2: `CellTypeRegistry`（text/number/checkbox＋カスタム登録）を painter に結線、条件付き書式の背景/文字色を描画。既定 type=text で既存挙動不変。
-  - Part B 着手（新規 `@ai-path/lattica-ai`・provider/embedder 抽象でモック100%）:
+  - Part B 着手（新規 `@ai-path/tb-ai`・provider/embedder 抽象でモック100%）:
     - A1: `AIProvider`/`MockProvider`/`AIClient`(コール/トークン上限) ＋ `withProvenance`（取り消し可能・来歴付き AICommand）。
     - A2: `nlToFormula`/`explainFormula`/`fixFormula`（parseFormula で検証）。
     - A5: `inferCellType`/`inferColumnType`/`normalizeValue`/`detectDuplicateRows`（決定的・全半角正規化・trigram重複検知）。
@@ -117,11 +123,11 @@
   - 全体 **1272テスト・100%カバレッジ**。typecheck/lint/build クリーン。
 - 2026-06-06: **Wave 5 完了**（React統合スライス2 + Part B AI 第2弾を並行）。
   - React統合: `GridController` に列型/配置・条件付き書式(`getCellStyle`)・検索(`runSearch`)を追加し `<LatticaGrid>` へ結線。グリッドがセル型描画・条件付き書式・検索ハイライトを実表示。
-  - Part B AI（`@ai-path/lattica-ai`）: A3 AI列・A4 スマートフィル（規則推論＋AIフォールバック、長さガード）・A7 NL→グリッド操作・A8 異常検知(z-score/IQR)・A9 検証ルール生成・A10 要約/翻訳/分類。全て provider 抽象でモック100%。
+  - Part B AI（`@ai-path/tb-ai`）: A3 AI列・A4 スマートフィル（規則推論＋AIフォールバック、長さガード）・A7 NL→グリッド操作・A8 異常検知(z-score/IQR)・A9 検証ルール生成・A10 要約/翻訳/分類。全て provider 抽象でモック100%。
   - 全体 **1388テスト・100%カバレッジ**。typecheck/lint/build クリーン。Part B は A11(MCP)/A12(ワークフロー) を残すのみ。
 - 2026-06-06: **Wave 6 完了**（Part B 仕上げ + React対話UX を並行）。**Part B（AI ネイティブ）A1–A12 全完了**。
-  - A11: 新規 `@ai-path/lattica-mcp` — グリッドのツールレジストリ（get_cell/set_cell/get_range/evaluate/define_name）＋ `ToolDispatcher`（結果エンベロープ）。get_range にセル数上限ガード追加。
-  - A12: `@ai-path/lattica-ai` ワークフロー — `planWorkflow`（NL→手順・未知ツール除外）＋ `WorkflowRunner`（HITL承認・監査ログ・失敗で停止）。
+  - A11: 新規 `@ai-path/tb-mcp` — グリッドのツールレジストリ（get_cell/set_cell/get_range/evaluate/define_name）＋ `ToolDispatcher`（結果エンベロープ）。get_range にセル数上限ガード追加。
+  - A12: `@ai-path/tb-ai` ワークフロー — `planWorkflow`（NL→手順・未知ツール除外）＋ `WorkflowRunner`（HITL承認・監査ログ・失敗で停止）。
   - React対話UX Phase 4: ドラッグ範囲選択（mousedown→move→up）。
   - 全体 **1429テスト・100%カバレッジ**。typecheck/lint/build クリーン。パッケージ8つ（core/data/formula/react/io/collab/ai/mcp）。
   - 残：Part A React 統合（フィルハンドル・リサイズ/移動ハンドル・コンテキストメニューUI・ソート/フィルタ結線・結合描画・ネスト行）と Phase 12c(R1C1/スピル)・18(性能/E2E/ベンチ)。
@@ -151,7 +157,7 @@
   - React: 結合セル描画（`mergeSelection`/`unmerge`・アンカースパン・被覆スキップ）。
   - 全体 **1610テスト・100%カバレッジ**。typecheck/lint/build クリーン。
 - 2026-06-07: **Wave 12 完了**（io JSON＋性能ベンチ＋ヘッダーソートUI）。
-  - `@ai-path/lattica-io` JSON: `matrixToJson`/`jsonToMatrix`/`recordsToMatrix`/`matrixToRecords`（own-key undefined→null 修正）。
+  - `@ai-path/tb-io` JSON: `matrixToJson`/`jsonToMatrix`/`recordsToMatrix`/`matrixToRecords`（own-key undefined→null 修正）。
   - 性能ベンチ（packages/react/bench, カバレッジ対象外）＋ `docs/PERFORMANCE.md`：100万行×1000列で buildScene+paintScene ≈0.12ms/frame・約8000fps を実測。
   - React: ヘッダークリックのソートUI（▲/▼/⇅・Shiftで複数列、`PositionedHeader.col` 追加）。
   - 全体 **1625テスト・100%カバレッジ**。typecheck/lint/build クリーン。
@@ -201,7 +207,7 @@
   - **XLOOKUP**/**XMATCH**（match_mode 0/-1/1・if_not_found）、**SORTBY**（キー配列でソート、スピル）、**TEXTSPLIT**/**TEXTBEFORE**/**TEXTAFTER**（n 番目の区切り）、**VSTACK**/**HSTACK**（配列の縦横結合、欠損は null パディング）、**LET**（名前束縛＋スコープ。evaluator にローカルスコープ getName を注入）。
   - 全体 **1803テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase D-2（スタイル付き XLSX 出力）。
 - 2026-06-07: **Phase D-2 完了**（スタイル付き XLSX 出力）。**Phase D 完了**。
-  - `@ai-path/lattica-io` `xlsx-style.ts`: `writeStyledXlsx(workbook)`。`styles.xml`（numFmts/fonts/fills/cellXfs を重複排除）を生成し、各セルが `s` インデックスでスタイル参照。**数値書式・太字/斜体・文字色・背景色・水平整列・結合セル（mergeCells）**に対応。依存ゼロ（自前 ZIP）。
+  - `@ai-path/tb-io` `xlsx-style.ts`: `writeStyledXlsx(workbook)`。`styles.xml`（numFmts/fonts/fills/cellXfs を重複排除）を生成し、各セルが `s` インデックスでスタイル参照。**数値書式・太字/斜体・文字色・背景色・水平整列・結合セル（mergeCells）**に対応。依存ゼロ（自前 ZIP）。
   - 既存 `writeXlsx`（値のみ）は維持。`readXlsx` で値の往復を検証。
   - 全体 **1819テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E（ピボット/チャート/サーバモデル）。
 - 2026-06-07: **Phase E-1 完了**（ピボットテーブル）。
@@ -213,14 +219,14 @@
   - `scene.ts`/`painter.ts`: `CellPaint.sparkline` を追加。**line は stroke、bar/winloss は fillRect**（正=活性色/負=赤）でセル原点へ平行移動して描画。
   - 全体 **1839テスト・100%カバレッジ**。typecheck/lint/build クリーン。残: Phase E-3（マスターディテール/サーバサイド行モデル等）。
 - 2026-06-07: **Phase E-3 完了**（非同期/サーバサイド行モデル）。
-  - `@ai-path/lattica-data` `async-rows.ts`: `AsyncRowModel<R>` — 固定ブロック単位の遅延ロード。`ensureRange(start,end)` で可視範囲を覆うブロックを `RowFetcher` 経由で取得（**in-flight 重複排除**・ブロックキャッシュ）、`getRow`/`isLoaded`/`getTotal`/`isTotalKnown`、`invalidate`（ソート/フィルタ後の再取得）、`subscribe`（到着通知）。汎用 `R`・DOM 非依存。
+  - `@ai-path/tb-data` `async-rows.ts`: `AsyncRowModel<R>` — 固定ブロック単位の遅延ロード。`ensureRange(start,end)` で可視範囲を覆うブロックを `RowFetcher` 経由で取得（**in-flight 重複排除**・ブロックキャッシュ）、`getRow`/`isLoaded`/`getTotal`/`isTotalKnown`、`invalidate`（ソート/フィルタ後の再取得）、`subscribe`（到着通知）。汎用 `R`・DOM 非依存。
   - 全体 **1847テスト・100%カバレッジ**。typecheck/lint/build クリーン。残: チャート（フル描画）・PDF/印刷・LAMBDA/構造化参照は大型のため必要に応じ別途。
 - 2026-06-07: **Phase E-4 完了**（チャート：line/bar/pie）。
   - core `chart.ts`: `layoutChart(spec)`（純粋）— プロット矩形・**nice 軸目盛**（`niceScale`）・系列の描画プリミティブ（折れ線点/棒/円グラフ扇形）・凡例を算出。`line`/`bar`（グループ化・ゼロ基準）/`pie`（割合扇形）。
   - react `chart-painter.ts` `paintChart`＋ **`<LatticaChart>`** コンポーネント（canvas、`role=img`）。Canvas2D に `arc`/`closePath`/`fill` を追加。
   - 全体 **1870テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E-5（PDF/印刷出力）。
 - 2026-06-07: **Phase E-5 完了**（PDF 出力）。
-  - `@ai-path/lattica-io` `pdf.ts`: `tableToPdf(rows, options)` — 依存ゼロの PDF 1.4 ライタ。Helvetica（WinAnsi）・罫線グリッド・**自動ページ分割**・タイトル・列幅指定。バイト精度の xref/trailer を手組み。非 Latin-1 は `?` に畳む（フォント埋め込みは対象外）。
+  - `@ai-path/tb-io` `pdf.ts`: `tableToPdf(rows, options)` — 依存ゼロの PDF 1.4 ライタ。Helvetica（WinAnsi）・罫線グリッド・**自動ページ分割**・タイトル・列幅指定。バイト精度の xref/trailer を手組み。非 Latin-1 は `?` に畳む（フォント埋め込みは対象外）。
   - 全体 **1877テスト・100%カバレッジ**。typecheck/lint/build クリーン。次は Phase E-6（数式 LAMBDA／構造化参照）。
 - 2026-06-07: **Phase E-6 完了**（LAMBDA ファミリ）。数式 144→**150**。
   - **LAMBDA / MAP / REDUCE / SCAN / BYROW / BYCOL**。LAMBDA は高階関数の最終引数の **AST を直接解釈**する方式（`asLambda`/`invokeLambda` で仮引数を子スコープに束縛）。値型・パーサ変更なしで安全に実装。LET 束縛名もラムダ本体から解決。
@@ -271,6 +277,6 @@
   - controlled `cellOverlay` / `renderCellOverlay` / `onCellOverlayClose` を追加。セル左下に root 内絶対配置し、render ctx にはセルの root 相対 rect を渡す。Escape・active セル移動・明示 close で close callback を呼ぶ。
   - examples/playground `/editors` に、セルクリックで値確認パネルを出す overlay デモを追加。
 - 2026-07-05: **Wave 4b 完了**（密度寸法の公開契約＋コンテンツ準拠 auto size）。
-  - `densityMetrics(density)` を `@ai-path/lattica-react` から公開。`densityOptions` と同じ density token から行高・列幅・行ヘッダ幅・列ヘッダ高を返し、プロダクト側の compact 寸法ハードコードを不要にした。
+  - `densityMetrics(density)` を `@ai-path/tb-react` から公開。`densityOptions` と同じ density token から行高・列幅・行ヘッダ幅・列ヘッダ高を返し、プロダクト側の compact 寸法ハードコードを不要にした。
   - `<LatticaGrid autoSize="content" maxWidth maxHeight>` を追加。可視列幅合計＋行ヘッダ、可視行高合計＋列ヘッダで自動サイズ化し、上限超過時は既存スクロールで閲覧する。`autoSize` 指定時は `width` / `height` / `fill` より優先。
   - examples/playground `/binding` を `autoSize="content"` + `maxHeight` の例に更新。`AGENTS.md` に stable `data-testid` / `aria-label` と Wave 1〜4 API の公開契約を追記。

@@ -8,7 +8,7 @@
  * {@link AIClient}, so these are fully testable with a mock provider.
  */
 
-import { parseFormula } from '@ai-path/lattica-formula';
+import { parseFormula } from '@ai-path/tb-formula';
 import type { AIClient } from './client.js';
 
 export interface NlFormulaResult {

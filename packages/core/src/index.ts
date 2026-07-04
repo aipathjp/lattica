@@ -1,4 +1,4 @@
-/** @ai-path/lattica-core — framework-agnostic data grid engine. */
+/** @ai-path/tb-core — framework-agnostic data grid engine. */
 
 export * from './types.js';
 export {

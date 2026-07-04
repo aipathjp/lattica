@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useReducer, useState, type CSSProperties, type ReactElement } from 'react';
-import type { ColumnNode } from '@ai-path/lattica-core';
+import type { ColumnNode } from '@ai-path/tb-core';
 import {
   LatticaGrid,
   renderStaticTable,
   staticTablePrintCss,
   useGridController,
-} from '@ai-path/lattica-react';
+} from '@ai-path/tb-react';
 
 const columns: readonly ColumnNode[] = [
   { headerName: 'Region' },

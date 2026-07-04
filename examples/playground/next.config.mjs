@@ -4,13 +4,13 @@ const nextConfig = {
   // The Lattica packages are workspace-linked; transpile them so Next/SWC
   // handles their ESM `.js` import specifiers consistently in dev and build.
   transpilePackages: [
-    '@ai-path/lattica-core',
-    '@ai-path/lattica-data',
-    '@ai-path/lattica-formula',
-    '@ai-path/lattica-react',
-    '@ai-path/lattica-io',
-    '@ai-path/lattica-collab',
-    '@ai-path/lattica-ai',
+    '@ai-path/tb-core',
+    '@ai-path/tb-data',
+    '@ai-path/tb-formula',
+    '@ai-path/tb-react',
+    '@ai-path/tb-io',
+    '@ai-path/tb-collab',
+    '@ai-path/tb-ai',
   ],
 };
 

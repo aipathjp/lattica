@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { deserializeState, serializeState, type ColumnNode, type GridStateSnapshot } from '@ai-path/lattica-core';
-import { LatticaColumnSettings, LatticaGrid, useGridController } from '@ai-path/lattica-react';
+import { deserializeState, serializeState, type ColumnNode, type GridStateSnapshot } from '@ai-path/tb-core';
+import { LatticaColumnSettings, LatticaGrid, useGridController } from '@ai-path/tb-react';
 
 const ORG_KEY = 'lattica-columns-org';
 const USER_KEY = 'lattica-columns-user';

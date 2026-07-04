@@ -6,7 +6,7 @@
  * boxes. Row-number gutter cells are positioned the same way.
  */
 
-import { columnIndexToLabel, type HeaderLayout } from '@ai-path/lattica-core';
+import { columnIndexToLabel, type HeaderLayout } from '@ai-path/tb-core';
 import { columnX, rowY, type GridGeometry } from './geometry.js';
 
 export interface PositionedHeader {

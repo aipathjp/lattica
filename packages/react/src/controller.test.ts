@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { GridController, formatValue, replaceInText, parseNumberInput } from './controller.js';
-import { FormulaError } from '@ai-path/lattica-formula';
+import { FormulaError } from '@ai-path/tb-formula';
 
 const make = () => new GridController({ rowCount: 50, colCount: 26 });
 

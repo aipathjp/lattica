@@ -1,6 +1,6 @@
-# Lattica Performance
+# Taible Performance
 
-Lattica is built around a **canvas-free hot path**: the per-frame engine work
+Taible is built around a **canvas-free hot path**: the per-frame engine work
 (deciding which cells are visible, building the paint instruction list, and
 issuing the draw-call sequence) is pure JavaScript with no DOM and no real
 canvas. Only the final draw calls touch a `CanvasRenderingContext2D`. This makes
@@ -14,8 +14,8 @@ runnable Node ESM script (intentionally **not** a `*.ts` under `src/**`, so it i
 excluded from coverage and from Vitest). It exercises the real published API,
 resolved from each package's built `dist`:
 
-- `SizeManager`, `SelectionModel` from `@ai-path/lattica-core`
-- `buildScene`, `paintScene` from `@ai-path/lattica-react`
+- `SizeManager`, `SelectionModel` from `@ai-path/tb-core`
+- `buildScene`, `paintScene` from `@ai-path/tb-react`
 
 ### Methodology
 
@@ -80,7 +80,7 @@ Representative back-to-back runs of the exact self-verify command
 
 - **~0.12 ms/frame** for the full canvas-free pipeline means the engine consumes
   a tiny fraction of a 16.7 ms (60 fps) budget. The grid is bound by raster/GPU
-  and DOM, not by Lattica's own bookkeeping, even on a billion-cell sheet.
+  and DOM, not by Taible's own bookkeeping, even on a billion-cell sheet.
 - **751 visible cells/frame** confirms virtualization: regardless of the 1e9
   total cells, only the cells intersecting the viewport (plus overscan and frozen
   bands) are ever built or painted.

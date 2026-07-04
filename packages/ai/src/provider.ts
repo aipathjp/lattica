@@ -1,7 +1,7 @@
 /**
- * Provider abstraction for Lattica's AI layer.
+ * Provider abstraction for Taible's AI layer.
  *
- * Lattica is provider-agnostic: the concrete LLM (OpenAI, Anthropic, a local
+ * Taible is provider-agnostic: the concrete LLM (OpenAI, Anthropic, a local
  * model, …) lives behind the {@link AIProvider} interface and is injected by the
  * caller. This keeps the package free of any network/SDK dependency and makes
  * every code path testable with a deterministic {@link MockProvider}.

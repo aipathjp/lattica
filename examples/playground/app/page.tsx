@@ -23,7 +23,7 @@ const FEATURES: { href: string; title: string; desc: string }[] = [
 export default function Home(): ReactElement {
   return (
     <main style={{ padding: 24, maxWidth: 1000 }}>
-      <h1 style={{ marginTop: 0 }}>Lattica — Feature Showcase</h1>
+      <h1 style={{ marginTop: 0 }}>Taible — Feature Showcase</h1>
       <p style={{ color: '#52606d' }}>
         A clean-room, MIT-licensed data grid &amp; spreadsheet engine for React. Every page below
         demonstrates a feature you can interact with. Source: <code>examples/playground</code>.

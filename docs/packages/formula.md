@@ -1,17 +1,17 @@
-# @ai-path/lattica-formula
+# @ai-path/tb-formula
 
 A clean-room, Excel-compatible formula engine: lexer, parser, value coercion, an evaluator with a pluggable function registry, reference extraction, a dependency graph with topological recalculation, and a high-level SheetEngine — with no runtime dependencies.
 
-This package is part of the [Lattica](/) monorepo. The full, canonical reference
+This package is part of the [Taible](/) monorepo. The full, canonical reference
 lives in the package README in the source tree:
 
 - Source README: [`packages/formula/README.md`](https://github.com/aipathjp/lattica/blob/main/packages/formula/README.md)
-- Package: `@ai-path/lattica-formula`
+- Package: `@ai-path/tb-formula`
 
 ## Install
 
 ```sh
-pnpm add @ai-path/lattica-formula
+pnpm add @ai-path/tb-formula
 ```
 
 See [Usage](/USAGE) for end-to-end examples and [Architecture](/ARCHITECTURE)

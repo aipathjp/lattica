@@ -7,7 +7,7 @@
  *   mul/div (* /) < unary minus < exponent (^) < percent (%) < range (:)
  */
 
-import { parseA1, type A1Reference } from '@ai-path/lattica-core';
+import { parseA1, type A1Reference } from '@ai-path/tb-core';
 import type { Token } from './tokens.js';
 import { tokenize } from './lexer.js';
 import type { AstNode, BinaryOperator } from './ast.js';

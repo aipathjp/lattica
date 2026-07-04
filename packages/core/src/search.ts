@@ -1,5 +1,5 @@
 /**
- * Pure search model for the Lattica grid.
+ * Pure search model for the Taible grid.
  *
  * {@link searchGrid} scans a `rowCount x colCount` space in row-major order via
  * a caller-supplied text accessor, returning every matching cell. Matching

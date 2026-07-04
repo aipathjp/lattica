@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { LatticaGrid, LatticaFormulaBar, useGridController } from '@ai-path/lattica-react';
-import type { ColumnNode } from '@ai-path/lattica-core';
+import { LatticaGrid, LatticaFormulaBar, useGridController } from '@ai-path/tb-react';
+import type { ColumnNode } from '@ai-path/tb-core';
 
 const columns: readonly ColumnNode[] = Array.from({ length: 7 }, (_, i) => ({
   headerName: String.fromCharCode(65 + i),

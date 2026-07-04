@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { AsyncRowModel, type RowFetcher } from '@ai-path/lattica-data';
+import { AsyncRowModel, type RowFetcher } from '@ai-path/tb-data';
 
 type Row = [string, string, number];
 

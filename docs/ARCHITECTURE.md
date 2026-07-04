@@ -1,4 +1,4 @@
-# Lattica — アーキテクチャ設計書
+# Taible — アーキテクチャ設計書
 
 > 高性能・フレームワーク非依存コア + React/Next.js 専用バインディングのデータグリッド／スプレッドシートエンジン。
 > 完全自社 IP・コピーレフト非依存（MIT）。クリーンルーム実装。
@@ -134,10 +134,10 @@ ColumnDef      = { field, headerName, width?, ... }
 
 | パッケージ | 役割 | 依存 |
 |-----------|------|------|
-| `@ai-path/lattica-core` | データモデル・座標・仮想化・選択・コマンド/undo・多段ヘッダー平坦化 | なし |
-| `@ai-path/lattica-formula` | 数式 lexer/parser/AST/evaluator/依存DAG/関数ライブラリ | core |
-| `@ai-path/lattica-react` | Canvas レンダラ・編集オーバーレイ・ヘッダー・ARIA・フック | core, formula, react |
-| `@ai-path/lattica-io` | CSV/TSV・xlsx(OOXML) 入出力・クリップボード | core |
-| `@ai-path/lattica-collab` | 表特化 CRDT・プレゼンス・トランスポート抽象 | core |
+| `@ai-path/tb-core` | データモデル・座標・仮想化・選択・コマンド/undo・多段ヘッダー平坦化 | なし |
+| `@ai-path/tb-formula` | 数式 lexer/parser/AST/evaluator/依存DAG/関数ライブラリ | core |
+| `@ai-path/tb-react` | Canvas レンダラ・編集オーバーレイ・ヘッダー・ARIA・フック | core, formula, react |
+| `@ai-path/tb-io` | CSV/TSV・xlsx(OOXML) 入出力・クリップボード | core |
+| `@ai-path/tb-collab` | 表特化 CRDT・プレゼンス・トランスポート抽象 | core |
 
 依存方向は一方向（core が最下層）。循環なし。

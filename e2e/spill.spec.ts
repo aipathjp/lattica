@@ -8,14 +8,14 @@ import { test, expect } from '@playwright/test';
  * the headless controller and reads several resolved cells back; the probe
  * element reports "spill OK" only when the spilled values resolve correctly.
  */
-test.describe('Lattica dynamic-array spill', () => {
+test.describe('Taible dynamic-array spill', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/spill');
   });
 
   test('renders the spill demo grid', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: 'Lattica — Dynamic Arrays (spill)' }),
+      page.getByRole('heading', { name: 'Taible — Dynamic Arrays (spill)' }),
     ).toBeVisible();
     await expect(page.getByTestId('lattica-grid')).toBeVisible();
     await expect(page.getByRole('grid')).toBeVisible();
@@ -27,11 +27,11 @@ test.describe('Lattica dynamic-array spill', () => {
   });
 });
 
-test.describe('Lattica playground navigation', () => {
+test.describe('Taible playground navigation', () => {
   test('home links reach both demos', async ({ page }) => {
     await page.goto('/');
     // Heading of the showcase home (layout nav carries the per-page links).
-    await expect(page.getByRole('heading', { name: 'Lattica — Feature Showcase' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Taible — Feature Showcase' })).toBeVisible();
 
     await page.getByTestId('nav-kitchen-sink').click();
     await expect(page).toHaveURL(/\/kitchen-sink$/);

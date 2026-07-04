@@ -1,5 +1,5 @@
 /**
- * A tiny typed event emitter used across Lattica for decoupled communication
+ * A tiny typed event emitter used across Taible for decoupled communication
  * between the model layer and the renderer. Zero dependencies.
  */
 

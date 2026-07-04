@@ -6,7 +6,7 @@
  * function takes a single reference string and a base cell (the cell the
  * relative R1C1 offsets are measured from) and returns the converted string.
  *
- * A1 semantics (zero-based internally via `@ai-path/lattica-core`):
+ * A1 semantics (zero-based internally via `@ai-path/tb-core`):
  *  - `A1`     — both parts relative
  *  - `$A$1`   — both parts absolute
  *  - `$A1`    — absolute column, relative row (mixed)
@@ -17,7 +17,7 @@
  *  - relative part: `R` (delta 0) or `R[delta]` e.g. `R`, `R[-2]`, `C[1]`
  */
 
-import { parseA1, toA1 } from '@ai-path/lattica-core';
+import { parseA1, toA1 } from '@ai-path/tb-core';
 
 /**
  * Matches a full R1C1 reference. Each of the row (`R…`) and column (`C…`)

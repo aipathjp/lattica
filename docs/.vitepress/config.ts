@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitepress';
 
 /**
- * VitePress site config for Lattica's documentation.
+ * VitePress site config for Taible's documentation.
  *
  * srcDir defaults to `docs/`, so the existing top-level docs (USAGE, PERFORMANCE,
  * ARCHITECTURE, WORKPLAN, PROGRESS, RESEARCH) resolve directly. The eight package
@@ -11,7 +11,7 @@ import { defineConfig } from 'vitepress';
  * wrappers keep the sidebar self-contained while pointing at the canonical source.
  */
 export default defineConfig({
-  title: 'Lattica',
+  title: 'Taible',
   description:
     'High-performance, framework-agnostic data grid & spreadsheet engine for React / Next.js — clean-room, zero-copyleft, MIT.',
   lastUpdated: true,
@@ -25,14 +25,14 @@ export default defineConfig({
       {
         text: 'Packages',
         items: [
-          { text: '@ai-path/lattica-core', link: '/packages/core' },
-          { text: '@ai-path/lattica-formula', link: '/packages/formula' },
-          { text: '@ai-path/lattica-react', link: '/packages/react' },
-          { text: '@ai-path/lattica-io', link: '/packages/io' },
-          { text: '@ai-path/lattica-data', link: '/packages/data' },
-          { text: '@ai-path/lattica-collab', link: '/packages/collab' },
-          { text: '@ai-path/lattica-ai', link: '/packages/ai' },
-          { text: '@ai-path/lattica-mcp', link: '/packages/mcp' },
+          { text: '@ai-path/tb-core', link: '/packages/core' },
+          { text: '@ai-path/tb-formula', link: '/packages/formula' },
+          { text: '@ai-path/tb-react', link: '/packages/react' },
+          { text: '@ai-path/tb-io', link: '/packages/io' },
+          { text: '@ai-path/tb-data', link: '/packages/data' },
+          { text: '@ai-path/tb-collab', link: '/packages/collab' },
+          { text: '@ai-path/tb-ai', link: '/packages/ai' },
+          { text: '@ai-path/tb-mcp', link: '/packages/mcp' },
         ],
       },
     ],
@@ -56,14 +56,14 @@ export default defineConfig({
       {
         text: 'Packages',
         items: [
-          { text: '@ai-path/lattica-core', link: '/packages/core' },
-          { text: '@ai-path/lattica-formula', link: '/packages/formula' },
-          { text: '@ai-path/lattica-react', link: '/packages/react' },
-          { text: '@ai-path/lattica-io', link: '/packages/io' },
-          { text: '@ai-path/lattica-data', link: '/packages/data' },
-          { text: '@ai-path/lattica-collab', link: '/packages/collab' },
-          { text: '@ai-path/lattica-ai', link: '/packages/ai' },
-          { text: '@ai-path/lattica-mcp', link: '/packages/mcp' },
+          { text: '@ai-path/tb-core', link: '/packages/core' },
+          { text: '@ai-path/tb-formula', link: '/packages/formula' },
+          { text: '@ai-path/tb-react', link: '/packages/react' },
+          { text: '@ai-path/tb-io', link: '/packages/io' },
+          { text: '@ai-path/tb-data', link: '/packages/data' },
+          { text: '@ai-path/tb-collab', link: '/packages/collab' },
+          { text: '@ai-path/tb-ai', link: '/packages/ai' },
+          { text: '@ai-path/tb-mcp', link: '/packages/mcp' },
         ],
       },
     ],

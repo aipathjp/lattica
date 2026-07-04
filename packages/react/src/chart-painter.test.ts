@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { layoutChart, type ChartSpec } from '@ai-path/lattica-core';
+import { layoutChart, type ChartSpec } from '@ai-path/tb-core';
 import { paintChart } from './chart-painter.js';
 import { defaultTheme } from './theme.js';
 import { createMockContext } from './test-utils.js';

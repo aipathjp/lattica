@@ -5,7 +5,7 @@
  *
  * This is the foundation for hide/show, move, sort, filter, and trim: every one
  * of those features is expressed as a mutation of the visual order and/or the
- * hidden set, and the rest of Lattica only ever asks "what physical index sits
+ * hidden set, and the rest of Taible only ever asks "what physical index sits
  * at visual position N?" (and vice versa).
  *
  * Internals:

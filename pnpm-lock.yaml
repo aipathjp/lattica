@@ -62,25 +62,25 @@ importers:
 
   examples/playground:
     dependencies:
-      '@ai-path/lattica-ai':
+      '@ai-path/tb-ai':
         specifier: workspace:*
         version: link:../../packages/ai
-      '@ai-path/lattica-collab':
+      '@ai-path/tb-collab':
         specifier: workspace:*
         version: link:../../packages/collab
-      '@ai-path/lattica-core':
+      '@ai-path/tb-core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@ai-path/lattica-data':
+      '@ai-path/tb-data':
         specifier: workspace:*
         version: link:../../packages/data
-      '@ai-path/lattica-formula':
+      '@ai-path/tb-formula':
         specifier: workspace:*
         version: link:../../packages/formula
-      '@ai-path/lattica-io':
+      '@ai-path/tb-io':
         specifier: workspace:*
         version: link:../../packages/io
-      '@ai-path/lattica-react':
+      '@ai-path/tb-react':
         specifier: workspace:*
         version: link:../../packages/react
       '@neondatabase/serverless':
@@ -105,19 +105,19 @@ importers:
 
   packages/ai:
     dependencies:
-      '@ai-path/lattica-core':
+      '@ai-path/tb-core':
         specifier: workspace:*
         version: link:../core
-      '@ai-path/lattica-data':
+      '@ai-path/tb-data':
         specifier: workspace:*
         version: link:../data
-      '@ai-path/lattica-formula':
+      '@ai-path/tb-formula':
         specifier: workspace:*
         version: link:../formula
 
   packages/collab:
     dependencies:
-      '@ai-path/lattica-core':
+      '@ai-path/tb-core':
         specifier: workspace:*
         version: link:../core
 
@@ -125,37 +125,37 @@ importers:
 
   packages/data:
     dependencies:
-      '@ai-path/lattica-core':
+      '@ai-path/tb-core':
         specifier: workspace:*
         version: link:../core
 
   packages/formula:
     dependencies:
-      '@ai-path/lattica-core':
+      '@ai-path/tb-core':
         specifier: workspace:*
         version: link:../core
 
   packages/io:
     dependencies:
-      '@ai-path/lattica-core':
+      '@ai-path/tb-core':
         specifier: workspace:*
         version: link:../core
 
   packages/mcp:
     dependencies:
-      '@ai-path/lattica-formula':
+      '@ai-path/tb-formula':
         specifier: workspace:*
         version: link:../formula
 
   packages/react:
     dependencies:
-      '@ai-path/lattica-core':
+      '@ai-path/tb-core':
         specifier: workspace:*
         version: link:../core
-      '@ai-path/lattica-data':
+      '@ai-path/tb-data':
         specifier: workspace:*
         version: link:../data
-      '@ai-path/lattica-formula':
+      '@ai-path/tb-formula':
         specifier: workspace:*
         version: link:../formula
       react:

@@ -1,11 +1,11 @@
 /**
- * Chart painter — draws a {@link ChartLayout} (computed by `@ai-path/lattica-core`'s
+ * Chart painter — draws a {@link ChartLayout} (computed by `@ai-path/tb-core`'s
  * `layoutChart`) onto a {@link Canvas2D}. Pure drawing: all geometry/scale work
  * lives in core, so this module just issues stroke/fill calls and is testable
  * with the recording mock context.
  */
 
-import type { ChartLayout } from '@ai-path/lattica-core';
+import type { ChartLayout } from '@ai-path/tb-core';
 import type { GridTheme } from './theme.js';
 import type { Canvas2D } from './painter.js';
 

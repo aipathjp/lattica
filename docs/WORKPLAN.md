@@ -43,7 +43,7 @@
 
 | Phase | 状態 | 実績 / 残項目 |
 |---|---|---|
-| A1 `@ai-path/lattica-ai` 基盤 | ✅ | `provider.ts`(抽象＋MockProvider)・`provenance.ts`(AICommand)・`client.ts`。AC どおり mock provider で全フロー検証済 |
+| A1 `@ai-path/tb-ai` 基盤 | ✅ | `provider.ts`(抽象＋MockProvider)・`provenance.ts`(AICommand)・`client.ts`。AC どおり mock provider で全フロー検証済 |
 | A2 NL⇄数式 | ✅ | `nl-formula.ts`(nlToFormula/explainFormula/fixFormula) |
 | A3 AI 列 | ✅ | `ai-column.ts`(generateColumn) |
 | A4 スマートフィル | ✅ | `smart-fill.ts`(inferRule/applyRule) |
@@ -53,7 +53,7 @@
 | A8 異常検知 | 🔶 | `anomaly.ts`(zScore/IQR/列別外れ値)。**残: 条件付き書式ルール自動提案 (Phase10 連携)** |
 | A9 AI 検証ルール生成 | ✅ | `rule-gen.ts`(inferRule/fitRate/suggestRule) |
 | A10 要約・翻訳・分類 | ✅ | `text-ops.ts`(summarize/translate/classify) |
-| A11 `@ai-path/lattica-mcp` | 🔶 | `tools.ts`(get/set cell/range 等)・`dispatcher.ts`。**残: 書込み承認モード・監査ログ・認可スコープ** |
+| A11 `@ai-path/tb-mcp` | 🔶 | `tools.ts`(get/set cell/range 等)・`dispatcher.ts`。**残: 書込み承認モード・監査ログ・認可スコープ** |
 | A12 エージェント・HITL | 🔶 | `workflow.ts`(planWorkflow/WorkflowRunner)。**残: 監査ログ可視化・差分承認 UI・本適用ゲート** |
 
 ### 計画外の追加実装（本計画に無い完了機能）
@@ -91,14 +91,14 @@
 
 | パッケージ | 役割 | 状態 (2026-06-08) |
 |---|---|---|
-| `@ai-path/lattica-core` | 座標・仮想化・選択・コマンド・ヘッダー・セルメタ・merge・検証モデル | ✅ 実装済（pivot/sparkline/chart/detail/borders/summary 等も格納） |
-| `@ai-path/lattica-data` | IndexMapper(物理↔表示)・データソースバインド・sort/filter/hide/move/trim・nested-rows・async-rows | ✅ 実装済 |
-| `@ai-path/lattica-formula` | 数式エンジン（150関数・名前付き範囲・R1C1・配列スピル・構造化参照・LAMBDA） | ✅ 実装済（関数 400+ へ拡張余地） |
-| `@ai-path/lattica-react` | Canvas描画・セル型レジストリ・対話UX・メニュー・テーマ・i18n・aria・FormulaBar/StatusBar | ✅ 実装済（超越セル型・RTL・wordWrap 結線が残） |
-| `@ai-path/lattica-io` | CSV/TSV・XLSX 読書き・スタイル往復・JSON・PDF | ✅ 実装済 |
-| `@ai-path/lattica-collab` | CRDT・プレゼンス・order-key・セッション | 🔶 Supabase Realtime アダプタ未（InMemoryNetwork のみ） |
-| `@ai-path/lattica-ai` | AI 親和機能（NL→数式・AI列・スマートフィル・意味検索・異常検知・ルール生成 ほか）provider 抽象 | ✅ 実装済（mock provider、HITL UI 残） |
-| `@ai-path/lattica-mcp` | MCP サーバ。外部 AI エージェントにグリッド操作を公開 | 🔶 ツール公開済・承認/監査/認可が残 |
+| `@ai-path/tb-core` | 座標・仮想化・選択・コマンド・ヘッダー・セルメタ・merge・検証モデル | ✅ 実装済（pivot/sparkline/chart/detail/borders/summary 等も格納） |
+| `@ai-path/tb-data` | IndexMapper(物理↔表示)・データソースバインド・sort/filter/hide/move/trim・nested-rows・async-rows | ✅ 実装済 |
+| `@ai-path/tb-formula` | 数式エンジン（150関数・名前付き範囲・R1C1・配列スピル・構造化参照・LAMBDA） | ✅ 実装済（関数 400+ へ拡張余地） |
+| `@ai-path/tb-react` | Canvas描画・セル型レジストリ・対話UX・メニュー・テーマ・i18n・aria・FormulaBar/StatusBar | ✅ 実装済（超越セル型・RTL・wordWrap 結線が残） |
+| `@ai-path/tb-io` | CSV/TSV・XLSX 読書き・スタイル往復・JSON・PDF | ✅ 実装済 |
+| `@ai-path/tb-collab` | CRDT・プレゼンス・order-key・セッション | 🔶 Supabase Realtime アダプタ未（InMemoryNetwork のみ） |
+| `@ai-path/tb-ai` | AI 親和機能（NL→数式・AI列・スマートフィル・意味検索・異常検知・ルール生成 ほか）provider 抽象 | ✅ 実装済（mock provider、HITL UI 残） |
+| `@ai-path/tb-mcp` | MCP サーバ。外部 AI エージェントにグリッド操作を公開 | 🔶 ツール公開済・承認/監査/認可が残 |
 
 ---
 
@@ -108,7 +108,7 @@
 
 ### Phase 1 — 基盤: IndexMapper ＋ データソースバインド  ★最優先
 - **目的**: 物理インデックス↔表示インデックスの変換層を作る。以降の hide/move/sort/filter/trim/nested の土台。加えて「行=オブジェクト配列、列=スキーマ」のデータバインドを導入（一般的アプリ用途必須）。
-- **対象**: `@ai-path/lattica-data`（新規）, `@ai-path/lattica-core`(連携)
+- **対象**: `@ai-path/tb-data`（新規）, `@ai-path/tb-core`(連携)
 - **主要API**:
   - `IndexMapper`: `getVisual(physical)`, `getPhysical(visual)`, `insert/remove`, `setOrder`, `setHidden`, `getNotHidden`, sequence/skip/trim マップ合成。
   - `DataSource<T>`: array-of-objects 入出力。`columns: { data: keyof T | accessor, type, header }[]`。`getCellByVisual`, `setCellByVisual`, `loadData`, `getData`, `getSourceData`。
@@ -118,7 +118,7 @@
 
 ### Phase 2 — セル型システム（レンダラ/エディタ登録 ＋ 組込型）
 - **目的**: HoT の中核拡張点。型ごとに「Canvas レンダラ」＋「DOM エディタ」を登録。
-- **対象**: `@ai-path/lattica-react`(`cell-types/`), `@ai-path/lattica-core`(cellMeta)
+- **対象**: `@ai-path/tb-react`(`cell-types/`), `@ai-path/tb-core`(cellMeta)
 - **組込型**: text / numeric(書式:桁区切り・通貨・小数) / date(ピッカー) / time / checkbox / select / dropdown / autocomplete / password / **超越: rating・progress・sparkline・tag/chips・image・link**。
 - **主要API**: `registerCellType({name, renderer(ctx, cell, theme), editor(props), parse, format, validate?})`。`column.type` で割当。
 - **AC**: 各型の描画(モックctx命令)＋編集コミット＋型変換のテスト。カスタム型登録で外部拡張可能。98%。
@@ -126,13 +126,13 @@
 
 ### Phase 3 — 検証・read-only・配置・セルメタ
 - **目的**: validator/allowInvalid・不正セル視覚化、readOnly セル/列、テキスト配置(水平/垂直)、per-cell メタ(className 相当)。
-- **対象**: `@ai-path/lattica-core`(validation, cellMeta), `@ai-path/lattica-react`(描画・編集ガード)
+- **対象**: `@ai-path/tb-core`(validation, cellMeta), `@ai-path/tb-react`(描画・編集ガード)
 - **主要API**: `setValidator(scope, fn|builtin)`, `getInvalidCells()`, `setReadOnly`, `setAlign`。非同期 validator 対応。
 - **AC**: 不正値で commit ブロック or 視覚フラグ（allowInvalid 設定）。read-only は編集不可。配置が描画反映。98%。
 
 ### Phase 4 — 対話 UX 基盤（選択・フィル・リサイズ・移動ハンドル）
 - **目的**: HoT の操作感を再現＋上回る。
-- **対象**: `@ai-path/lattica-react`(interaction/), `@ai-path/lattica-core`(selection 拡張)
+- **対象**: `@ai-path/tb-react`(interaction/), `@ai-path/tb-core`(selection 拡張)
 - **機能**:
   - **ドラッグ範囲選択**(mousedown→move→up)、**Ctrl/Cmd クリック複数範囲**、Shift 拡張、オートスクロール。
   - **フィルハンドル/オートフィル**: 連続データ推論(数値等差・日付・曜日・コピー・**超越: 数式相対参照の自動調整**)。
@@ -142,28 +142,28 @@
 
 ### Phase 5 — コンテキストメニュー ＋ ヘッダードロップダウンメニュー ＋ ショートカット登録
 - **目的**: 右クリックメニュー(行列挿入/削除・整列・read-only・コピー/貼付・結合 等)、列ヘッダーメニュー、キーバインド・レジストリ。
-- **対象**: `@ai-path/lattica-react`(menu/, shortcuts/)
+- **対象**: `@ai-path/tb-react`(menu/, shortcuts/)
 - **主要API**: `contextMenu: items | (ctx)=>items`、`registerShortcut(keymap, action, context)`。プラグインから項目追加可。
 - **AC**: メニュー項目の実行が Command 化(undo可)、キーマップ衝突解決、a11y(キーボード操作可)。98%。
 
 ### Phase 6 — 並べ替え（単一・複数列）  ※Phase1 依存
 - **目的**: 型別 comparator(数値/日付/文字/真偽)、複数列ソート、ヘッダークリック/メニュー、安定ソート、未ソート復帰。
-- **対象**: `@ai-path/lattica-data`(sort モデル via IndexMapper), `@ai-path/lattica-react`(UI/インジケータ)
+- **対象**: `@ai-path/tb-data`(sort モデル via IndexMapper), `@ai-path/tb-react`(UI/インジケータ)
 - **AC**: 型別比較が正確、複数列優先順位、ソート後も編集/数式参照整合。98%。
 
 ### Phase 7 — フィルタ（列フィルタ UI）  ※Phase1 依存
 - **目的**: 型適応フィルタ(条件式・値リスト・範囲・テキスト含む)、複合条件、フィルタ UI(ポップオーバー)。
-- **対象**: `@ai-path/lattica-data`(filter モデル), `@ai-path/lattica-react`(UI)
+- **対象**: `@ai-path/tb-data`(filter モデル), `@ai-path/tb-react`(UI)
 - **AC**: 各型の条件評価、AND/OR 複合、フィルタ＋ソート併用、表示行数整合。98%。
 
 ### Phase 8 — 隠す/トリム/移動/ネスト行  ※Phase1 依存
 - **目的**: 列/行の hide・trimRows、列/行 move(Phase4と統合)、**ネスト行(階層・展開折畳)**、行ヘッダーのグルーピング(rowspan)。
-- **対象**: `@ai-path/lattica-data`, `@ai-path/lattica-react`
+- **対象**: `@ai-path/tb-data`, `@ai-path/tb-react`
 - **AC**: hide/trim/move/nested が IndexMapper 経由で全機能と整合(数式・選択・コピー)。98%。
 
 ### Phase 9 — 結合セル（merge cells）
 - **目的**: 範囲結合(左上値保持)、描画(spanned rect)、選択/コピー/数式の結合考慮、解除。
-- **対象**: `@ai-path/lattica-core`(merge モデル), `@ai-path/lattica-react`(描画/ヒット)
+- **対象**: `@ai-path/tb-core`(merge モデル), `@ai-path/tb-react`(描画/ヒット)
 - **AC**: 結合セルの描画・選択・コピー・undo、重なり禁止検証。98%。
 
 ### Phase 10 — コメント・条件付き書式・カスタム枠線・列サマリ
@@ -172,42 +172,42 @@
   - **条件付き書式**(値ベースの背景/文字色/アイコン、ルールエンジン)。
   - **カスタム枠線**(per-cell 罫線)。
   - **列サマリ**(sum/avg/min/max/count、フッタ行、数式連携)。
-- **対象**: `@ai-path/lattica-core`(rules/comments/summary), `@ai-path/lattica-react`(描画)
+- **対象**: `@ai-path/tb-core`(rules/comments/summary), `@ai-path/tb-react`(描画)
 - **AC**: ルール評価が再計算と連動、コメント collab 同期、サマリが filter/sort 反映。98%。
 
 ### Phase 11 — 検索・ハイライト
 - **目的**: find(部分一致/正規表現/型考慮)、ヒットハイライト描画、次/前ナビ、置換(超越)。
-- **対象**: `@ai-path/lattica-core`(search), `@ai-path/lattica-react`(ハイライト)
+- **対象**: `@ai-path/tb-core`(search), `@ai-path/tb-react`(ハイライト)
 - **AC**: 検索結果走査、ハイライト描画、置換の undo。98%。
 
 ### Phase 12 — 数式エンジン拡張（HoT/HyperFormula 超え）
 - **目的**: 関数を **280+→ 最終 400+** へ、**名前付き範囲**、**R1C1 記法**、**配列数式/スピル**、**複数シート参照**、エラートレース。
-- **対象**: `@ai-path/lattica-formula`
+- **対象**: `@ai-path/tb-formula`
 - **AC**: 追加関数の Excel 互換テスト、名前付き範囲の依存解決、スピル領域の再計算、循環/エラー伝播維持。98%。
 
 ### Phase 13 — IO 拡張: XLSX インポート ＋ スタイル往復 ＋ JSON
 - **目的**: **XLSX 読込**(DEFLATE inflate を自前実装→stored/deflate 両対応)、セル値・数式・書式・結合・列幅の往復、JSON 入出力、CSV 方言。
-- **対象**: `@ai-path/lattica-io`(inflate.ts, xlsx-read.ts)
+- **対象**: `@ai-path/tb-io`(inflate.ts, xlsx-read.ts)
 - **AC**: 代表 .xlsx の読込→Lattice→書出しで値/数式/結合が保存、巨大ファイルのストリーミング。98%。
 
 ### Phase 14 — 自動サイズ・ストレッチ・折返し可変行高
 - **目的**: autoColumnSize / autoRowSize(内容計測)、stretchH(幅フィット)、wordWrap・複数行セル・自動行高描画(Canvas テキスト計測)。
-- **対象**: `@ai-path/lattica-react`(measure.ts), `@ai-path/lattica-core`(SizeManager 連携)
+- **対象**: `@ai-path/tb-react`(measure.ts), `@ai-path/tb-core`(SizeManager 連携)
 - **AC**: 計測が DPR/フォント考慮で正確、可変行高で仮想化整合。98%。
 
 ### Phase 15 — 国際化・RTL・テーマ
 - **目的**: i18n(UI 文言・数値/日付ロケール書式)、RTL/layoutDirection、プリセットテーマ(light/dark/high-contrast)＋トークン化。
-- **対象**: `@ai-path/lattica-react`(i18n/, themes/)
+- **対象**: `@ai-path/tb-react`(i18n/, themes/)
 - **AC**: ロケール別書式、RTL レイアウト/ヒット反転、テーマ切替で全描画反映。98%。
 
 ### Phase 16 — フルアクセシビリティ
 - **目的**: ARIA grid 完全準拠(可視セルの aria-rowindex/colindex ミラー)、navigableHeaders、tabNavigation、スクリーンリーダ読み上げ、imeFastEdit、フォーカスリング。
-- **対象**: `@ai-path/lattica-react`(a11y/)
+- **対象**: `@ai-path/tb-react`(a11y/)
 - **AC**: 主要 SR(VoiceOver/NVDA 想定)でセル位置/値読み上げ、キーボードのみで全操作。axe 検査 + Playwright a11y。
 
 ### Phase 17 — フック/イベント体系 ＋ 永続状態 ＋ プラグイン API
 - **目的**: HoT 相当の豊富なフック(before/after CRUD・選択・描画…)を型安全に、persistentState(列幅/順/ソート/フィルタを storage 保存)、公式プラグイン API。
-- **対象**: `@ai-path/lattica-core`(hooks), `@ai-path/lattica-react`
+- **対象**: `@ai-path/tb-core`(hooks), `@ai-path/tb-react`
 - **AC**: フック発火順序保証・キャンセル可能フック、状態復元、外部プラグイン登録。98%。
 
 ### Phase 18 — 性能・ベンチ・ドキュメントサイト・E2E
@@ -228,7 +228,7 @@
 > - **ストリーミング**: 逐次反映＋キャンセル。**コスト/トークン上限**を必ず数値設定。
 > - **セキュリティ**: 送信前 PII マスキング、外部 URL allowlist、機密は Vault/env 経由。
 
-### Phase A1 — `@ai-path/lattica-ai` 基盤
+### Phase A1 — `@ai-path/tb-ai` 基盤
 - **目的**: AI 層の土台。provider 抽象、`AICommand`、ストリーミング、構造化出力、来歴、承認 UI フック、レート/コスト制御。
 - **主要API**: `createAIClient({ model, gateway, limits })`, `AICommand`(core Command 拡張), `withProvenance`, `useAIReview()`(差分承認)。
 - **AC**: モック provider で全フロー(生成→検証→Command→undo→provenance記録)テスト。98%(provider I/O はモック)。
@@ -271,7 +271,7 @@
 - **目的**: 選択範囲の要約、セル/列の翻訳(i18n連携)、自動カテゴリ分類(tag セル型へ)。
 - **AC**: バッチ処理・上限制御・来歴、結果のセル型整合。
 
-### Phase A11 — `@ai-path/lattica-mcp`（エージェント公開）
+### Phase A11 — `@ai-path/tb-mcp`（エージェント公開）
 - **目的**: MCP サーバとしてグリッドを外部 AI エージェントに公開。read/write/query/compute/transform をツール化。Quartet/Sibyl からの操作を想定。
 - **AC**: ツールスキーマ(構造化)、書込みは AICommand 経由で undo/承認、監査ログ、認可。
 - **セキュリティ**: 認可スコープ、書込み承認モード、機密マスク。
