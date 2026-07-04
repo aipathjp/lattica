@@ -229,6 +229,98 @@ describe('buildScene visual conditional formatting', () => {
   });
 });
 
+describe('buildScene cell meta (P0-1)', () => {
+  const base = (over: Partial<BuildSceneParams> = {}): BuildSceneParams => ({
+    geom: geom(),
+    scrollLeft: 0,
+    scrollTop: 0,
+    clientWidth: 200,
+    clientHeight: 100,
+    selection: new SelectionModel({ rowCount: 100, colCount: 100 }),
+    getDisplay: () => '5',
+    ...over,
+  });
+
+  it('meta background/color override cf, visual, and base styles; fontWeight propagates', () => {
+    const scene = buildScene(
+      base({
+        getBaseStyle: () => ({ background: '#f8f8f8' }),
+        getCfStyle: () => ({ background: '#fee', color: '#900' }),
+        getVisual: () => ({ background: '#808080' }),
+        getCellMeta: (r, c) =>
+          r === 0 && c === 0
+            ? { background: '#dbeafe', color: '#1e3a8a', fontWeight: 'bold' }
+            : null,
+      }),
+    );
+    const meta = scene.cells.find((k) => k.row === 0 && k.col === 0)!;
+    expect(meta.cfStyle).toEqual({ background: '#dbeafe', color: '#1e3a8a' });
+    expect(meta.fontWeight).toBe('bold');
+    // Cells without meta keep the cf/visual layering untouched.
+    const plain = scene.cells.find((k) => k.row === 1 && k.col === 1)!;
+    expect(plain.cfStyle).toEqual({ background: '#fee', color: '#900' });
+    expect(plain.fontWeight).toBeUndefined();
+  });
+
+  it('partial meta merges over the existing style instead of replacing it', () => {
+    const scene = buildScene(
+      base({
+        getCfStyle: () => ({ background: '#fee', color: '#900' }),
+        getCellMeta: (_r, c) =>
+          c === 0 ? { background: '#fef9c3' } : c === 1 ? { color: '#1d4ed8' } : null,
+      }),
+    );
+    expect(scene.cells.find((k) => k.row === 0 && k.col === 0)!.cfStyle).toEqual({
+      background: '#fef9c3',
+      color: '#900',
+    });
+    expect(scene.cells.find((k) => k.row === 0 && k.col === 1)!.cfStyle).toEqual({
+      background: '#fee',
+      color: '#1d4ed8',
+    });
+  });
+
+  it('creates a style for meta-only cells and keeps selection flags intact', () => {
+    const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
+    sel.setActive({ row: 0, col: 0 });
+    const scene = buildScene(
+      base({
+        selection: sel,
+        getCellMeta: (r, c) =>
+          r === 0 && c === 0
+            ? { background: '#fecaca' }
+            : r === 0 && c === 1
+              ? { color: '#7f1d1d' }
+              : null,
+      }),
+    );
+    const cell = scene.cells.find((k) => k.row === 0 && k.col === 0)!;
+    expect(cell.cfStyle).toEqual({ background: '#fecaca' });
+    // A color-only meta on an otherwise unstyled cell also creates the style.
+    expect(scene.cells.find((k) => k.row === 0 && k.col === 1)!.cfStyle).toEqual({ color: '#7f1d1d' });
+    // Selection/active visuals stay above cell meta: flags are untouched, so
+    // the painter still draws the tint and border over the meta background.
+    expect(cell.selected).toBe(true);
+    expect(cell.active).toBe(true);
+    expect(scene.activeRect).not.toBeNull();
+  });
+
+  it('re-reads the provider each build, so external-state changes repaint on the next frame', () => {
+    const pending = new Map<string, string>();
+    const params = base({
+      getCellMeta: (r, c) => {
+        const background = pending.get(`${r},${c}`);
+        return background === undefined ? null : { background };
+      },
+    });
+    expect(buildScene(params).cells[0]!.cfStyle).toBeUndefined();
+    pending.set('0,0', '#dbeafe');
+    expect(buildScene(params).cells[0]!.cfStyle).toEqual({ background: '#dbeafe' });
+    pending.set('0,0', '#fecaca');
+    expect(buildScene(params).cells[0]!.cfStyle).toEqual({ background: '#fecaca' });
+  });
+});
+
 describe('buildScene text wrapping', () => {
   /** Deterministic measurer: 7px per character. Column width is 50. */
   const measure: MeasureText = (t) => t.length * 7;

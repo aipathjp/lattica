@@ -218,6 +218,36 @@ export type DisplayOverride = (
 ) => string | null;
 
 /**
+ * Per-cell metadata returned by a {@link CellMetaProvider} (Handsontable
+ * `cells()` 相当). Presentation fields (`background` / `color` / `fontWeight`)
+ * are merged into the paint pipeline **above** conditional-format, search, and
+ * validation styles but **below** the selection tint and the active-cell
+ * border. `readOnly: true` is OR-composed with
+ * {@link GridController.setCellReadOnly} and
+ * {@link GridController.setColumnEditable} inside
+ * {@link GridController.isCellEditable} — any of the three can lock a cell.
+ */
+export interface CellMeta {
+  /** Cell background color (wins over conditional-format backgrounds). */
+  background?: string;
+  /** Cell text color (wins over conditional-format text colors). */
+  color?: string;
+  /** Font weight for the painted cell text. Default `'normal'`. */
+  fontWeight?: 'bold' | 'normal';
+  /** When true the cell is read-only regardless of column/cell editability. */
+  readOnly?: boolean;
+}
+
+/**
+ * Cell-meta provider. Called with **physical** (data) coordinates on every
+ * scene build, so meta derived from external state (a pending-save Map, an
+ * audit diff…) is re-read each frame — call
+ * {@link GridController.refreshCellMeta} after mutating that state to force a
+ * repaint. Return null for "no meta on this cell".
+ */
+export type CellMetaProvider = (physicalRow: number, physicalCol: number) => CellMeta | null;
+
+/**
  * Per-column behavior options attached alongside the cell type via
  * {@link GridController.setColumnType}. Currently these tune the `time`
  * input pipeline; see {@link TimeInputOptions}.
@@ -429,6 +459,8 @@ export class GridController {
   private readonly searchKeys = new Set<string>();
   /** Display-only text override (audit snapshots, per-column formatting…). */
   private displayOverride: DisplayOverride | null = null;
+  /** Per-cell meta provider (style + readOnly), keyed by physical coords. */
+  private cellMetaProvider: CellMetaProvider | null = null;
   private readonly emitter = new Emitter<ControllerEvents>();
   private suppressChangeEvents = false;
 
@@ -1212,6 +1244,46 @@ export class GridController {
     return this.displayOverride;
   }
 
+  /**
+   * Set (or clear with `null`) the per-cell meta provider (Handsontable
+   * `cells()` 相当). The provider receives **physical** (data) coordinates and
+   * is consulted on every scene build, so external state it reads is
+   * re-applied each frame. Its `background`/`color`/`fontWeight` paint above
+   * conditional formats and below the selection visuals; `readOnly` feeds
+   * {@link isCellEditable}. Emits a change so the grid repaints immediately.
+   */
+  setCellMetaProvider(fn: CellMetaProvider | null): void {
+    this.cellMetaProvider = fn;
+    this.emitter.emit('change', undefined);
+  }
+
+  /** The current cell-meta provider, or null when none is set. */
+  getCellMetaProvider(): CellMetaProvider | null {
+    return this.cellMetaProvider;
+  }
+
+  /**
+   * Meta for a (visual) cell from the current provider, or null when no
+   * provider is set or the provider has no meta for the cell. Maps visual →
+   * physical coordinates before calling the provider.
+   */
+  getCellMeta(visualRow: number, visualCol: number): CellMeta | null {
+    if (this.cellMetaProvider === null) {
+      return null;
+    }
+    const p = this.toPhysical(visualRow, visualCol);
+    return this.cellMetaProvider(p.row, p.col);
+  }
+
+  /**
+   * Force a repaint after external state consulted by the cell-meta provider
+   * (e.g. a pending-save Map) changes. The provider itself is unchanged — the
+   * next scene build simply re-reads it for every visible cell.
+   */
+  refreshCellMeta(): void {
+    this.emitter.emit('change', undefined);
+  }
+
   /** Raw computed value of a cell (for value-based renderers / formatting). */
   getValue(row: number, col: number): unknown {
     const v = this.engine.getValue(this.toPhysical(row, col));
@@ -1389,6 +1461,11 @@ export class GridController {
   isCellEditable(visualRow: number, visualCol: number): boolean {
     const p = this.toPhysical(visualRow, visualCol);
     if (this.cellReadOnly.has(`${p.row},${p.col}`)) {
+      return false;
+    }
+    // Cell-meta readOnly OR-composes with setCellReadOnly / setColumnEditable:
+    // any of the three locks the cell.
+    if (this.cellMetaProvider !== null && this.cellMetaProvider(p.row, p.col)?.readOnly === true) {
       return false;
     }
     return this.columnEditable.get(p.col) ?? true;

@@ -1699,6 +1699,82 @@ describe('display override', () => {
   });
 });
 
+describe('cell meta provider (P0-1)', () => {
+  it('emits change on set and clear, and exposes the current provider', () => {
+    const c = make();
+    const change = vi.fn();
+    c.on('change', change);
+    const provider = () => null;
+    c.setCellMetaProvider(provider);
+    expect(change).toHaveBeenCalledTimes(1);
+    expect(c.getCellMetaProvider()).toBe(provider);
+    c.setCellMetaProvider(null);
+    expect(change).toHaveBeenCalledTimes(2);
+    expect(c.getCellMetaProvider()).toBeNull();
+  });
+
+  it('getCellMeta returns null without a provider and maps visual → physical coordinates', () => {
+    const c = make();
+    expect(c.getCellMeta(0, 0)).toBeNull();
+    c.setData([[3], [1], [2]]);
+    const seen: [number, number][] = [];
+    c.setCellMetaProvider((row, col) => {
+      seen.push([row, col]);
+      return row === 1 ? { background: '#dbeafe' } : null;
+    });
+    c.toggleSort(0); // ascending: visual row 0 → physical row 1
+    seen.length = 0;
+    expect(c.getCellMeta(0, 0)).toEqual({ background: '#dbeafe' });
+    expect(seen).toEqual([[1, 0]]);
+    expect(c.getCellMeta(1, 0)).toBeNull(); // physical row 2 → no meta
+  });
+
+  it('OR-composes provider readOnly with setCellReadOnly and setColumnEditable', () => {
+    const c = make();
+    // Provider readOnly locks the cell even though column/cell allow editing.
+    c.setCellMetaProvider((row, col) => (row === 0 && col === 0 ? { readOnly: true } : null));
+    expect(c.isCellEditable(0, 0)).toBe(false);
+    c.beginEdit(0, 0);
+    expect(c.getEdit()).toBeNull();
+    // Meta without readOnly (or null meta) leaves the other gates in charge.
+    expect(c.isCellEditable(0, 1)).toBe(true);
+    c.setCellMetaProvider((row, col) => (row === 0 && col === 1 ? { background: '#fee' } : null));
+    expect(c.isCellEditable(0, 0)).toBe(true);
+    expect(c.isCellEditable(0, 1)).toBe(true);
+    // setCellReadOnly still wins on its own…
+    c.setCellReadOnly(0, 1, true);
+    expect(c.isCellEditable(0, 1)).toBe(false);
+    // …and so does setColumnEditable(false).
+    c.setColumnEditable(2, false);
+    expect(c.isCellEditable(0, 2)).toBe(false);
+  });
+
+  it('re-reads external state on refreshCellMeta (pending-Map highlight scenario)', () => {
+    const c = make();
+    const pending = new Map<string, string>();
+    c.setCellMetaProvider((row, col) => {
+      const background = pending.get(`${row},${col}`);
+      return background === undefined ? null : { background, readOnly: true };
+    });
+    expect(c.getCellMeta(1, 1)).toBeNull();
+    expect(c.isCellEditable(1, 1)).toBe(true);
+
+    const change = vi.fn();
+    c.on('change', change);
+    pending.set('1,1', '#dbeafe'); // unsaved cell → blue highlight + lock
+    c.refreshCellMeta();
+    expect(change).toHaveBeenCalledTimes(1);
+    expect(c.getCellMeta(1, 1)).toEqual({ background: '#dbeafe', readOnly: true });
+    expect(c.isCellEditable(1, 1)).toBe(false);
+
+    pending.delete('1,1'); // saved → back to normal
+    c.refreshCellMeta();
+    expect(change).toHaveBeenCalledTimes(2);
+    expect(c.getCellMeta(1, 1)).toBeNull();
+    expect(c.isCellEditable(1, 1)).toBe(true);
+  });
+});
+
 describe('GridController comments', () => {
   it('sets, reads, and deletes comments, emitting change on mutations only', () => {
     const c = new GridController({ rowCount: 3, colCount: 2 });

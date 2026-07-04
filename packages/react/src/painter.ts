@@ -236,22 +236,33 @@ function paintCell(
     drawIcon(ctx, cell.icon, rect.x + theme.cellPaddingX, rect.y + rect.height / 2, theme);
   }
 
+  // Cell-meta bold text: swap the canvas font for this cell's text paint only,
+  // then restore the theme font so subsequent cells are unaffected.
+  const bold = cell.fontWeight === 'bold';
+  if (bold) {
+    ctx.font = `bold ${theme.fontSize}px ${theme.fontFamily}`;
+  }
   // Wrapped text (built by the scene for wrap columns) replaces the default
   // single-line text path; typed/custom renderers never receive `lines`.
   if (cell.lines !== undefined) {
     paintWrappedText(ctx, rect, cell.lines, theme, cell.align ?? 'left', cell.cfStyle?.color);
+  } else {
+    registry.resolve(cell.type)({
+      ctx,
+      rect,
+      value: cell.value ?? cell.text,
+      text: cell.text,
+      theme,
+      align: cell.align ?? 'left',
+      color: cell.cfStyle?.color,
+    });
+  }
+  if (bold) {
+    ctx.font = `${theme.fontSize}px ${theme.fontFamily}`;
+  }
+  if (cell.lines !== undefined) {
     return;
   }
-
-  registry.resolve(cell.type)({
-    ctx,
-    rect,
-    value: cell.value ?? cell.text,
-    text: cell.text,
-    theme,
-    align: cell.align ?? 'left',
-    color: cell.cfStyle?.color,
-  });
 
   // Comment marker: a small triangle in the top-right corner, over the content.
   if (cell.comment === true) {

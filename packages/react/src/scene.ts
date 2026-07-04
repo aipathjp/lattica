@@ -31,6 +31,8 @@ export interface CellPaint {
   value?: unknown;
   /** Conditional-format style for this cell, if any. */
   cfStyle?: { background?: string; color?: string };
+  /** Font weight for the cell text (from cell meta). Default normal. */
+  fontWeight?: 'bold' | 'normal';
   /** In-cell data bar (ratio 0..1 + color), if any. */
   bar?: { ratio: number; color: string };
   /** Icon-set mark to draw at the cell's left, if any. */
@@ -81,6 +83,14 @@ export interface BuildSceneParams {
   getCfStyle?: (row: number, col: number) => { background?: string; color?: string } | null;
   /** Lowest-priority per-cell style, below conditional formats and visual rules. */
   getBaseStyle?: (row: number, col: number) => { background?: string; color?: string } | null;
+  /** Per-cell meta style (background / color / fontWeight). Highest-priority
+   *  cell style: it overrides conditional-format, search, validation, and
+   *  visual-rule styles, but stays below the selection tint and the active
+   *  border (both painted later, over the cell background). */
+  getCellMeta?: (
+    row: number,
+    col: number,
+  ) => { background?: string; color?: string; fontWeight?: 'bold' | 'normal' } | null;
   /** Visual conditional-format accessor (color scale / data bar / icon set). */
   getVisual?: (row: number, col: number) => CellVisual | null;
   /** Sparkline accessor; receives the cell size for layout. */
@@ -190,6 +200,16 @@ export function buildScene(params: BuildSceneParams): Scene {
       if (visual?.background !== undefined) {
         cfStyle = { ...(cfStyle ?? {}), background: explicitStyle?.background ?? visual.background };
       }
+      // Cell meta is the top style layer (re-read every scene build): its
+      // background/color win over cf/search/invalid/visual styles. Selection
+      // tint and the active border still paint over it.
+      const meta = params.getCellMeta?.(row, col) ?? null;
+      if (meta?.background !== undefined) {
+        cfStyle = { ...(cfStyle ?? {}), background: meta.background };
+      }
+      if (meta?.color !== undefined) {
+        cfStyle = { ...(cfStyle ?? {}), color: meta.color };
+      }
       const cell: CellPaint = {
         row,
         col,
@@ -201,6 +221,7 @@ export function buildScene(params: BuildSceneParams): Scene {
         align: params.getAlign?.(row, col),
         value: params.getValue?.(row, col),
         cfStyle,
+        fontWeight: meta?.fontWeight,
         bar: visual?.bar,
         icon: visual?.icon,
         sparkline: params.getSparkline?.(row, col, rect.width, rect.height) ?? undefined,
