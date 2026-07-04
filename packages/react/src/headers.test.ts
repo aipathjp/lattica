@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SizeManager, computeHeaderLayout, type ColumnNode } from '@ai-path/tb-core';
-import { columnHeaderCells, rowHeaderCells } from './headers.js';
+import { columnHeaderCells, computeHeaderRowHeights, rowHeaderCells } from './headers.js';
 import type { GridGeometry } from './geometry.js';
 
 const geom = (overrides: Partial<GridGeometry> = {}): GridGeometry => ({
@@ -106,6 +106,70 @@ describe('columnHeaderCells (multi-level)', () => {
     const g = cells.find((c) => c.id === 'g')!;
     expect(g.collapsible).toBe(true);
     expect(g.collapsed).toBe(false);
+  });
+});
+
+describe('computeHeaderRowHeights', () => {
+  const opts = { baseHeight: 24, lineHeight: 16, paddingY: 3 };
+
+  it('returns the base height when there is no layout', () => {
+    expect(computeHeaderRowHeights(null, opts)).toEqual({ rows: [24], total: 24 });
+  });
+
+  it('returns the base height for a zero-depth layout', () => {
+    expect(computeHeaderRowHeights(computeHeaderLayout([]), opts)).toEqual({ rows: [24], total: 24 });
+  });
+
+  it('keeps the legacy uniform band for single-line layouts', () => {
+    const layout = computeHeaderLayout([
+      { headerName: 'A' },
+      { headerName: 'G', children: [{ headerName: 'B' }] },
+    ]);
+    expect(computeHeaderRowHeights(layout, opts)).toEqual({ rows: [12, 12], total: 24 });
+  });
+
+  it('expands rows containing multi-line labels', () => {
+    const layout = computeHeaderLayout([
+      { headerName: 'G', children: [{ headerName: 'a\nb' }] },
+    ]);
+    // depth 2, band 12; row 1 needs 2 lines -> max(12, 2*16 + 2*3) = 38.
+    expect(computeHeaderRowHeights(layout, opts)).toEqual({ rows: [12, 38], total: 50 });
+  });
+
+  it('never shrinks a multi-line row below its band', () => {
+    const layout = computeHeaderLayout([{ headerName: 'x\ny' }]);
+    const tall = computeHeaderRowHeights(layout, { baseHeight: 100, lineHeight: 16, paddingY: 3 });
+    expect(tall).toEqual({ rows: [100], total: 100 });
+  });
+});
+
+describe('columnHeaderCells (per-row heights)', () => {
+  const cols: ColumnNode[] = [
+    { headerName: 'A', field: 'a' },
+    { headerName: 'Group', children: [{ headerName: 'B\nb' }, { headerName: 'C' }] },
+  ];
+
+  it('positions cells with uneven row heights', () => {
+    const layout = computeHeaderLayout(cols);
+    const cells = columnHeaderCells(geom(), 0, [0, 1, 2], layout, undefined, [10, 30]);
+    const group = cells.find((c) => c.label === 'Group')!;
+    expect(group.y).toBe(0);
+    expect(group.height).toBe(10);
+    const leafB = cells.find((c) => c.label === 'B\nb')!;
+    expect(leafB.y).toBe(10);
+    expect(leafB.height).toBe(30);
+    // Top-level leaf spans both rows -> full 40px.
+    const leafA = cells.find((c) => c.label === 'A')!;
+    expect(leafA.y).toBe(0);
+    expect(leafA.height).toBe(40);
+  });
+
+  it('falls back to the uniform band for rows missing from rowHeights', () => {
+    const layout = computeHeaderLayout(cols);
+    // Only row 0 supplied; row 1 falls back to geom.colHeaderHeight / depth = 12.
+    const cells = columnHeaderCells(geom(), 0, [0, 1, 2], layout, undefined, [10]);
+    expect(cells.find((c) => c.label === 'C')!.height).toBe(12);
+    expect(cells.find((c) => c.label === 'A')!.height).toBe(22);
   });
 });
 

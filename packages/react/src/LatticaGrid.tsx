@@ -25,13 +25,18 @@ import {
 } from 'react';
 import { HeaderModel, isGroup, type ColumnDef, type ColumnNode, type GridStateSnapshot } from '@ai-path/tb-core';
 import type { CellCommitEvent, GridController, EditState } from './controller.js';
-import { resolveTheme, type GridTheme } from './theme.js';
+import {
+  DEFAULT_HEADER_LINE_HEIGHT,
+  DEFAULT_HEADER_PADDING_Y,
+  resolveTheme,
+  type GridTheme,
+} from './theme.js';
 import { buildScene } from './scene.js';
 import { paintScene, type Canvas2D } from './painter.js';
 import { cellRect, columnX, hitTest, type GridGeometry, type HitResult } from './geometry.js';
 import { interpretKey, type KeyInput } from './keyboard.js';
 import { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
-import { columnHeaderCells, rowHeaderCells } from './headers.js';
+import { columnHeaderCells, computeHeaderRowHeights, rowHeaderCells } from './headers.js';
 import { buildMenu, type MenuItem, type MenuItemSpec } from './menu.js';
 import { hitResizeHandle, type ResizeTarget } from './resize.js';
 
@@ -185,7 +190,31 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   const [measured, setMeasured] = useState<{ w: number; h: number } | null>(null);
   const [, force] = useReducer((n: number) => n + 1, 0);
 
-  const geom = effectiveGeometry(controller.geometry(), showRowNumbers);
+  const headerModelRef = useRef<HeaderModel | null>(null);
+  if (columns !== undefined && headerModelRef.current === null) {
+    headerModelRef.current = new HeaderModel(columns);
+  }
+  const layout = headerModelRef.current?.getLayout() ?? null;
+
+  // Multi-line header labels ("\n" in headerName) expand their header row by
+  // headerLineHeight per extra line; single-line layouts keep the base band.
+  const headerLineHeight = theme.headerLineHeight ?? DEFAULT_HEADER_LINE_HEIGHT;
+  const headerPaddingY = theme.headerPaddingY ?? DEFAULT_HEADER_PADDING_Y;
+  const headerHeights = computeHeaderRowHeights(layout, {
+    baseHeight: controller.getBaseHeaderHeight(),
+    lineHeight: headerLineHeight,
+    paddingY: headerPaddingY,
+  });
+  const geom = {
+    ...effectiveGeometry(controller.geometry(), showRowNumbers),
+    colHeaderHeight: headerHeights.total,
+  };
+
+  // Keep the controller's effective header height in sync so external strip
+  // UIs can align via controller.getHeaderHeight(). No-op when unchanged.
+  useEffect(() => {
+    controller.setHeaderHeight(headerHeights.total);
+  }, [controller, headerHeights.total]);
   const contentWidth = geom.rowHeaderWidth + geom.colSizes.getTotalSize();
   const contentHeight = geom.colHeaderHeight + geom.rowSizes.getTotalSize();
   // Sizing priority: autoSize='content' ignores width/height/fill, then fill,
@@ -230,11 +259,6 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     ro.observe(el);
     return () => ro.disconnect();
   }, [autoSize, fill]);
-
-  const headerModelRef = useRef<HeaderModel | null>(null);
-  if (columns !== undefined && headerModelRef.current === null) {
-    headerModelRef.current = new HeaderModel(columns);
-  }
 
   useEffect(() => {
     if (rows === undefined || columns === undefined) {
@@ -709,7 +733,6 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     [geom, width, height],
   );
 
-  const layout = headerModelRef.current?.getLayout() ?? null;
   const scene = buildScene({
     geom,
     scrollLeft: scroll.left,
@@ -732,8 +755,13 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     getCfStyle: (r, c) => controller.getCellStyle(r, c),
     getMerge: (r, c) => controller.getMerge(r, c),
   });
-  const colHeaders = columnHeaderCells(geom, scroll.left, scene.visibleCols, layout, (leaf) =>
-    controller.view.cols.getVisualIndex(leaf),
+  const colHeaders = columnHeaderCells(
+    geom,
+    scroll.left,
+    scene.visibleCols,
+    layout,
+    (leaf) => controller.view.cols.getVisualIndex(leaf),
+    headerHeights.rows,
   );
   const rowHeaders = rowHeaderCells(geom, scroll.top, scene.visibleRows);
 
@@ -993,6 +1021,10 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
               alignItems: 'center',
               justifyContent: h.isGroup ? 'center' : 'flex-start',
               paddingLeft: h.isGroup ? 0 : theme.cellPaddingX,
+              paddingTop: headerPaddingY,
+              paddingBottom: headerPaddingY,
+              whiteSpace: 'pre-line',
+              lineHeight: `${headerLineHeight}px`,
               fontFamily: theme.fontFamily,
               fontSize: theme.fontSize,
               color: theme.headerTextColor,

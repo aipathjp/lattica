@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { defaultTheme, resolveTheme, buildTheme } from './theme.js';
+import {
+  defaultTheme,
+  resolveTheme,
+  buildTheme,
+  DEFAULT_HEADER_LINE_HEIGHT,
+  DEFAULT_HEADER_PADDING_Y,
+} from './theme.js';
 import { darkPalette } from './palette.js';
 import { compactDensity } from './density.js';
 
@@ -50,5 +56,22 @@ describe('buildTheme', () => {
 
   it('produces exactly the GridTheme key set', () => {
     expect(Object.keys(buildTheme({ palette: 'sepia' })).sort()).toEqual(Object.keys(defaultTheme).sort());
+  });
+});
+
+describe('header tokens', () => {
+  it('ships header line-height and padding defaults', () => {
+    expect(defaultTheme.headerLineHeight).toBe(DEFAULT_HEADER_LINE_HEIGHT);
+    expect(defaultTheme.headerPaddingY).toBe(DEFAULT_HEADER_PADDING_Y);
+    expect(buildTheme().headerLineHeight).toBe(DEFAULT_HEADER_LINE_HEIGHT);
+    expect(buildTheme().headerPaddingY).toBe(DEFAULT_HEADER_PADDING_Y);
+  });
+
+  it('is overridable via resolveTheme and buildTheme overrides', () => {
+    expect(resolveTheme({ headerLineHeight: 20 }).headerLineHeight).toBe(20);
+    expect(resolveTheme({ headerPaddingY: 8 }).headerPaddingY).toBe(8);
+    const built = buildTheme({ overrides: { headerLineHeight: 18, headerPaddingY: 6 } });
+    expect(built.headerLineHeight).toBe(18);
+    expect(built.headerPaddingY).toBe(6);
   });
 });

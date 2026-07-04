@@ -11,6 +11,19 @@
  * `'open'` children and a expanded group hides its `'closed'` children. This
  * is more flexible than a fixed two-state header and supports row-header
  * grouping by reusing the same flattening over a transposed tree.
+ *
+ * Two layout affordances support multi-line / unit-row headers:
+ *
+ * - **Multi-line labels** — a `headerName` may contain `"\n"`; renderers show
+ *   it as line breaks (`white-space: pre-line`). {@link HeaderLayout.rowLineCounts}
+ *   reports, per header row, the number of label lines that must fit so the
+ *   renderer can auto-expand row heights.
+ * - **Unit-less columns** — a leaf placed directly at a shallower depth (the
+ *   recommended form: simply omit the unit level) gets a `rowSpan` down to the
+ *   bottom header row. As an equivalent normalization, a non-collapsible group
+ *   whose only child is a leaf with an empty `headerName` is *absorbed*: no
+ *   empty unit cell is emitted and the parent cell extends down instead,
+ *   keeping the child's leaf metadata (`field` etc.).
  */
 
 /** Visibility rule for a node relative to its parent group's collapse state. */
@@ -87,6 +100,13 @@ export interface HeaderLayout {
   readonly leaves: readonly VisibleLeaf[];
   /** Number of header rows. */
   readonly depth: number;
+  /**
+   * Per header row (top to bottom), the maximum number of `"\n"`-separated
+   * label lines that must fit in that row. A cell spanning several rows
+   * distributes its lines evenly across them (`ceil(lines / rowSpan)`).
+   * Always `1` for single-line labels; length equals {@link depth}.
+   */
+  readonly rowLineCounts: readonly number[];
 }
 
 /** Derive a stable id from a node's path when one is not supplied. */
@@ -152,8 +172,25 @@ function buildVisible(
   return { node, id, collapsedSelf: selfCollapsed, children };
 }
 
+/**
+ * A non-collapsible group whose only visible child is a leaf with an empty
+ * `headerName` is *absorbed*: the group renders as a single leaf-like cell
+ * (keeping the child's column metadata) that spans down to the bottom header
+ * row, instead of emitting an empty unit cell. Collapsible groups are never
+ * absorbed so their toggle chevron stays reachable.
+ */
+function isAbsorbedGroup(vn: VisibleNode): boolean {
+  return (
+    isGroup(vn.node) &&
+    vn.node.collapsible !== true &&
+    vn.children.length === 1 &&
+    vn.children[0]!.children.length === 0 &&
+    (vn.children[0]!.node as ColumnDef).headerName === ''
+  );
+}
+
 function heightOf(vn: VisibleNode): number {
-  if (vn.children.length === 0) {
+  if (vn.children.length === 0 || isAbsorbedGroup(vn)) {
     return 1;
   }
   let max = 0;
@@ -161,6 +198,17 @@ function heightOf(vn: VisibleNode): number {
     max = Math.max(max, heightOf(child));
   }
   return 1 + max;
+}
+
+/** Number of `"\n"`-separated lines in a header label (at least 1). */
+function labelLineCount(label: string): number {
+  let count = 1;
+  for (let i = 0; i < label.length; i++) {
+    if (label[i] === '\n') {
+      count++;
+    }
+  }
+  return count;
 }
 
 /**
@@ -183,7 +231,7 @@ export function computeHeaderLayout(
   });
 
   if (visible.length === 0) {
-    return { rows: [], leaves: [], depth: 0 };
+    return { rows: [], leaves: [], depth: 0, rowLineCounts: [] };
   }
 
   const totalRows = visible.reduce((m, vn) => Math.max(m, heightOf(vn)), 0);
@@ -191,23 +239,34 @@ export function computeHeaderLayout(
   const leaves: VisibleLeaf[] = [];
   let leafCounter = 0;
 
+  const emitLeafCell = (id: string, label: string, def: ColumnDef, depth: number): void => {
+    const leafIndex = leafCounter++;
+    leaves.push({ id, def, leafIndex });
+    rows[depth]!.push({
+      id,
+      label,
+      depth,
+      rowSpan: totalRows - depth,
+      startLeaf: leafIndex,
+      endLeaf: leafIndex + 1,
+      colSpan: 1,
+      isGroup: false,
+      collapsible: false,
+      collapsed: false,
+    });
+  };
+
   const emit = (vn: VisibleNode, depth: number): void => {
     if (vn.children.length === 0) {
-      const leafIndex = leafCounter++;
       const def = vn.node as ColumnDef;
-      leaves.push({ id: vn.id, def, leafIndex });
-      rows[depth]!.push({
-        id: vn.id,
-        label: def.headerName,
-        depth,
-        rowSpan: totalRows - depth,
-        startLeaf: leafIndex,
-        endLeaf: leafIndex + 1,
-        colSpan: 1,
-        isGroup: false,
-        collapsible: false,
-        collapsed: false,
-      });
+      emitLeafCell(vn.id, def.headerName, def, depth);
+      return;
+    }
+    if (isAbsorbedGroup(vn)) {
+      // Unit-less column written as `group('Item') → leaf('')`: keep the
+      // child's leaf metadata but label the merged cell with the group name.
+      const child = vn.children[0]!;
+      emitLeafCell(child.id, vn.node.headerName, child.node as ColumnDef, depth);
       return;
     }
     const start = leafCounter;
@@ -234,7 +293,17 @@ export function computeHeaderLayout(
     emit(vn, 0);
   }
 
-  return { rows, leaves, depth: totalRows };
+  const rowLineCounts: number[] = Array.from({ length: totalRows }, () => 1);
+  for (const row of rows) {
+    for (const cell of row) {
+      const perRow = Math.ceil(labelLineCount(cell.label) / cell.rowSpan);
+      for (let r = cell.depth; r < cell.depth + cell.rowSpan; r++) {
+        rowLineCounts[r] = Math.max(rowLineCounts[r]!, perRow);
+      }
+    }
+  }
+
+  return { rows, leaves, depth: totalRows, rowLineCounts };
 }
 
 /**

@@ -23,7 +23,25 @@ export interface GridTheme {
   colHeaderHeight: number;
   defaultRowHeight: number;
   defaultColWidth: number;
+  /**
+   * Line height (px) for header labels. Multi-line labels (`"\n"` in
+   * `headerName`) expand their header row by this much per extra line.
+   * Optional so pre-existing theme objects stay valid; defaults to
+   * {@link DEFAULT_HEADER_LINE_HEIGHT}.
+   */
+  headerLineHeight?: number;
+  /**
+   * Vertical padding (px) inside header cells. Also reserved when a header
+   * row auto-expands for multi-line labels. Defaults to
+   * {@link DEFAULT_HEADER_PADDING_Y}.
+   */
+  headerPaddingY?: number;
 }
+
+/** Default {@link GridTheme.headerLineHeight} (px per header label line). */
+export const DEFAULT_HEADER_LINE_HEIGHT = 16;
+/** Default {@link GridTheme.headerPaddingY} (px above/below header labels). */
+export const DEFAULT_HEADER_PADDING_Y = 3;
 
 export const defaultTheme: GridTheme = {
   fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
@@ -44,6 +62,8 @@ export const defaultTheme: GridTheme = {
   colHeaderHeight: 24,
   defaultRowHeight: 24,
   defaultColWidth: 100,
+  headerLineHeight: DEFAULT_HEADER_LINE_HEIGHT,
+  headerPaddingY: DEFAULT_HEADER_PADDING_Y,
 };
 
 /** Merge a partial override onto the default theme. */
@@ -85,6 +105,8 @@ export function buildTheme(options: BuildThemeOptions = {}): GridTheme {
     defaultColWidth: density.defaultColWidth,
     readOnlyCellBackground: undefined,
     editableCellBackground: undefined,
+    headerLineHeight: DEFAULT_HEADER_LINE_HEIGHT,
+    headerPaddingY: DEFAULT_HEADER_PADDING_Y,
     ...palette,
     ...options.overrides,
   };

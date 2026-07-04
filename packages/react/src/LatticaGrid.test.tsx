@@ -658,6 +658,99 @@ describe('LatticaGrid multi-level headers', () => {
   });
 });
 
+describe('LatticaGrid multi-line headers and unit rows', () => {
+  // 3段 (大分類 / 項目 / 単位)。単位なし列は leaf を浅い段に直接置くか
+  // `group → leaf('')` (吸収) で表し、上段セルが下まで縦に伸びる。
+  const unitColumns: ColumnNode[] = [
+    { headerName: 'No', field: 'no' },
+    {
+      headerName: '寸法',
+      children: [
+        { headerName: '幅\n(外寸)', children: [{ headerName: 'mm', field: 'w' }] },
+        { headerName: '数量', field: 'qty' },
+      ],
+    },
+    { headerName: '判定', children: [{ headerName: '', field: 'result' }] },
+  ];
+
+  const headerByText = (text: string): HTMLElement =>
+    screen.getAllByRole('columnheader').find((el) => el.textContent!.startsWith(text))! as HTMLElement;
+
+  it('auto-expands the header band for "\\n" labels and merges unit-less columns', () => {
+    const c = new GridController({ rowCount: 3, colCount: 5 });
+    const { rerender } = render(
+      <LatticaGrid controller={c} columns={unitColumns} width={640} height={300} />,
+    );
+    // Base 24 over 3 bands of 8; the 2-line row expands to 2*16 + 2*3 = 38.
+    expect(c.getHeaderHeight()).toBe(54);
+    expect(c.getBaseHeaderHeight()).toBe(24);
+
+    const band = screen.getAllByRole('columnheader')[0]!.parentElement!;
+    expect(band.style.height).toBe('54px');
+
+    const multiline = headerByText('幅');
+    expect(multiline.style.top).toBe('8px');
+    expect(multiline.style.height).toBe('38px');
+    expect(multiline.style.whiteSpace).toBe('pre-line');
+    expect(multiline.style.lineHeight).toBe('16px');
+    expect(multiline.style.paddingTop).toBe('3px');
+    expect(multiline.style.paddingBottom).toBe('3px');
+
+    // Unit-less leaf (数量) spans the item and unit rows: 38 + 8.
+    const qty = headerByText('数量');
+    expect(qty.style.top).toBe('8px');
+    expect(qty.style.height).toBe('46px');
+    // Absorbed group (判定 → leaf('')) spans all three rows.
+    const result = headerByText('判定');
+    expect(result.style.top).toBe('0px');
+    expect(result.style.height).toBe('54px');
+    // The unit cell sits in the bottom band.
+    const unit = headerByText('mm');
+    expect(unit.style.top).toBe('46px');
+    expect(unit.style.height).toBe('8px');
+    // Top-level leaf spans the full band.
+    expect(headerByText('No').style.height).toBe('54px');
+
+    // Removing columns returns the header band (and the controller) to base.
+    rerender(<LatticaGrid controller={c} width={640} height={300} />);
+    expect(c.getHeaderHeight()).toBe(24);
+  });
+
+  it('honors headerLineHeight/headerPaddingY theme tokens', () => {
+    const c = new GridController({ rowCount: 3, colCount: 5 });
+    render(
+      <LatticaGrid
+        controller={c}
+        columns={unitColumns}
+        width={640}
+        height={300}
+        theme={{ headerLineHeight: 20, headerPaddingY: 5 }}
+      />,
+    );
+    // 2-line row: max(8, 2*20 + 2*5) = 50 -> total 8 + 50 + 8 = 66.
+    expect(c.getHeaderHeight()).toBe(66);
+    const multiline = headerByText('幅');
+    expect(multiline.style.height).toBe('50px');
+    expect(multiline.style.lineHeight).toBe('20px');
+    expect(multiline.style.paddingTop).toBe('5px');
+  });
+
+  it('falls back to default tokens when a theme sets them to undefined', () => {
+    const c = new GridController({ rowCount: 3, colCount: 5 });
+    render(
+      <LatticaGrid
+        controller={c}
+        columns={unitColumns}
+        width={640}
+        height={300}
+        theme={{ headerLineHeight: undefined, headerPaddingY: undefined }}
+      />,
+    );
+    expect(c.getHeaderHeight()).toBe(54);
+    expect(headerByText('幅').style.lineHeight).toBe('16px');
+  });
+});
+
 describe('LatticaGrid undo via keyboard', () => {
   it('undoes and redoes edits', () => {
     const c = new GridController({ rowCount: 10, colCount: 5 });
