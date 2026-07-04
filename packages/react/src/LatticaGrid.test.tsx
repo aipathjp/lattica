@@ -1,9 +1,10 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, waitFor, act } from '@testing-library/react';
+import { createRef } from 'react';
 import { LatticaGrid } from './LatticaGrid.js';
 import { GridController } from './controller.js';
 import type { ColumnNode } from '@ai-path/lattica-core';
-import type { LatticaGridProps } from './LatticaGrid.js';
+import type { LatticaGridHandle, LatticaGridProps } from './LatticaGrid.js';
 
 afterEach(cleanup);
 
@@ -62,6 +63,76 @@ describe('LatticaGrid rendering', () => {
 });
 
 describe('LatticaGrid interaction', () => {
+  it('exposes a cell-geometry imperative handle', async () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    const ref = createRef<LatticaGridHandle>();
+    const onScrollChange = vi.fn();
+    render(
+      <LatticaGrid
+        ref={ref}
+        controller={c}
+        width={180}
+        height={90}
+        onScrollChange={onScrollChange}
+      />,
+    );
+    const grid = screen.getByTestId('lattica-grid');
+    grid.getBoundingClientRect = vi.fn(() => ({
+      left: 10,
+      top: 20,
+      right: 190,
+      bottom: 110,
+      width: 180,
+      height: 90,
+      x: 10,
+      y: 20,
+      toJSON: () => ({}),
+    }));
+
+    expect(ref.current?.getCellClientRect(0, 0)).toMatchObject({
+      left: 58,
+      top: 44,
+      width: 100,
+      height: 24,
+    });
+    expect(ref.current?.getCellClientRect(-1, 0)).toBeNull();
+    expect(ref.current?.getCellClientRect(0, 99)).toBeNull();
+
+    ref.current?.focus();
+    expect(document.activeElement).toBe(grid);
+
+    act(() => ref.current?.scrollCellIntoView(10, 4));
+    await waitFor(() => {
+      expect(onScrollChange).toHaveBeenLastCalledWith(expect.objectContaining({ left: expect.any(Number), top: expect.any(Number) }));
+    });
+    const last = onScrollChange.mock.calls.at(-1)?.[0];
+    expect(last.left).toBeGreaterThan(0);
+    expect(last.top).toBeGreaterThan(0);
+    const calls = onScrollChange.mock.calls.length;
+    act(() => ref.current?.scrollCellIntoView(-1, 0));
+    expect(onScrollChange).toHaveBeenCalledTimes(calls);
+  });
+
+  it('reports flush-left client rects when row numbers are hidden', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    const ref = createRef<LatticaGridHandle>();
+    render(<LatticaGrid ref={ref} controller={c} width={300} height={160} showRowNumbers={false} />);
+    const grid = screen.getByTestId('lattica-grid');
+    grid.getBoundingClientRect = vi.fn(() => ({
+      left: 7,
+      top: 11,
+      right: 307,
+      bottom: 171,
+      width: 300,
+      height: 160,
+      x: 7,
+      y: 11,
+      toJSON: () => ({}),
+    }));
+
+    expect(ref.current?.getCellClientRect(0, 0)).toMatchObject({ left: 7, top: 35, width: 100, height: 24 });
+  });
+
   it('selects a cell on mouse down', () => {
     const c = new GridController({ rowCount: 20, colCount: 10 });
     renderGrid(c);
@@ -169,6 +240,78 @@ describe('LatticaGrid interaction', () => {
     fireEvent.keyDown(grid, { key: 'ArrowDown' });
     fireEvent.keyDown(grid, { key: 'ArrowRight' });
     expect(c.selection.getState().active).toEqual({ row: 1, col: 1 });
+  });
+
+  it('renders a controlled cell overlay with root-relative rect and close callback', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.setCellText(0, 0, 'Tokyo');
+    const onCellOverlayClose = vi.fn();
+    const renderCellOverlay = vi.fn(({ row, col, rect, close }) => (
+      <button type="button" data-testid="overlay-close" onClick={close}>
+        {row}:{col}:{rect.left}:{rect.top}:{rect.width}:{rect.height}
+      </button>
+    ));
+    renderGrid(c, undefined, {
+      cellOverlay: { row: 0, col: 0 },
+      onCellOverlayClose,
+      renderCellOverlay,
+    });
+
+    const overlay = screen.getByTestId('lattica-cell-overlay');
+    expect(overlay.style.left).toBe('48px');
+    expect(overlay.style.top).toBe('48px');
+    expect(screen.getByTestId('overlay-close').textContent).toBe('0:0:48:24:100:24');
+    fireEvent.click(screen.getByTestId('overlay-close'));
+    expect(onCellOverlayClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render a cell overlay without a renderer or when offscreen', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    const { rerender } = render(<LatticaGrid controller={c} width={220} height={100} cellOverlay={{ row: 0, col: 0 }} />);
+    expect(screen.queryByTestId('lattica-cell-overlay')).toBeNull();
+
+    rerender(
+      <LatticaGrid
+        controller={c}
+        width={220}
+        height={100}
+        cellOverlay={{ row: 15, col: 8 }}
+        renderCellOverlay={() => <div>hidden</div>}
+      />,
+    );
+    expect(screen.queryByTestId('lattica-cell-overlay')).toBeNull();
+  });
+
+  it('requests overlay close on Escape and active-cell movement', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    const onCellOverlayClose = vi.fn();
+    renderGrid(c, undefined, {
+      cellOverlay: { row: 0, col: 0 },
+      onCellOverlayClose,
+      renderCellOverlay: () => <div>overlay</div>,
+    });
+    const grid = screen.getByTestId('lattica-grid');
+
+    fireEvent.keyDown(grid, { key: 'Escape' });
+    expect(onCellOverlayClose).toHaveBeenCalledTimes(1);
+
+    act(() => c.setCellText(0, 0, 'same active'));
+    expect(onCellOverlayClose).toHaveBeenCalledTimes(1);
+
+    act(() => c.selection.setActive({ row: 1, col: 0 }));
+    expect(onCellOverlayClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps overlay mouse down from changing grid selection', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.selection.setActive({ row: 2, col: 2 });
+    renderGrid(c, undefined, {
+      cellOverlay: { row: 0, col: 0 },
+      renderCellOverlay: () => <div>overlay</div>,
+    });
+
+    fireEvent.mouseDown(screen.getByTestId('lattica-cell-overlay'), { clientX: 60, clientY: 50 });
+    expect(c.selection.getState().active).toEqual({ row: 2, col: 2 });
   });
 
   it('deletes the selection with Delete', () => {
