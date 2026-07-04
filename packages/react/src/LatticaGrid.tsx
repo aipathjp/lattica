@@ -48,7 +48,17 @@ import {
 import { buildScene } from './scene.js';
 import { canvasMeasurer } from './measure.js';
 import { paintScene, type Canvas2D } from './painter.js';
-import { cellRect, columnX, hitTest, summaryBandHeight, type GridGeometry, type HitResult } from './geometry.js';
+import {
+  cellRect,
+  columnX,
+  hitTest,
+  layoutSignature,
+  rowStripRect,
+  summaryBandHeight,
+  visibleRowStrips,
+  type GridGeometry,
+  type HitResult,
+} from './geometry.js';
 import { interpretKey, type EnterMoves, type KeyInput } from './keyboard.js';
 import { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
 import { columnHeaderCells, computeHeaderRowHeights, rowHeaderCells } from './headers.js';
@@ -124,6 +134,15 @@ export interface LatticaGridProps {
   onCellClick?: (hit: { row: number; col: number }, event: ReactMouseEvent<HTMLDivElement>) => void;
   /** スクロール位置が変わったとき */
   onScrollChange?: (scroll: ScrollOffset) => void;
+  /**
+   * Fired when the rendered layout changes — scroll, grid resize, row-height /
+   * column-width changes, row/column count changes, view reflows (sort /
+   * filter / hide), and header-height changes. Debounced to one call per
+   * animation frame, so bursts collapse into a single notification. Use it to
+   * re-measure external aligned UIs (deletion rails, criteria strips) via
+   * {@link LatticaGridHandle.getRowClientRects} and friends.
+   */
+  onLayoutChange?: () => void;
   /** Fired once a column-border drag is committed and the width actually changed. */
   onColumnResize?: (change: { col: number; physicalCol: number; width: number }) => void;
   /** Fired when controller view state changes through user-facing view operations. */
@@ -213,6 +232,17 @@ export interface CellActionEvent {
 
 export interface LatticaGridHandle {
   getCellClientRect(row: number, col: number): DOMRect | null;
+  /**
+   * The full-width strip of a visual row in viewport coordinates (the
+   * row-full-width companion of {@link getCellClientRect}, reflecting the
+   * current scroll), or null when the row is out of range or not visible.
+   */
+  getRowClientRect(row: number): DOMRect | null;
+  /**
+   * Viewport top/height of every currently visible row (frozen rows first,
+   * then the scrolled window) — one call positions an external rail UI.
+   */
+  getRowClientRects(): Array<{ row: number; top: number; height: number }>;
   focus(): void;
   scrollCellIntoView(row: number, col: number): void;
   /** Commit the in-flight edit through the normal commit path; true if one existed. */
@@ -547,6 +577,46 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     onScrollChange?.(scroll);
   }, [scroll, onScrollChange]);
 
+  // Latest onLayoutChange callback; a ref so callback identity churn neither
+  // re-runs the notifier below nor re-schedules a pending frame.
+  const onLayoutChangeRef = useRef(props.onLayoutChange);
+  useEffect(() => {
+    onLayoutChangeRef.current = props.onLayoutChange;
+  });
+  const layoutSigRef = useRef<string | null>(null);
+  const layoutFrameRef = useRef<number | null>(null);
+
+  // Layout-change notifier: after every commit, compare the pure layout
+  // signature (scroll, client size, header bands, per-axis sizes/counts) and
+  // notify external aligned UIs at requestAnimationFrame granularity — bursts
+  // within one frame collapse into a single onLayoutChange call.
+  useEffect(() => {
+    const signature = layoutSignature(geom, scroll.left, scroll.top, width, height);
+    if (layoutSigRef.current === signature) {
+      return;
+    }
+    const isFirst = layoutSigRef.current === null;
+    layoutSigRef.current = signature;
+    // The mount-time layout is the baseline, not a change.
+    if (isFirst || onLayoutChangeRef.current === undefined || layoutFrameRef.current !== null) {
+      return;
+    }
+    layoutFrameRef.current = requestAnimationFrame(() => {
+      layoutFrameRef.current = null;
+      onLayoutChangeRef.current?.();
+    });
+  });
+
+  // Cancel a pending layout notification on unmount.
+  useEffect(
+    () => () => {
+      if (layoutFrameRef.current !== null) {
+        cancelAnimationFrame(layoutFrameRef.current);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (cellOverlay === null || cellOverlay === undefined || onCellOverlayClose === undefined) {
       return;
@@ -575,6 +645,36 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
         const rootRect = root.getBoundingClientRect();
         return new DOMRect(rootRect.left + rect.x, rootRect.top + rect.y, rect.width, rect.height);
       },
+      getRowClientRect(row) {
+        const root = rootRef.current;
+        /* v8 ignore next 3 -- the imperative handle is only observable after the root ref is attached */
+        if (root === null) {
+          return null;
+        }
+        if (row < 0 || row >= controller.getRowCount()) {
+          return null;
+        }
+        const rect = rowStripRect(geom, scroll.left, scroll.top, row, width);
+        const bottom = height - summaryBandHeight(geom);
+        if (rect.width <= 0 || rect.y >= bottom || rect.y + rect.height <= geom.colHeaderHeight) {
+          return null;
+        }
+        const rootRect = root.getBoundingClientRect();
+        return new DOMRect(rootRect.left + rect.x, rootRect.top + rect.y, rect.width, rect.height);
+      },
+      getRowClientRects() {
+        const root = rootRef.current;
+        /* v8 ignore next 3 -- the imperative handle is only observable after the root ref is attached */
+        if (root === null) {
+          return [];
+        }
+        const rootRect = root.getBoundingClientRect();
+        return visibleRowStrips(geom, scroll.top, height).map((strip) => ({
+          row: strip.row,
+          top: rootRect.top + strip.top,
+          height: strip.height,
+        }));
+      },
       focus() {
         rootRef.current?.focus();
       },
@@ -587,7 +687,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       commitEditing,
       cancelEditing,
     }),
-    [controller, geom, getVisibleCellRect, height, width, commitEditing, cancelEditing],
+    [controller, geom, getVisibleCellRect, height, scroll.left, scroll.top, width, commitEditing, cancelEditing],
   );
 
   // Paint on every render (cheap: only visible cells).

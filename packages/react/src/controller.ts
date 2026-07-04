@@ -779,6 +779,15 @@ export class GridController {
     return this.viewColSizes.getSize(visualCol);
   }
 
+  /** Widths (px) of every visible column, in visual order — indexable by visual column. */
+  getColumnWidths(): number[] {
+    const widths: number[] = [];
+    for (let col = 0; col < this.viewColSizes.getCount(); col++) {
+      widths.push(this.viewColSizes.getSize(col));
+    }
+    return widths;
+  }
+
   /** Current height of a visible row. */
   getRowHeight(visualRow: number): number {
     return this.viewRowSizes.getSize(visualRow);

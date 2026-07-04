@@ -7,8 +7,11 @@ import {
   columnAt,
   rowAt,
   hitTest,
+  layoutSignature,
   maxScroll,
+  rowStripRect,
   summaryBandHeight,
+  visibleRowStrips,
   type GridGeometry,
 } from './geometry.js';
 
@@ -118,5 +121,129 @@ describe('maxScroll with a summary band', () => {
     const g = geom({ summaryRows: 2, summaryRowHeight: 20 });
     // body height 120-20-40=60 -> maxTop 2000-60=1940 (vs 1900 without band)
     expect(maxScroll(g, 240, 120).maxTop).toBe(1940);
+  });
+});
+
+describe('rowStripRect', () => {
+  it('spans the body from the gutter to the data edge, following scroll', () => {
+    const g = geom({ colSizes: new SizeManager({ count: 3, defaultSize: 50 }) });
+    // right edge = min(clientWidth 400, 40 + 150) = 190 -> width 150
+    expect(rowStripRect(g, 0, 0, 0, 400)).toEqual({ x: 40, y: 20, width: 150, height: 20 });
+    // scrolled vertically: y follows rowY
+    expect(rowStripRect(g, 0, 30, 2, 400)).toEqual({ x: 40, y: 20 + 40 - 30, width: 150, height: 20 });
+    // horizontal scroll shrinks the visible data width
+    expect(rowStripRect(g, 60, 0, 0, 400).width).toBe(90);
+  });
+
+  it('clips to the client width and clamps to zero when nothing fits', () => {
+    const g = geom(); // total col width 2500
+    expect(rowStripRect(g, 0, 0, 0, 240).width).toBe(200);
+    // client narrower than the row-number gutter -> empty strip
+    expect(rowStripRect(g, 0, 0, 0, 30).width).toBe(0);
+  });
+
+  it('uses per-row height overrides', () => {
+    const rows = new SizeManager({ count: 10, defaultSize: 20 });
+    rows.setSize(4, 44);
+    const g = geom({ rowSizes: rows });
+    expect(rowStripRect(g, 0, 0, 4, 400).height).toBe(44);
+  });
+});
+
+describe('visibleRowStrips', () => {
+  it('lists exactly the rows intersecting the body, top-down', () => {
+    const g = geom(); // header 20, rows 20px
+    // clientHeight 100 -> body [20,100) -> rows 0..3 fully, none beyond
+    expect(visibleRowStrips(g, 0, 100)).toEqual([
+      { row: 0, top: 20, height: 20 },
+      { row: 1, top: 40, height: 20 },
+      { row: 2, top: 60, height: 20 },
+      { row: 3, top: 80, height: 20 },
+    ]);
+  });
+
+  it('starts at the first row under the scroll offset, including partial rows', () => {
+    const g = geom();
+    const strips = visibleRowStrips(g, 30, 100);
+    // scroll 30 -> row 1 (offset 20..40) is cut at the top; last visible is row 5 (top 90 < 100)
+    expect(strips[0]).toEqual({ row: 1, top: 20 + 20 - 30, height: 20 });
+    expect(strips.at(-1)).toEqual({ row: 5, top: 20 + 100 - 30, height: 20 });
+  });
+
+  it('negative scroll offsets behave like zero', () => {
+    const g = geom();
+    expect(visibleRowStrips(g, -50, 60)).toEqual(visibleRowStrips(g, 0, 60));
+  });
+
+  it('stops above the pinned summary band', () => {
+    const g = geom({ summaryRows: 1, summaryRowHeight: 20 });
+    // bottom limit 100-20=80 -> last row is row 2 (top 60)
+    expect(visibleRowStrips(g, 0, 100).at(-1)).toEqual({ row: 2, top: 60, height: 20 });
+  });
+
+  it('returns every remaining row when content ends above the viewport bottom', () => {
+    const g = geom({ rowSizes: new SizeManager({ count: 2, defaultSize: 20 }) });
+    expect(visibleRowStrips(g, 0, 500)).toHaveLength(2);
+  });
+
+  it('pins frozen rows first, then the scrolled window below them', () => {
+    const g = geom({ frozenRows: 2 });
+    const strips = visibleRowStrips(g, 100, 120);
+    // frozen rows 0-1 at their pinned offsets
+    expect(strips[0]).toEqual({ row: 0, top: 20, height: 20 });
+    expect(strips[1]).toEqual({ row: 1, top: 40, height: 20 });
+    // scrolled region starts at offset frozenSize(40)+scroll(100)=140 -> row 7
+    expect(strips[2]).toEqual({ row: 7, top: 20 + 140 - 100, height: 20 });
+  });
+
+  it('drops frozen rows below the bottom limit and handles all-frozen axes', () => {
+    // clientHeight 30 -> bottom 30; frozen row 1 tops at 40 -> excluded
+    expect(visibleRowStrips(geom({ frozenRows: 2 }), 0, 30)).toEqual([
+      { row: 0, top: 20, height: 20 },
+    ]);
+    // more frozen rows than rows: the scrolled window is empty
+    const g = geom({ rowSizes: new SizeManager({ count: 2, defaultSize: 20 }), frozenRows: 5 });
+    expect(visibleRowStrips(g, 0, 500)).toHaveLength(2);
+  });
+
+  it('returns nothing for an empty grid', () => {
+    const g = geom({ rowSizes: new SizeManager({ count: 0, defaultSize: 20 }) });
+    expect(visibleRowStrips(g, 0, 200)).toEqual([]);
+  });
+});
+
+describe('layoutSignature', () => {
+  it('is stable for identical layouts', () => {
+    expect(layoutSignature(geom(), 5, 10, 400, 200)).toBe(layoutSignature(geom(), 5, 10, 400, 200));
+  });
+
+  it('changes with scroll, client size, and band metrics', () => {
+    const base = layoutSignature(geom(), 0, 0, 400, 200);
+    expect(layoutSignature(geom(), 10, 0, 400, 200)).not.toBe(base);
+    expect(layoutSignature(geom(), 0, 10, 400, 200)).not.toBe(base);
+    expect(layoutSignature(geom(), 0, 0, 500, 200)).not.toBe(base);
+    expect(layoutSignature(geom(), 0, 0, 400, 300)).not.toBe(base);
+    expect(layoutSignature(geom({ colHeaderHeight: 40 }), 0, 0, 400, 200)).not.toBe(base);
+    expect(layoutSignature(geom({ summaryRows: 1, summaryRowHeight: 20 }), 0, 0, 400, 200)).not.toBe(base);
+  });
+
+  it('distinguishes equal-total size redistributions and is insertion-order independent', () => {
+    const a = new SizeManager({ count: 5, defaultSize: 50 });
+    a.setSize(1, 70);
+    a.setSize(3, 30); // total unchanged: +20 -20
+    const redistributed = layoutSignature(geom({ colSizes: a }), 0, 0, 400, 200);
+    expect(redistributed).not.toBe(layoutSignature(geom({ colSizes: new SizeManager({ count: 5, defaultSize: 50 }) }), 0, 0, 400, 200));
+    // Same overrides applied in the opposite order fingerprint identically.
+    const b = new SizeManager({ count: 5, defaultSize: 50 });
+    b.setSize(3, 30);
+    b.setSize(1, 70);
+    expect(layoutSignature(geom({ colSizes: b }), 0, 0, 400, 200)).toBe(redistributed);
+  });
+
+  it('changes when the row count changes', () => {
+    const shrunk = new SizeManager({ count: 99, defaultSize: 20 });
+    expect(layoutSignature(geom({ rowSizes: shrunk }), 0, 0, 400, 200)).not.toBe(
+      layoutSignature(geom(), 0, 0, 400, 200),
+    );
   });
 });

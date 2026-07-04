@@ -102,10 +102,14 @@ export {
   rowAt,
   maxScroll,
   summaryBandHeight,
+  rowStripRect,
+  visibleRowStrips,
+  layoutSignature,
   type GridGeometry,
   type HitResult,
   type Region,
   type Rect,
+  type RowStrip,
 } from './geometry.js';
 export { buildScene, visibleIndices, type Scene, type CellPaint } from './scene.js';
 export { paintScene, type Canvas2D, type PaintOptions } from './painter.js';

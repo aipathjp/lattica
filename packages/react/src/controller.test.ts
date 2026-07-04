@@ -1514,6 +1514,32 @@ describe('view-state persistence', () => {
     expect(viewstate).toHaveBeenCalledTimes(3);
   });
 
+  it('returns all visible column widths in visual order', () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    expect(c.getColumnWidths()).toEqual([100, 100, 100]);
+
+    c.setColumnWidth(0, 150);
+    c.setColumnWidth(2, 60);
+    expect(c.getColumnWidths()).toEqual([150, 100, 60]);
+    // Mirrors the per-column getter at every visual index.
+    expect(c.getColumnWidths()).toEqual(
+      c.getColumnWidths().map((_, col) => c.getColumnWidth(col)),
+    );
+
+    // Hidden columns drop out; the rest keep visual order.
+    c.hideColumn(1);
+    expect(c.getColumnWidths()).toEqual([150, 60]);
+
+    // Moves reorder the widths along with the columns.
+    c.showAllColumns();
+    c.moveColumn(0, 2);
+    expect(c.getColumnWidths()).toEqual(
+      [0, 1, 2].map((col) => c.getColumnWidth(col)),
+    );
+    expect(c.getColumnWidths()).toContain(150);
+    expect(c.getColumnWidths()[0]).toBe(100); // physical col 0 no longer leads
+  });
+
   it('uses present empty fields to reset that slice while omitted fields layer over prior state', () => {
     const c = new GridController({ rowCount: 3, colCount: 3 });
     c.resizeCol(0, 120);

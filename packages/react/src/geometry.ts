@@ -79,6 +79,109 @@ export function cellRect(
   };
 }
 
+/** A visible row's vertical strip: its visual index, top edge, and height. */
+export interface RowStrip {
+  row: number;
+  top: number;
+  height: number;
+}
+
+/**
+ * The full-width strip occupied by a row, in client pixels: from the body's
+ * left edge (after the row-number gutter) to the data's right edge, clipped to
+ * the client width. The row-full-width companion of {@link cellRect}.
+ */
+export function rowStripRect(
+  geom: GridGeometry,
+  scrollLeft: number,
+  scrollTop: number,
+  row: number,
+  clientWidth: number,
+): Rect {
+  const right = Math.min(
+    clientWidth,
+    geom.rowHeaderWidth + geom.colSizes.getTotalSize() - scrollLeft,
+  );
+  return {
+    x: geom.rowHeaderWidth,
+    y: rowY(geom, scrollTop, row),
+    width: Math.max(0, right - geom.rowHeaderWidth),
+    height: geom.rowSizes.getSize(row),
+  };
+}
+
+/**
+ * Every row whose strip starts above the body's bottom edge (the client height
+ * minus the pinned summary band): frozen rows first, then the scrolled window.
+ * One call gives an external rail UI the position of each visible row.
+ */
+export function visibleRowStrips(
+  geom: GridGeometry,
+  scrollTop: number,
+  clientHeight: number,
+): RowStrip[] {
+  const sizes = geom.rowSizes;
+  const count = sizes.getCount();
+  const frozenCount = Math.min(geom.frozenRows, count);
+  const bottom = clientHeight - summaryBandHeight(geom);
+  const scroll = Math.max(0, scrollTop);
+  const strips: RowStrip[] = [];
+  for (let row = 0; row < frozenCount; row++) {
+    const top = rowY(geom, scroll, row);
+    if (top < bottom) {
+      strips.push({ row, top, height: sizes.getSize(row) });
+    }
+  }
+  const frozenSize = frozenExtent(sizes, frozenCount);
+  const first = Math.max(frozenCount, sizes.getIndexAt(frozenSize + scroll));
+  for (let row = first; row < count; row++) {
+    const top = rowY(geom, scroll, row);
+    if (top >= bottom) {
+      break;
+    }
+    strips.push({ row, top, height: sizes.getSize(row) });
+  }
+  return strips;
+}
+
+/** One axis of {@link layoutSignature}: count, total extent, and every override. */
+function axisSignature(sizes: SizeManager): string {
+  const overrides = [...sizes.getOverrides()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([index, size]) => `${index}:${size}`)
+    .join(',');
+  return `${sizes.getCount()}*${sizes.getTotalSize()}|${overrides}`;
+}
+
+/**
+ * Compact fingerprint of everything that affects pixel layout: scroll offsets,
+ * client size, header bands, frozen counts, the summary band, and per-axis
+ * sizes (count + total + individual overrides, so equal-total redistributions
+ * still change the signature). Two layouts paint the same grid chrome iff
+ * their signatures are equal — used to drive layout-change notifications.
+ */
+export function layoutSignature(
+  geom: GridGeometry,
+  scrollLeft: number,
+  scrollTop: number,
+  clientWidth: number,
+  clientHeight: number,
+): string {
+  return [
+    scrollLeft,
+    scrollTop,
+    clientWidth,
+    clientHeight,
+    geom.rowHeaderWidth,
+    geom.colHeaderHeight,
+    geom.frozenRows,
+    geom.frozenCols,
+    summaryBandHeight(geom),
+    axisSignature(geom.rowSizes),
+    axisSignature(geom.colSizes),
+  ].join(';');
+}
+
 /** Column index at a client x coordinate (within the body), clamped. */
 export function columnAt(geom: GridGeometry, scrollLeft: number, x: number): number {
   const frozenW = frozenExtent(geom.colSizes, geom.frozenCols);
