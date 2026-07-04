@@ -13,7 +13,7 @@ import {
   type IconMark,
   type SparklineShape,
 } from '@ai-path/tb-core';
-import { cellRect, type GridGeometry, type Rect } from './geometry.js';
+import { cellRect, columnX, summaryBandHeight, type GridGeometry, type Rect } from './geometry.js';
 import { wrapText, type MeasureText } from './measure.js';
 
 export interface CellPaint {
@@ -48,10 +48,15 @@ export interface CellPaint {
    *  so single-axis frozen cells (e.g. an overscan row in a pinned column)
    *  cannot cover it. */
   frozenCorner?: boolean;
+  /** True for pinned summary (footer) cells — painted over everything else.
+   *  For these, `row` is the summary-row index within the band. */
+  summary?: boolean;
 }
 
 export interface Scene {
   cells: CellPaint[];
+  /** Pinned summary (footer) cells, present when the grid declares summary rows. */
+  summaryCells?: CellPaint[];
   activeRect: Rect | null;
   visibleRows: number[];
   visibleCols: number[];
@@ -93,6 +98,8 @@ export interface BuildSceneParams {
   wrapPaddingX?: number;
   /** Whether a cell has a comment attached (paints a corner marker). */
   hasComment?: (row: number, col: number) => boolean;
+  /** Display text for a pinned summary (footer) cell (optional). */
+  getSummaryDisplay?: (summaryRow: number, col: number) => string;
 }
 
 /** Sum the sizes of `count` indices starting at `start`. */
@@ -219,5 +226,49 @@ export function buildScene(params: BuildSceneParams): Scene {
     }
   }
 
-  return { cells, activeRect, visibleRows, visibleCols };
+  const scene: Scene = { cells, activeRect, visibleRows, visibleCols };
+  const summaryCells = buildSummaryCells(params, visibleCols);
+  if (summaryCells !== null) {
+    scene.summaryCells = summaryCells;
+  }
+  return scene;
+}
+
+/**
+ * Build the pinned summary (footer) band: one row of cells per summary spec,
+ * anchored to the viewport's bottom edge — or directly below the last data row
+ * when the content is shorter than the viewport. Reuses the visible/frozen
+ * column set of the body so frozen columns pin inside the band too.
+ */
+function buildSummaryCells(params: BuildSceneParams, visibleCols: number[]): CellPaint[] | null {
+  const { geom, scrollLeft, scrollTop, clientHeight } = params;
+  const count = geom.summaryRows ?? 0;
+  if (count === 0 || params.getSummaryDisplay === undefined) {
+    return null;
+  }
+  const rowHeight = geom.summaryRowHeight ?? 0;
+  const contentBottom = geom.colHeaderHeight + geom.rowSizes.getTotalSize() - scrollTop;
+  const bandTop = Math.min(clientHeight - summaryBandHeight(geom), contentBottom);
+  const cells: CellPaint[] = [];
+  for (let s = 0; s < count; s++) {
+    for (const col of visibleCols) {
+      cells.push({
+        row: s,
+        col,
+        rect: {
+          x: columnX(geom, scrollLeft, col),
+          y: bandTop + s * rowHeight,
+          width: geom.colSizes.getSize(col),
+          height: rowHeight,
+        },
+        text: params.getSummaryDisplay(s, col),
+        selected: false,
+        active: false,
+        align: params.getAlign?.(0, col),
+        summary: true,
+        frozen: col < geom.frozenCols,
+      });
+    }
+  }
+  return cells;
 }

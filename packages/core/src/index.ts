@@ -119,6 +119,12 @@ export {
   type SummaryFn,
 } from './summary.js';
 export {
+  computeSummaryCell,
+  type SummaryRowAggregate,
+  type SummaryCellRule,
+  type SummaryRowSpec,
+} from './summary-rows.js';
+export {
   ruleMatches,
   evaluateRules,
   ConditionalFormatModel,

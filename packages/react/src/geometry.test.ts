@@ -8,6 +8,7 @@ import {
   rowAt,
   hitTest,
   maxScroll,
+  summaryBandHeight,
   type GridGeometry,
 } from './geometry.js';
 
@@ -98,5 +99,24 @@ describe('maxScroll', () => {
   it('clamps to zero when content fits', () => {
     const g = geom({ colSizes: new SizeManager({ count: 1, defaultSize: 10 }) });
     expect(maxScroll(g, 1000, 1000).maxLeft).toBe(0);
+  });
+});
+
+describe('summaryBandHeight', () => {
+  it('is rows x row height when both are set', () => {
+    expect(summaryBandHeight(geom({ summaryRows: 2, summaryRowHeight: 24 }))).toBe(48);
+  });
+  it('defaults missing fields to zero', () => {
+    expect(summaryBandHeight(geom())).toBe(0);
+    expect(summaryBandHeight(geom({ summaryRows: 3 }))).toBe(0);
+    expect(summaryBandHeight(geom({ summaryRowHeight: 24 }))).toBe(0);
+  });
+});
+
+describe('maxScroll with a summary band', () => {
+  it('reserves the band height so the last rows stay reachable above it', () => {
+    const g = geom({ summaryRows: 2, summaryRowHeight: 20 });
+    // body height 120-20-40=60 -> maxTop 2000-60=1940 (vs 1900 without band)
+    expect(maxScroll(g, 240, 120).maxTop).toBe(1940);
   });
 });

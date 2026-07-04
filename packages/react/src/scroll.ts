@@ -5,7 +5,7 @@
  * scroll). Clamped to the valid scroll range.
  */
 
-import { maxScroll, type GridGeometry } from './geometry.js';
+import { maxScroll, summaryBandHeight, type GridGeometry } from './geometry.js';
 
 export interface ScrollOffset {
   left: number;
@@ -59,7 +59,9 @@ export function scrollToCell(
       geom.rowSizes.getOffset(row),
       geom.rowSizes.getSize(row),
       scroll.top,
-      clientHeight - geom.colHeaderHeight,
+      // The pinned summary band covers the viewport's bottom edge, so target
+      // cells must land above it.
+      clientHeight - geom.colHeaderHeight - summaryBandHeight(geom),
       frozenH,
       maxTop,
     ),

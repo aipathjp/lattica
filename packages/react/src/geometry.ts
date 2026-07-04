@@ -17,6 +17,15 @@ export interface GridGeometry {
   frozenCols: number;
   rowHeaderWidth: number;
   colHeaderHeight: number;
+  /** Pinned summary (footer) rows at the grid's bottom edge (0 when absent). */
+  summaryRows?: number;
+  /** Pixel height of each pinned summary row. */
+  summaryRowHeight?: number;
+}
+
+/** Total pixel height of the pinned summary (footer) band. */
+export function summaryBandHeight(geom: GridGeometry): number {
+  return (geom.summaryRows ?? 0) * (geom.summaryRowHeight ?? 0);
 }
 
 export type Region = 'corner' | 'colHeader' | 'rowHeader' | 'cell';
@@ -119,7 +128,9 @@ export function maxScroll(
   clientHeight: number,
 ): { maxLeft: number; maxTop: number } {
   const bodyWidth = clientWidth - geom.rowHeaderWidth;
-  const bodyHeight = clientHeight - geom.colHeaderHeight;
+  // The pinned summary band eats into the scrollable body, so the last data
+  // rows must be reachable above it.
+  const bodyHeight = clientHeight - geom.colHeaderHeight - summaryBandHeight(geom);
   const totalW = geom.colSizes.getTotalSize();
   const totalH = geom.rowSizes.getTotalSize();
   return {

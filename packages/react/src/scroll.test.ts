@@ -62,3 +62,12 @@ describe('clampScroll', () => {
     expect(huge.top).toBe(100 * 20 - 200);
   });
 });
+
+describe('scrollToCell with a summary band', () => {
+  it('lands the target cell above the pinned summary band', () => {
+    const g = geom({ summaryRows: 2, summaryRowHeight: 20 });
+    // top viewport = 220-20-40 = 160. row 15 offset=300 size 20 -> 320-160=160.
+    const result = scrollToCell(g, { left: 0, top: 0 }, 440, 220, 15, 0);
+    expect(result.top).toBe(160);
+  });
+});

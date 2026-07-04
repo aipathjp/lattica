@@ -44,7 +44,9 @@ import {
   fillRegion,
   toA1,
   parseA1,
+  computeSummaryCell,
   type ColumnDef,
+  type SummaryRowSpec,
 } from '@ai-path/tb-core';
 import {
   DataView,
@@ -314,6 +316,10 @@ export class GridController {
   private readonly cellReadOnly = new Set<string>();
   private readonly columnInputs = new Map<number, ColumnInputOptions>();
   private readonly columnInputsFromDefs = new Set<number>();
+  /** Leaf column `field` → physical column, learned from column defs. */
+  private readonly columnFields = new Map<string, number>();
+  /** Pinned summary (footer) row specs, rendered below the body. */
+  private summarySpecs: readonly SummaryRowSpec[] = [];
   private readonly searchKeys = new Set<string>();
   /** Display-only text override (audit snapshots, per-column formatting…). */
   private displayOverride: DisplayOverride | null = null;
@@ -778,15 +784,84 @@ export class GridController {
     }
   }
 
-  /** Aggregate a (visual) column over the currently visible rows. */
-  aggregateColumn(visualCol: number, fn: AggregateFn): number | null {
+  /** Values of a (visual) column over the currently visible rows. */
+  private visibleColumnValues(visualCol: number): CellValue[] {
     const rows = this.getRowCount();
     const values: CellValue[] = [];
     for (let r = 0; r < rows; r++) {
       const p = this.toPhysical(r, visualCol);
       values.push(this.engine.getValue(p) as CellValue);
     }
-    return aggregate(values, fn);
+    return values;
+  }
+
+  /** Aggregate a (visual) column over the currently visible rows. */
+  aggregateColumn(visualCol: number, fn: AggregateFn): number | null {
+    return aggregate(this.visibleColumnValues(visualCol), fn);
+  }
+
+  // ── Pinned summary (footer) rows ───────────────────────────────────────────
+  /** Replace the pinned summary rows. `null` (or an empty list) removes them. */
+  setSummaryRows(rows: readonly SummaryRowSpec[] | null): void {
+    this.summarySpecs = rows ?? [];
+    this.emitter.emit('change', undefined);
+  }
+
+  /** Current pinned summary row specs. */
+  getSummaryRows(): readonly SummaryRowSpec[] {
+    return this.summarySpecs;
+  }
+
+  /** Number of pinned summary rows. */
+  getSummaryRowCount(): number {
+    return this.summarySpecs.length;
+  }
+
+  /**
+   * Resolve a summary-cell key — a physical column index (number or numeric
+   * string) or a leaf column `field` name — to a physical column, or null.
+   */
+  private resolveSummaryKey(key: string | number): number | null {
+    if (typeof key === 'number') {
+      return validIndex(key, this.colCount) ? key : null;
+    }
+    if (/^\d+$/.test(key)) {
+      const col = Number(key);
+      return validIndex(col, this.colCount) ? col : null;
+    }
+    return this.columnFields.get(key) ?? null;
+  }
+
+  /**
+   * Display text of a pinned summary cell. Aggregates run over the visible
+   * (filter-applied) rows of the (visual) column, so they track edits, sort,
+   * and filter changes automatically; built-in aggregates apply the column's
+   * number format. The row label renders in its label column (default: the
+   * first visible column) when that column carries no aggregation rule.
+   */
+  getSummaryDisplay(summaryRow: number, visualCol: number): string {
+    const spec = this.summarySpecs[summaryRow];
+    if (spec === undefined) {
+      return '';
+    }
+    const physicalCol = this.view.cols.getPhysicalIndex(visualCol);
+    for (const [key, rule] of Object.entries(spec.cells)) {
+      if (this.resolveSummaryKey(key) !== physicalCol) {
+        continue;
+      }
+      return computeSummaryCell(
+        this.visibleColumnValues(visualCol),
+        rule,
+        typeof rule === 'string' ? this.columnFormats.get(physicalCol) : undefined,
+      );
+    }
+    if (spec.label !== undefined) {
+      const labelCol = spec.labelCol === undefined ? null : this.resolveSummaryKey(spec.labelCol);
+      if (labelCol === null ? visualCol === 0 : labelCol === physicalCol) {
+        return spec.label;
+      }
+    }
+    return '';
   }
 
   /** Collect the raw values inside the current selection bounding box. */
@@ -968,6 +1043,8 @@ export class GridController {
       frozenCols: this.frozenCols,
       rowHeaderWidth: this.rowHeaderWidth,
       colHeaderHeight: this.colHeaderHeight,
+      summaryRows: this.summarySpecs.length,
+      summaryRowHeight: this.defaultRowHeight,
     };
   }
 
@@ -1113,6 +1190,9 @@ export class GridController {
     defs.forEach((def, physicalCol) => {
       if (!validIndex(physicalCol, this.colCount)) {
         return;
+      }
+      if (def.field !== undefined && def.field !== '') {
+        this.columnFields.set(def.field, physicalCol);
       }
       if (def.width !== undefined) {
         this.colSizes.setSize(physicalCol, def.width);

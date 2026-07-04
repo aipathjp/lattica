@@ -95,7 +95,66 @@ export function paintScene(
     ctx.strokeRect(r.x + 1, r.y + 1, r.width - 1, r.height - 1);
   }
 
+  // Pinned summary (footer) cells paint last of all — opaque, over scrolled
+  // body cells and the active border. Frozen-column summary cells paint after
+  // the scrolled ones, mirroring the body's frozen-over-scrolled order.
+  const summaryCells = scene.summaryCells ?? [];
+  for (const cell of summaryCells) {
+    if (cell.frozen !== true) {
+      paintSummaryCell(ctx, cell, theme, registry);
+    }
+  }
+  for (const cell of summaryCells) {
+    if (cell.frozen === true) {
+      paintSummaryCell(ctx, cell, theme, registry);
+    }
+  }
+
   ctx.restore();
+}
+
+/** Paint one pinned summary (footer) cell: an opaque themed background,
+ *  gridlines, a separator over the band's first row, and the cell text. */
+function paintSummaryCell(
+  ctx: Canvas2D,
+  cell: CellPaint,
+  theme: GridTheme,
+  registry: CellTypeRegistry,
+): void {
+  const { rect } = cell;
+  ctx.fillStyle = theme.summaryRowBackground ?? theme.headerBackground;
+  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+
+  // Gridlines (right + bottom edge), matching the body cells.
+  ctx.strokeStyle = theme.gridLineColor;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(rect.x, rect.y + rect.height);
+  ctx.lineTo(rect.x + rect.width, rect.y + rect.height);
+  ctx.moveTo(rect.x + rect.width, rect.y);
+  ctx.lineTo(rect.x + rect.width, rect.y + rect.height);
+  ctx.stroke();
+
+  // Header-colored separator along the band's top edge (first summary row).
+  if (cell.row === 0) {
+    ctx.strokeStyle = theme.headerGridLineColor;
+    ctx.beginPath();
+    ctx.moveTo(rect.x, rect.y + 0.5);
+    ctx.lineTo(rect.x + rect.width, rect.y + 0.5);
+    ctx.stroke();
+  }
+
+  // Always the text renderer: summary cells show aggregate text, never
+  // checkboxes or other type-specific widgets.
+  registry.resolve(undefined)({
+    ctx,
+    rect,
+    value: cell.text,
+    text: cell.text,
+    theme,
+    align: cell.align ?? 'left',
+    color: theme.summaryRowTextColor,
+  });
 }
 
 /** Paint a single cell. `opaqueBase` fills the theme background first (for
