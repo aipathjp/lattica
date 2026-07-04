@@ -5,6 +5,7 @@ import {
   buildTheme,
   DEFAULT_HEADER_LINE_HEIGHT,
   DEFAULT_HEADER_PADDING_Y,
+  DEFAULT_COMMENT_MARKER_COLOR,
 } from './theme.js';
 import { darkPalette } from './palette.js';
 import { compactDensity } from './density.js';
@@ -73,5 +74,18 @@ describe('header tokens', () => {
     const built = buildTheme({ overrides: { headerLineHeight: 18, headerPaddingY: 6 } });
     expect(built.headerLineHeight).toBe(18);
     expect(built.headerPaddingY).toBe(6);
+  });
+});
+
+describe('comment marker token', () => {
+  it('defaults to the Excel-like red in defaultTheme and buildTheme', () => {
+    expect(defaultTheme.commentMarkerColor).toBe(DEFAULT_COMMENT_MARKER_COLOR);
+    expect(buildTheme().commentMarkerColor).toBe(DEFAULT_COMMENT_MARKER_COLOR);
+    expect(DEFAULT_COMMENT_MARKER_COLOR).toBe('#d64545');
+  });
+
+  it('is overridable via buildTheme overrides and resolveTheme', () => {
+    expect(buildTheme({ overrides: { commentMarkerColor: '#000000' } }).commentMarkerColor).toBe('#000000');
+    expect(resolveTheme({ commentMarkerColor: '#0a0a0a' }).commentMarkerColor).toBe('#0a0a0a');
   });
 });

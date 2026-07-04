@@ -299,3 +299,21 @@ describe('buildScene sparklines', () => {
     expect(scene.cells.find((k) => k.col === 1)!.sparkline).toBeUndefined();
   });
 });
+
+describe('buildScene comments', () => {
+  it('flags commented cells via hasComment and leaves others undefined', () => {
+    const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
+    const scene = buildScene({
+      geom: geom(),
+      scrollLeft: 0,
+      scrollTop: 0,
+      clientWidth: 200,
+      clientHeight: 60,
+      selection: sel,
+      getDisplay: () => '',
+      hasComment: (r, c) => r === 0 && c === 0,
+    });
+    expect(scene.cells.find((k) => k.row === 0 && k.col === 0)!.comment).toBe(true);
+    expect(scene.cells.find((k) => k.row === 0 && k.col === 1)!.comment).toBeUndefined();
+  });
+});

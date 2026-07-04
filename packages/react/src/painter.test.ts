@@ -387,3 +387,44 @@ describe('paintScene wrapped text', () => {
     expect(texts).toEqual(['aa', 'bb']);
   });
 });
+
+describe('paintScene comment markers', () => {
+  const commentScene = () =>
+    scene({
+      cells: [
+        {
+          row: 0, col: 0, rect: { x: 0, y: 0, width: 50, height: 20 },
+          text: 'v', selected: false, active: false,
+          comment: true,
+        },
+      ],
+      activeRect: null,
+    });
+
+  it('draws a top-right corner triangle using the theme token color', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, commentScene(), { ...defaultTheme, commentMarkerColor: '#123456' }, { width: 200, height: 100 });
+    // Marker triangle: moveTo(44,0) → lineTo(50,0) → lineTo(50,6) → closePath → fill.
+    const start = ctx.calls.findIndex((c) => c.method === 'moveTo' && c.args[0] === 44 && c.args[1] === 0);
+    expect(start).toBeGreaterThanOrEqual(0);
+    const after = ctx.calls.slice(start + 1, start + 4).map((c) => ({ method: c.method, args: c.args }));
+    expect(after).toEqual([
+      { method: 'lineTo', args: [50, 0] },
+      { method: 'lineTo', args: [50, 6] },
+      { method: 'closePath', args: [] },
+    ]);
+    expect(methods(ctx)).toContain('fill');
+  });
+
+  it('falls back to the default marker color when the theme token is unset', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, commentScene(), { ...defaultTheme, commentMarkerColor: undefined }, { width: 200, height: 100 });
+    expect(ctx.calls.some((c) => c.method === 'moveTo' && c.args[0] === 44 && c.args[1] === 0)).toBe(true);
+  });
+
+  it('does not draw a marker for uncommented cells', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, scene(), defaultTheme, { width: 200, height: 100 });
+    expect(ctx.calls.some((c) => c.method === 'moveTo' && c.args[0] === 44 && c.args[1] === 0)).toBe(false);
+  });
+});

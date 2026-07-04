@@ -4,6 +4,9 @@
 import { palettes, type ColorPalette, type PaletteName } from './palette.js';
 import { densityPresets, type Density, type DensityTokens } from './density.js';
 
+/** Default color of the cell-comment corner marker (Excel-like red). */
+export const DEFAULT_COMMENT_MARKER_COLOR = '#d64545';
+
 export interface GridTheme {
   fontFamily: string;
   fontSize: number;
@@ -18,6 +21,8 @@ export interface GridTheme {
   activeBorder: string;
   readOnlyCellBackground?: string;
   editableCellBackground?: string;
+  /** Color of the comment marker triangle in a cell's top-right corner. */
+  commentMarkerColor?: string;
   cellPaddingX: number;
   rowHeaderWidth: number;
   colHeaderHeight: number;
@@ -57,6 +62,7 @@ export const defaultTheme: GridTheme = {
   activeBorder: '#2563eb',
   readOnlyCellBackground: undefined,
   editableCellBackground: undefined,
+  commentMarkerColor: DEFAULT_COMMENT_MARKER_COLOR,
   cellPaddingX: 6,
   rowHeaderWidth: 48,
   colHeaderHeight: 24,
@@ -107,6 +113,7 @@ export function buildTheme(options: BuildThemeOptions = {}): GridTheme {
     editableCellBackground: undefined,
     headerLineHeight: DEFAULT_HEADER_LINE_HEIGHT,
     headerPaddingY: DEFAULT_HEADER_PADDING_Y,
+    commentMarkerColor: DEFAULT_COMMENT_MARKER_COLOR,
     ...palette,
     ...options.overrides,
   };

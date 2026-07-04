@@ -6,7 +6,7 @@
  */
 
 import { iconColor, lerpColor, type IconMark } from '@ai-path/tb-core';
-import type { GridTheme } from './theme.js';
+import { DEFAULT_COMMENT_MARKER_COLOR, type GridTheme } from './theme.js';
 import type { Scene, CellPaint } from './scene.js';
 import { defaultCellTypes, type CellTypeRegistry } from './cell-types.js';
 import { wrapLineHeight } from './measure.js';
@@ -193,6 +193,21 @@ function paintCell(
     align: cell.align ?? 'left',
     color: cell.cfStyle?.color,
   });
+
+  // Comment marker: a small triangle in the top-right corner, over the content.
+  if (cell.comment === true) {
+    const size = Math.min(6, rect.width, rect.height);
+    ctx.fillStyle = theme.commentMarkerColor ?? DEFAULT_COMMENT_MARKER_COLOR;
+    triangle(
+      ctx,
+      rect.x + rect.width - size,
+      rect.y,
+      rect.x + rect.width,
+      rect.y,
+      rect.x + rect.width,
+      rect.y + size,
+    );
+  }
 }
 
 /**

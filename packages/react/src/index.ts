@@ -1,6 +1,6 @@
 /** @ai-path/tb-react — canvas-rendered, virtualized React data grid. */
 
-export { LatticaGrid, type LatticaGridHandle, type LatticaGridProps } from './LatticaGrid.js';
+export { LatticaGrid, TOOLTIP_DELAY_MS, type LatticaGridHandle, type LatticaGridProps } from './LatticaGrid.js';
 export { LatticaStatusBar, type LatticaStatusBarProps } from './StatusBar.js';
 export { LatticaFormulaBar, type LatticaFormulaBarProps } from './FormulaBar.js';
 export { LatticaColumnSettings, type LatticaColumnSettingsProps } from './ColumnSettings.js';
@@ -31,6 +31,7 @@ export {
   DEFAULT_FONT_FAMILY,
   DEFAULT_HEADER_LINE_HEIGHT,
   DEFAULT_HEADER_PADDING_Y,
+  DEFAULT_COMMENT_MARKER_COLOR,
   type GridTheme,
   type BuildThemeOptions,
 } from './theme.js';
