@@ -56,6 +56,8 @@
 凡例: ✅完了 / 🚧進行中 / ⏳未着手
 
 ## 変更履歴
+- 2026-07-05: **React SSR-safe import / first render**。
+  - `@ai-path/lattica-react` の public module graph と `LatticaGrid` / `LatticaColumnSettings` / `LatticaStatusBar` / `LatticaFormulaBar` の node 環境 SSR を回帰テスト化。App Router で `next/dynamic({ ssr:false })` 不要の方針を明文化。
 - 2026-07-05: **Momotani Wave 1 編集ライフサイクル / 入力制御**。
   - `cellcommit` イベントを追加。edit/paste/fill/delete/undo/redo の committed changes を raw 編集テキストの prev/next と visual/physical 座標で通知し、`<LatticaGrid onCellCommit>` から購読可能にした。
   - UI 編集向け read-only 制御を追加。`setColumnEditable` / `setCellReadOnly` / `isCellEditable` と、テーマの `readOnlyCellBackground` / `editableCellBackground` を低優先度セル背景として結線。

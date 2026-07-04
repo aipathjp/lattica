@@ -292,6 +292,10 @@ await m.ensureRange(start, end); m.getRow(i); m.getTotal(); m.subscribe(rerender
 - **No runtime deps** in core/io (self-built ZIP/deflate/PDF). Keep it that way.
 - **PDF** uses Helvetica/WinAnsi; non-Latin-1 chars become `?` (no font embedding).
 
+## SSR/Next.js: dynamic import not required (server-safe import guaranteed)
+
+`@ai-path/lattica-react` must import and server-render in Next.js App Router without `next/dynamic({ ssr: false })`; keep browser globals in effects/event handlers or behind `typeof` guards, and preserve the node-environment SSR test.
+
 ## If you modify this repo
 
 - Tests: **Vitest**, unit tests next to source (`foo.ts` → `foo.test.ts`).
