@@ -239,3 +239,6 @@
   - **`<LatticaGrid fill />`**：`ResizeObserver` で親要素を実測し、**横幅/高さいっぱい**に自動拡張。コンテナを `100%`/`100vh`/`resize:both` 等にするだけで全画面・可変サイズに。
   - デモ `/fullscreen`（Fit width / Full screen / Resizable box / Fixed の切替、数式バー＋ステータスバー、書式付き入力の確認）。
   - 全体 **1955テスト・100%カバレッジ**。typecheck/lint/build クリーン。
+- 2026-07-04: **Grid view controls 追加**。
+  - `<LatticaGrid>` に `showRowNumbers` / `sortable` / `showSortIcons` / `filterable` / `showFilterIcons` を追加（全て既定 true）。行番号ガター非表示時は effective geometry でセル座標を左端へ詰め、ソート/フィルタ UI はアイコンまたは列ヘッダー/コンテキストメニュー経由に切替可能。
+  - examples/playground `/data-ops` に 5 つの表示制御トグルを追加。
