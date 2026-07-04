@@ -415,6 +415,16 @@ export class GridController {
     this.emitViewState();
   }
 
+  /** Set visibility for a physical column. Out-of-range columns are ignored. */
+  setColumnVisible(physicalCol: number, visible: boolean): void {
+    if (!validIndex(physicalCol, this.colCount)) {
+      return;
+    }
+    this.view.cols.setHidden([physicalCol], !visible);
+    this.refreshColumns();
+    this.emitViewState();
+  }
+
   // ── Master / detail ────────────────────────────────────────────────────────
   /** Extra height reserved below an expanded master row (default 120). */
   setDetailHeight(height: number): void {
@@ -1177,6 +1187,27 @@ export class GridController {
   }
   resizeCol(col: number, width: number): void {
     this.colSizes.setSize(this.view.cols.getPhysicalIndex(col), width);
+    this.rebuildViewSizes();
+    this.emitter.emit('change', undefined);
+    this.emitViewState();
+  }
+
+  /** Set width for a physical column. Out-of-range columns are ignored. */
+  setColumnWidth(physicalCol: number, width: number): void {
+    if (!validIndex(physicalCol, this.colCount)) {
+      return;
+    }
+    this.colSizes.setSize(physicalCol, width);
+    this.rebuildViewSizes();
+    this.emitter.emit('change', undefined);
+    this.emitViewState();
+  }
+
+  /** Reset every customized physical column width to the controller default. */
+  resetColumnWidths(): void {
+    for (const col of this.colSizes.getOverrides().keys()) {
+      this.colSizes.resetSize(col);
+    }
     this.rebuildViewSizes();
     this.emitter.emit('change', undefined);
     this.emitViewState();

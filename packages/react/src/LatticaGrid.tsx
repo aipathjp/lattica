@@ -542,7 +542,9 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     getCfStyle: (r, c) => controller.getCellStyle(r, c),
     getMerge: (r, c) => controller.getMerge(r, c),
   });
-  const colHeaders = columnHeaderCells(geom, scroll.left, scene.visibleCols, layout);
+  const colHeaders = columnHeaderCells(geom, scroll.left, scene.visibleCols, layout, (leaf) =>
+    controller.view.cols.getVisualIndex(leaf),
+  );
   const rowHeaders = rowHeaderCells(geom, scroll.top, scene.visibleRows);
 
   // Frozen header cells paint last (and opaque) so scrolled headers slide

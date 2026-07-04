@@ -39,12 +39,19 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): b
  * Position column header cells. When `layout` is provided, multi-level group
  * cells are laid out across `layout.depth` bands; otherwise a single row of
  * column letters is produced for the visible columns.
+ *
+ * Layout leaf indices are *definition* (physical) indices; on-screen positions
+ * are *visual* indices. `leafToVisual` translates between the two (returning a
+ * negative value for hidden leaves) so hidden columns drop out of the header
+ * band instead of desyncing it from the canvas. Omitting it assumes the
+ * identity mapping (no hidden/moved columns).
  */
 export function columnHeaderCells(
   geom: GridGeometry,
   scrollLeft: number,
   visibleCols: readonly number[],
   layout: HeaderLayout | null,
+  leafToVisual: (leaf: number) => number = (leaf) => leaf,
 ): PositionedHeader[] {
   if (visibleCols.length === 0) {
     return [];
@@ -71,11 +78,26 @@ export function columnHeaderCells(
   const result: PositionedHeader[] = [];
   for (const row of layout.rows) {
     for (const cell of row) {
-      if (!overlaps(cell.startLeaf, cell.endLeaf, firstCol, lastCol)) {
+      // Visual extent of the cell's still-visible leaves (hidden ones drop out).
+      let minVisual = -1;
+      let maxVisual = -1;
+      for (let leaf = cell.startLeaf; leaf < cell.endLeaf; leaf++) {
+        const visual = leafToVisual(leaf);
+        if (visual < 0) {
+          continue;
+        }
+        if (minVisual === -1 || visual < minVisual) {
+          minVisual = visual;
+        }
+        if (visual > maxVisual) {
+          maxVisual = visual;
+        }
+      }
+      if (minVisual === -1 || !overlaps(minVisual, maxVisual + 1, firstCol, lastCol)) {
         continue;
       }
-      const left = columnX(geom, scrollLeft, cell.startLeaf);
-      const right = columnX(geom, scrollLeft, cell.endLeaf - 1) + geom.colSizes.getSize(cell.endLeaf - 1);
+      const left = columnX(geom, scrollLeft, minVisual);
+      const right = columnX(geom, scrollLeft, maxVisual) + geom.colSizes.getSize(maxVisual);
       result.push({
         id: cell.id,
         label: cell.label,
@@ -86,7 +108,7 @@ export function columnHeaderCells(
         isGroup: cell.isGroup,
         collapsible: cell.collapsible,
         collapsed: cell.collapsed,
-        ...(cell.isGroup ? {} : { col: cell.startLeaf }),
+        ...(cell.isGroup ? {} : { col: minVisual }),
       });
     }
   }

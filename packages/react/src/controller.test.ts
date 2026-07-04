@@ -1012,6 +1012,50 @@ describe('view-state persistence', () => {
     expect(listener).toHaveBeenCalledTimes(9);
   });
 
+  it('sets physical column visibility and ignores out-of-range columns', () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    const change = vi.fn();
+    const viewstate = vi.fn();
+    c.on('change', change);
+    c.on('viewstate', viewstate);
+
+    c.moveColumn(0, 2);
+    c.setColumnVisible(0, false);
+    expect(c.isColumnHidden(0)).toBe(true);
+    expect(c.getColCount()).toBe(2);
+    c.setColumnVisible(0, true);
+    expect(c.isColumnHidden(0)).toBe(false);
+    expect(c.getColCount()).toBe(3);
+
+    c.setColumnVisible(-1, false);
+    c.setColumnVisible(9, false);
+    expect(change).toHaveBeenCalled();
+    expect(viewstate).toHaveBeenCalledTimes(3);
+  });
+
+  it('sets and resets physical column widths', () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    const change = vi.fn();
+    const viewstate = vi.fn();
+    c.on('change', change);
+    c.on('viewstate', viewstate);
+    c.moveColumn(0, 2);
+
+    c.setColumnWidth(0, 150);
+    expect(c.captureViewState().columnWidths).toEqual({ 0: 150 });
+    expect(c.getColumnWidth(c.view.cols.getVisualIndex(0))).toBe(150);
+
+    c.setColumnWidth(-1, 99);
+    c.setColumnWidth(99, 99);
+    expect(c.captureViewState().columnWidths).toEqual({ 0: 150 });
+
+    c.resetColumnWidths();
+    expect(c.captureViewState().columnWidths).toBeUndefined();
+    expect(c.getColumnWidth(c.view.cols.getVisualIndex(0))).toBe(100);
+    expect(change).toHaveBeenCalled();
+    expect(viewstate).toHaveBeenCalledTimes(3);
+  });
+
   it('uses present empty fields to reset that slice while omitted fields layer over prior state', () => {
     const c = new GridController({ rowCount: 3, colCount: 3 });
     c.resizeCol(0, 120);

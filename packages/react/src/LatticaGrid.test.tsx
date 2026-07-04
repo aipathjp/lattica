@@ -27,6 +27,15 @@ describe('LatticaGrid rendering', () => {
     expect(screen.getByText('1')).toBeTruthy();
   });
 
+  it('removes the DOM header of a hidden column when explicit columns are given', () => {
+    const c = new GridController({ rowCount: 3, colCount: 3 });
+    renderGrid(c, [{ headerName: 'One' }, { headerName: 'Two' }, { headerName: 'Three' }]);
+    expect(screen.getByText('Two')).toBeTruthy();
+    act(() => c.hideColumn(1));
+    expect(screen.queryByText('Two')).toBeNull();
+    expect(screen.getByText('Three')).toBeTruthy();
+  });
+
   it('renders row numbers plus sort and filter icons by default', () => {
     const c = new GridController({ rowCount: 3, colCount: 2 });
     renderGrid(c);
