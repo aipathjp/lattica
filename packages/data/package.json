@@ -1,6 +1,6 @@
 {
   "name": "@ai-path/lattica-data",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Index mapping (physical<->visual) and data-source binding for Lattica: the foundation for hiding, moving, sorting, filtering, trimming, and grouping.",
   "license": "MIT",
   "type": "module",
