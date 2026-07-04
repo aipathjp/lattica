@@ -99,6 +99,148 @@ function isTruthy(value: unknown): boolean {
   return false;
 }
 
+// ── Bar cells (pseudo-Gantt) ────────────────────────────────────────────────
+
+/**
+ * Parsed shape of a `bar` cell value. Cells accept either a JSON object
+ * (`{ color?, label?, ratio? }`), a JSON string of the same shape, or a plain
+ * string (treated as the label of a full-width bar).
+ */
+export interface BarCellSpec {
+  /** Bar fill color (any CSS color); the theme accent when omitted. */
+  color?: string;
+  /** Text drawn on the bar (ellipsized when it overflows). */
+  label?: string;
+  /** Bar width as a fraction of the cell width (clamped to 0..1); 1 when omitted. */
+  ratio?: number;
+}
+
+/**
+ * Parse a `bar` cell value into a {@link BarCellSpec}. Returns `null` for
+ * malformed JSON or unexpected values, signalling the renderer to fall back to
+ * plain text rendering.
+ */
+export function parseBarValue(value: unknown): BarCellSpec | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') {
+      return null;
+    }
+    if (!trimmed.startsWith('{')) {
+      return { label: value };
+    }
+    try {
+      return specFromRecord(JSON.parse(trimmed) as Record<string, unknown>);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    return specFromRecord(value as Record<string, unknown>);
+  }
+  return null;
+}
+
+/** Validate field types of a candidate bar object; `null` when malformed. */
+function specFromRecord(record: Record<string, unknown>): BarCellSpec | null {
+  const { color, label, ratio } = record;
+  if (color !== undefined && typeof color !== 'string') {
+    return null;
+  }
+  if (label !== undefined && typeof label !== 'string') {
+    return null;
+  }
+  if (ratio !== undefined && (typeof ratio !== 'number' || !Number.isFinite(ratio))) {
+    return null;
+  }
+  const spec: BarCellSpec = {};
+  if (color !== undefined) {
+    spec.color = color;
+  }
+  if (label !== undefined) {
+    spec.label = label;
+  }
+  if (ratio !== undefined) {
+    spec.ratio = Math.min(1, Math.max(0, ratio));
+  }
+  return spec;
+}
+
+/**
+ * Shorten `text` with a trailing ellipsis so it measures within `maxWidth`.
+ * Returns the text unchanged when it already fits, and an empty string when
+ * not even a single character plus the ellipsis fits.
+ */
+export function truncateWithEllipsis(
+  text: string,
+  maxWidth: number,
+  measure: (text: string) => number,
+): string {
+  if (measure(text) <= maxWidth) {
+    return text;
+  }
+  let end = text.length;
+  while (end > 0 && measure(`${text.slice(0, end)}…`) > maxWidth) {
+    end--;
+  }
+  return end === 0 ? '' : `${text.slice(0, end)}…`;
+}
+
+/** Readable label color for a bar fill: dark text on light hex fills, else white. */
+function barLabelColor(color: string): string {
+  const hex = /^#([0-9a-fA-F]{6})$/.exec(color);
+  if (hex === null) {
+    return '#ffffff';
+  }
+  const n = parseInt(hex[1]!, 16);
+  const luminance = 0.299 * ((n >> 16) & 0xff) + 0.587 * ((n >> 8) & 0xff) + 0.114 * (n & 0xff);
+  return luminance > 160 ? '#1f2937' : '#ffffff';
+}
+
+/** Real contexts expose `measureText`; the minimal {@link Canvas2D} does not. */
+type MeasuringCanvas = Canvas2D & { measureText?: (text: string) => { width: number } };
+
+/**
+ * A horizontal bar (pseudo-Gantt segment) filling `ratio` of the cell width,
+ * with an optional label drawn on the bar. Combined with merged cells the bar
+ * spans the whole merge area, which is the building block for cell-based
+ * production-plan Gantt charts. Unexpected values render as plain text.
+ */
+export const barRenderer: CellRenderer = (c) => {
+  const spec = parseBarValue(c.value);
+  if (spec === null) {
+    drawCellText(c);
+    return;
+  }
+  const { ctx, rect, theme } = c;
+  const inset = 2;
+  const barWidth = Math.max(0, rect.width - inset * 2) * (spec.ratio ?? 1);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(rect.x, rect.y, rect.width, rect.height);
+  ctx.clip();
+  const color = spec.color ?? theme.activeBorder;
+  if (barWidth > 0) {
+    ctx.fillStyle = color;
+    ctx.fillRect(rect.x + inset, rect.y + inset, barWidth, rect.height - inset * 2);
+  }
+  const label = spec.label ?? '';
+  if (label !== '') {
+    const measurable = ctx as MeasuringCanvas;
+    const measure = (text: string): number =>
+      measurable.measureText !== undefined
+        ? measurable.measureText(text).width
+        : text.length * theme.fontSize * 0.6;
+    const shown = truncateWithEllipsis(label, Math.max(0, barWidth - theme.cellPaddingX * 2), measure);
+    if (shown !== '') {
+      ctx.fillStyle = barLabelColor(color);
+      ctx.textAlign = 'left';
+      ctx.fillText(shown, rect.x + inset + theme.cellPaddingX, rect.y + rect.height / 2);
+    }
+  }
+  ctx.restore();
+};
+
 /** Built-in renderers keyed by cell-type name. */
 export const builtinRenderers: Readonly<Record<string, CellRenderer>> = {
   text: textRenderer,
@@ -106,6 +248,7 @@ export const builtinRenderers: Readonly<Record<string, CellRenderer>> = {
   numeric: numberRenderer,
   boolean: booleanRenderer,
   checkbox: booleanRenderer,
+  bar: barRenderer,
 };
 
 /** A registry resolving cell-type names to renderers, with a text default. */
