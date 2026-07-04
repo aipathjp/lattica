@@ -12,6 +12,26 @@
 - 公開契約は互換性維持のため変更なし: エクスポート名・型名（`LatticaGrid` / `LatticaColumnSettings` / `GridController` 等）、`data-testid="lattica-*"`、CSS class `lattica-static-table`。
 - 本文書以下の履歴記述は当時の呼称のまま保持する。
 
+## 2026-07-05 — tayca 移行要件バッチ (P1/P2 全 10 機能)
+
+tayca-okayama-qc の Handsontable 16 置換調査 (`docs/PRODUCT_REQUIREMENTS_TAYCA.md`) で洗い出した P1/P2 要件を、10 並列 worktree エージェントで一括実装・逐次統合。全 PR ローカル full-gate (build/typecheck/lint/coverage 100%) で検証 (CI 課金停止中)。統合後 **2334 テスト・100% 維持**。
+
+| PR | 機能 | 要件 |
+|---|---|---|
+| #58 | `bar` セル型 (mergeCells 併用の擬似ガントバー、D&D は将来) | P2-4 |
+| #59 | 複数行ヘッダーラベル (`\n`) + 単位行の rowSpan 吸収 + `getHeaderHeight` | P1-2 |
+| #60 | `wrap` 列の複数行描画 + `autoSizeRows` (opt-in) | P1-6 |
+| #61 | `EditorRegistry` カスタムエディタ登録 + `ColumnDef.editor` | P2-1 |
+| #63 | `setDisplayOverride` / `displayValue` prop (表示専用差し替え) | P1-3 |
+| #64 | コメント grid 結線 (コーナーマーカー + hover) + `cellTooltip` | P2-2 |
+| #65 | `summaryRows` 固定集計フッター行 (sum/avg/min/max/count/カスタム) | P2-3 |
+| #66 | `elapsed` 列型 + time オプション (小数時間 / Excel シリアル) + 桁数補完網羅 | P1-1a |
+| #67 | 全角正規化/拒否 `fullWidthMode` + `inputreject` イベント + 空=null/0表示保証 | P1-1b |
+| #68 | `enterMoves`/`enterBeginsEditing`/`tabNavigation`/`outsideClickDeselects`/`selectionDisabled`/`undo.setEnabled`/contextMenu プリセット | P1-4+P1-5 |
+
+- #62: PR #61 で誤混入した `.claude/` ハーネスを untrack し `.gitignore` へ追加 (D-49 非コミット運用)。
+- P0 (cellMeta 層 / アクションセル / autoHeight / commit 強制 / 行座標 API / insertRow 等) は未着手 — 次バッチ。
+
 ## サマリ
 
 | 区分 | 状態 |

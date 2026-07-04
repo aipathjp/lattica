@@ -355,6 +355,145 @@ await m.ensureRange(start, end); m.getRow(i); m.getTotal(); m.subscribe(rerender
 
 `@ai-path/tb-react` must import and server-render in Next.js App Router without `next/dynamic({ ssr: false })`; keep browser globals in effects/event handlers or behind `typeof` guards, and preserve the node-environment SSR test.
 
+## Manufacturing-report features (tayca batch, 2026-07-05)
+
+Ten additive features shipped for the Handsontable-replacement requirements in
+`docs/PRODUCT_REQUIREMENTS_TAYCA.md` (PRs #58–#68). All are opt-in and
+backward compatible.
+
+### Time & elapsed input (`time` options, `elapsed` type)
+
+```ts
+controller.setColumnType(2, 'time');                               // 930 / 1613 / 635 / 18 → HH:MM (range-checked)
+controller.setColumnType(3, 'time', { timeOrDecimalHours: true }); // "1.5" stays a decimal-hours number
+controller.setColumnType(4, 'time', { excelTimeSerial: true });    // "0.5" (0<x<1) → "12:00"
+controller.setColumnType(5, 'elapsed');                            // "30:15" stored as-is, displayed "1:06:15"
+controller.getColumnTypeOptions(3);                                // → { timeOrDecimalHours: true }
+```
+
+Pure helpers: `normalizeFlexibleTimeInput`, `excelTimeSerialToHhMm`,
+`parseElapsedTime`, `normalizeElapsedInput`, `formatElapsedDisplay`.
+
+### Full-width input policy + reject event
+
+`number`/`time` columns normalize zenkaku digits (０-９ ．，－−＋：) by default.
+
+```tsx
+<LatticaGrid onInputReject={(e) => toast(`${e.reason}: ${e.raw}`)} ... />
+// e: { row, col, raw, reason: 'fullwidth' | 'transform' | 'validator' }
+```
+
+```ts
+controller.setColumnFullWidthMode(1, 'reject');  // 'reject' | 'normalize' | 'off' | null(=default)
+// ColumnDef: { field: 'qty', type: 'number', fullWidthMode: 'reject' }
+```
+
+Cleared cells always commit as empty (stored `null`, never `""`); numeric `0`
+renders through the column format (`"0.00"`), never blank.
+
+### Multi-line header labels & unit-tier merge
+
+`headerName` may contain `\n` (renders multi-line; header band auto-grows).
+A non-collapsible group whose only child is a `headerName: ''` leaf is
+absorbed: the parent label spans down to the bottom header row (3-tier
+group/name/unit layouts with unit-less columns).
+
+```ts
+controller.getHeaderHeight();      // effective band height (px) — align external strips with this
+controller.getBaseHeaderHeight();  // pre-expansion base
+// Theme tokens: headerLineHeight (16), headerPaddingY (3)
+```
+
+### Display-only override
+
+```tsx
+<LatticaGrid displayValue={(row, col, base) => auditPreview?.get(`${row}:${col}`) ?? null} ... />
+// or controller.setDisplayOverride(fn) / setDisplayOverride(null) to clear
+```
+
+Painted text only — stored values, edit text, and copy output are untouched.
+
+### Navigation / selection / undo / context-menu config
+
+```tsx
+<LatticaGrid
+  enterMoves={{ row: 0, col: 1 }}   // Enter commits then moves right
+  enterBeginsEditing={false}
+  tabNavigation={false}
+  outsideClickDeselects={false}
+  selectionDisabled                  // view-only: no selection visuals/interaction
+  contextMenu="clipboard-only"       // 'none' | 'clipboard-only' | 'full' | (target) => MenuItemSpec[]
+  ...
+/>
+```
+
+`controller.undo.setEnabled(false)` pauses history (push/undo/redo become
+no-ops; `canUndo()`/`canRedo()` report false) — re-enable with `setEnabled(true)`.
+
+### Word wrap + row auto-sizing
+
+```ts
+// ColumnDef: { field: 'note', wrap: true }  — or controller.setColumnWrap(col, true)
+controller.autoSizeRows({ measure, font: '13px sans-serif', lineHeight: wrapLineHeight(13) });
+```
+
+Wrapped columns paint multi-line (clipped to the row); non-wrap columns keep
+the single-line ellipsis path with zero added cost.
+
+### Custom editor registry
+
+```tsx
+const editors = new EditorRegistry();
+editors.registerEditor('color-picker', ({ value, container, commit, cancel }) => {
+  const input = document.createElement('input');
+  input.type = 'color'; input.value = value || '#000000';
+  input.onchange = () => commit(input.value);
+  container.appendChild(input);
+  return { focus: () => input.focus(), destroy: () => input.remove() };
+}, { commitOnOutsideClick: true });
+
+<LatticaGrid editors={editors} columns={[{ headerName: 'Color', field: 'c', editor: 'color-picker' }]} ... />
+```
+
+`commit(next)` joins the normal commit path (sanitize/validation/undo/
+`cellcommit` source `'edit'`). Unregistered kinds silently fall back to the
+text editor.
+
+### Comments & tooltips
+
+```ts
+controller.setComment(row, col, '異常値検知');  // empty/blank deletes; marker paints top-right
+controller.getComment(row, col); controller.hasComment(row, col);
+```
+
+```tsx
+<LatticaGrid cellTooltip={(row, col) => anomaly(row, col) ? '判定基準範囲外' : null} ... />
+// Hover tooltip (data-testid="lattica-tooltip", 500ms dwell). Comments win over cellTooltip.
+// Theme token: commentMarkerColor (default '#d64545')
+```
+
+### Pinned summary (footer) rows
+
+```tsx
+<LatticaGrid
+  summaryRows={[{ label: '合計', cells: { qty: 'sum', price: 'avg', memo: (vs) => `${vs.length}件` } }]}
+  ...
+/>
+```
+
+Aggregates (`sum|avg|min|max|count` or a custom fn) run over filtered visible
+rows, re-compute on commit/filter/sort, render pinned below the body
+(read-only, non-selectable), and apply the column number format. Theme tokens:
+`summaryRowBackground`, `summaryRowTextColor`.
+
+### `bar` cell type (pseudo-Gantt)
+
+```ts
+controller.setColumnType(6, 'bar');
+// Cell value: '{"color":"#2563eb","label":"Build","ratio":0.6}' or a plain string label.
+// Spans merged ranges; malformed JSON falls back to plain text. Drag-to-resize is future work.
+```
+
 ## If you modify this repo
 
 - Tests: **Vitest**, unit tests next to source (`foo.ts` → `foo.test.ts`).
