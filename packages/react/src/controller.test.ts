@@ -427,6 +427,75 @@ describe('column input pipeline', () => {
     c.commitEdit();
     expect(c.getEditText(0, 0)).toBe('1330');
   });
+
+  it('stores and clears column type options via setColumnType', () => {
+    const c = make();
+    c.setColumnType(0, 'time', { timeOrDecimalHours: true });
+    expect(c.getColumnTypeOptions(0)).toEqual({ timeOrDecimalHours: true });
+    expect(c.getColumnTypeOptions(1)).toBeUndefined();
+    c.setColumnType(0, 'time');
+    expect(c.getColumnTypeOptions(0)).toBeUndefined();
+  });
+
+  it('accepts decimal hours on a time column with timeOrDecimalHours', () => {
+    const c = make();
+    c.setColumnType(0, 'time', { timeOrDecimalHours: true });
+    c.beginEdit(0, 0);
+    c.updateDraft('1.5x');
+    expect(c.getEdit()?.draft).toBe('1.5');
+    c.commitEdit();
+    expect(c.getEditText(0, 0)).toBe('1.5');
+    expect(c.getValue(0, 0)).toBe(1.5);
+
+    c.beginEdit(1, 0, '1613');
+    c.commitEdit();
+    expect(c.getEditText(1, 0)).toBe('16:13');
+  });
+
+  it('absorbs Excel time serials on a time column with excelTimeSerial', () => {
+    const c = make();
+    c.setColumnType(0, 'time', { excelTimeSerial: true });
+    c.beginEdit(0, 0, '0.5');
+    c.commitEdit();
+    expect(c.getEditText(0, 0)).toBe('12:00');
+  });
+
+  it('falls back to the strict time pipeline when type options are all disabled', () => {
+    const c = make();
+    c.setColumnType(0, 'time', {});
+    c.beginEdit(0, 0);
+    c.updateDraft('1.30');
+    expect(c.getEdit()?.draft).toBe('130'); // strict sanitizer drops the dot
+    c.commitEdit();
+    expect(c.getEditText(0, 0)).toBe('01:30');
+  });
+
+  it('normalizes the elapsed type end-to-end and formats its display', () => {
+    const c = make();
+    c.setColumnType(0, 'elapsed');
+    c.beginEdit(0, 0);
+    c.updateDraft('3a0:15');
+    expect(c.getEdit()?.draft).toBe('30:15');
+    c.commitEdit();
+    expect(c.getEditText(0, 0)).toBe('30:15');
+    expect(c.getDisplay(0, 0)).toBe('1:06:15');
+
+    c.beginEdit(1, 0, '9:05');
+    c.commitEdit();
+    expect(c.getDisplay(1, 0)).toBe('09:05');
+  });
+
+  it('cancels invalid elapsed input and leaves non-string elapsed values untouched', () => {
+    const c = make();
+    c.setColumnType(0, 'elapsed');
+    c.beginEdit(0, 0, '1:99');
+    c.commitEdit();
+    expect(c.getEditText(0, 0)).toBe('');
+
+    // A numeric value in an elapsed column falls through to the plain formatter.
+    c.setCellText(1, 0, '42');
+    expect(c.getDisplay(1, 0)).toBe('42');
+  });
 });
 
 describe('resizing', () => {
