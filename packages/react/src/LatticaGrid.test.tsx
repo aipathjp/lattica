@@ -3,11 +3,15 @@ import { render, cleanup, fireEvent, screen, waitFor, act } from '@testing-libra
 import { LatticaGrid } from './LatticaGrid.js';
 import { GridController } from './controller.js';
 import type { ColumnNode } from '@ai-path/lattica-core';
+import type { LatticaGridProps } from './LatticaGrid.js';
 
 afterEach(cleanup);
 
-const renderGrid = (controller: GridController, columns?: ColumnNode[]) =>
-  render(<LatticaGrid controller={controller} columns={columns} width={400} height={200} />);
+const renderGrid = (
+  controller: GridController,
+  columns?: ColumnNode[],
+  props?: Partial<Omit<LatticaGridProps, 'controller' | 'columns'>>,
+) => render(<LatticaGrid controller={controller} columns={columns} width={400} height={200} {...props} />);
 
 describe('LatticaGrid rendering', () => {
   it('renders an ARIA grid with a canvas and headers', () => {
@@ -22,6 +26,30 @@ describe('LatticaGrid rendering', () => {
     // Row numbers present.
     expect(screen.getByText('1')).toBeTruthy();
   });
+
+  it('renders row numbers plus sort and filter icons by default', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    renderGrid(c);
+    expect(screen.getAllByRole('rowheader').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('lattica-sort-0')).toBeTruthy();
+    expect(screen.getByTestId('lattica-filter-0')).toBeTruthy();
+  });
+
+  it('hides row numbers and shifts cell coordinates flush-left', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    renderGrid(c, undefined, { showRowNumbers: false });
+    expect(screen.queryByRole('rowheader')).toBeNull();
+    const grid = screen.getByTestId('lattica-grid');
+    const zeroWidthCorner = Array.from(grid.children).find(
+      (el) => el instanceof HTMLElement && el.style.width === '0px' && el.style.height === '24px',
+    );
+    expect(zeroWidthCorner).toBeUndefined();
+    const band = screen.getAllByRole('columnheader')[0]!.parentElement!;
+    expect(band.style.left).toBe('0px');
+    c.selection.setActive({ row: 1, col: 1 });
+    fireEvent.mouseDown(grid, { clientX: 10, clientY: 40 });
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 0 });
+  });
 });
 
 describe('LatticaGrid interaction', () => {
@@ -33,6 +61,18 @@ describe('LatticaGrid interaction', () => {
     const { active } = c.selection.getState();
     expect(active.row).toBeGreaterThanOrEqual(1);
     expect(active.col).toBe(0);
+  });
+
+  it('emits cell clicks and scroll changes through optional callbacks', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    const onCellClick = vi.fn();
+    const onScrollChange = vi.fn();
+    renderGrid(c, undefined, { onCellClick, onScrollChange });
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.mouseDown(grid, { clientX: 60, clientY: 40 });
+    expect(onCellClick).toHaveBeenCalledWith({ row: 0, col: 0 }, expect.any(Object));
+    fireEvent.wheel(grid, { deltaX: 20, deltaY: 20 });
+    expect(onScrollChange).toHaveBeenCalledWith({ left: 20, top: 20 });
   });
 
   it('extends the selection with shift+mouse down', () => {
@@ -524,6 +564,26 @@ describe('LatticaGrid header sort', () => {
     expect(c.getSortDirection(0)).toBe('asc');
     expect(c.getSortDirection(1)).toBe('asc');
   });
+
+  it('disables sort UI and header-click sorting when sortable is false', () => {
+    const c = new GridController({ rowCount: 3, colCount: 3 });
+    renderGrid(c, undefined, { sortable: false });
+    expect(screen.queryByTestId('lattica-sort-0')).toBeNull();
+    fireEvent.click(screen.getAllByRole('columnheader')[0]!);
+    expect(c.getSortDirection(0)).toBe(null);
+  });
+
+  it('sorts by header clicks when sort icons are hidden, including additive shift-click', () => {
+    const c = new GridController({ rowCount: 3, colCount: 3 });
+    renderGrid(c, undefined, { showSortIcons: false });
+    expect(screen.queryByTestId('lattica-sort-0')).toBeNull();
+    const headers = screen.getAllByRole('columnheader');
+    fireEvent.click(headers[0]!);
+    expect(c.getSortDirection(0)).toBe('asc');
+    fireEvent.click(headers[1]!, { shiftKey: true });
+    expect(c.getSortDirection(0)).toBe('asc');
+    expect(c.getSortDirection(1)).toBe('asc');
+  });
 });
 
 describe('LatticaGrid nested rows', () => {
@@ -706,6 +766,28 @@ describe('LatticaGrid filter UI & column menu (Phase B-UI)', () => {
     fireEvent.contextMenu(grid, { clientX: 80, clientY: 8 });
     fireEvent.mouseDown(screen.getByText('Show all columns'));
     expect(c.getColCount()).toBe(3);
+  });
+
+  it('disables filter icons and prevents opening the filter panel when filterable is false', () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    seed(c);
+    renderGrid(c, undefined, { filterable: false });
+    expect(screen.queryByTestId('lattica-filter-0')).toBeNull();
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.contextMenu(grid, { clientX: 80, clientY: 8 });
+    expect(screen.queryByText('Filter…')).toBeNull();
+    expect(screen.queryByTestId('lattica-filter-panel')).toBeNull();
+  });
+
+  it('opens the filter panel from the column menu when filter icons are hidden', () => {
+    const c = new GridController({ rowCount: 4, colCount: 3 });
+    seed(c);
+    renderGrid(c, undefined, { showFilterIcons: false });
+    expect(screen.queryByTestId('lattica-filter-0')).toBeNull();
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.contextMenu(grid, { clientX: 80, clientY: 8 });
+    fireEvent.mouseDown(screen.getByText('Filter…'));
+    expect(screen.getByTestId('lattica-filter-panel')).toBeTruthy();
   });
 });
 

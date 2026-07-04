@@ -26,7 +26,7 @@ import type { GridController, EditState } from './controller.js';
 import { resolveTheme, type GridTheme } from './theme.js';
 import { buildScene } from './scene.js';
 import { paintScene, type Canvas2D } from './painter.js';
-import { cellRect, hitTest, type HitResult } from './geometry.js';
+import { cellRect, columnX, hitTest, type GridGeometry, type HitResult } from './geometry.js';
 import { interpretKey, type KeyInput } from './keyboard.js';
 import { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
 import { columnHeaderCells, rowHeaderCells } from './headers.js';
@@ -51,6 +51,16 @@ export interface LatticaGridProps {
   contextMenu?: (target: HitResult) => MenuItemSpec[];
   /** Render the detail panel for an expanded master row (by physical row index). */
   renderDetail?: (physicalRow: number) => ReactNode;
+  /** Show the auto-numbered row header gutter. Defaults to true. */
+  showRowNumbers?: boolean;
+  /** Enable the header sort UI. Defaults to true. */
+  sortable?: boolean;
+  /** Show clickable sort icons when sorting is enabled. Defaults to true. */
+  showSortIcons?: boolean;
+  /** Enable the header filter UI. Defaults to true. */
+  filterable?: boolean;
+  /** Show filter icons when filtering is enabled. Defaults to true. */
+  showFilterIcons?: boolean;
   /** セル領域クリック時（選択更新後） */
   onCellClick?: (hit: { row: number; col: number }, event: ReactMouseEvent<HTMLDivElement>) => void;
   /** スクロール位置が変わったとき */
@@ -63,12 +73,21 @@ interface MenuState {
   items: MenuItem[];
 }
 
+function effectiveGeometry(geom: GridGeometry, showRowNumbers: boolean): GridGeometry {
+  return showRowNumbers ? geom : { ...geom, rowHeaderWidth: 0 };
+}
+
 export function LatticaGrid(props: LatticaGridProps): ReactElement {
   const { controller, columns, onCellClick, onScrollChange } = props;
   const theme = resolveTheme(props.theme);
   const fill = props.fill ?? false;
   const fixedWidth = props.width ?? 640;
   const fixedHeight = props.height ?? 400;
+  const showRowNumbers = props.showRowNumbers ?? true;
+  const sortable = props.sortable ?? true;
+  const showSortIcons = props.showSortIcons ?? true;
+  const filterable = props.filterable ?? true;
+  const showFilterIcons = props.showFilterIcons ?? true;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const editorRef = useRef<HTMLElement | null>(null);
@@ -90,6 +109,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   // Effective pixel size: the measured container when `fill`, else the fixed size.
   const width = fill && measured !== null ? measured.w : fixedWidth;
   const height = fill && measured !== null ? measured.h : fixedHeight;
+  const geom = effectiveGeometry(controller.geometry(), showRowNumbers);
 
   // Measure the container when filling, so the canvas matches its parent.
   useEffect(() => {
@@ -156,7 +176,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     const scene = buildScene({
-      geom: controller.geometry(),
+      geom,
       scrollLeft: scroll.left,
       scrollTop: scroll.top,
       clientWidth: width,
@@ -177,9 +197,9 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   const ensureVisible = useCallback(() => {
     const { active } = controller.selection.getState();
     setScroll((prev) =>
-      scrollToCell(controller.geometry(), prev, width, height, active.row, active.col),
+      scrollToCell(geom, prev, width, height, active.row, active.col),
     );
-  }, [controller, width, height]);
+  }, [controller, geom, width, height]);
 
   const dispatchKey = useCallback(
     (input: KeyInput): boolean => {
@@ -253,12 +273,12 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
    * column/row reads as empty space instead of a phantom column/row.
    */
   const contentEdge = useCallback((): { right: number; bottom: number } => {
-    const g = controller.geometry();
+    const g = geom;
     return {
       right: g.rowHeaderWidth + g.colSizes.getTotalSize() - scroll.left,
       bottom: g.colHeaderHeight + g.rowSizes.getTotalSize() - scroll.top,
     };
-  }, [controller, scroll]);
+  }, [geom, scroll]);
 
   const onMouseDown = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -271,7 +291,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       // A drag starting on a header border resizes that column/row instead of selecting.
-      const border = hitResizeHandle(controller.geometry(), scroll.left, scroll.top, x, y);
+      const border = hitResizeHandle(geom, scroll.left, scroll.top, x, y);
       if (border !== null) {
         const startSize =
           border.type === 'col'
@@ -287,7 +307,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
         root.focus();
         return;
       }
-      const hit = hitTest(controller.geometry(), scroll.left, scroll.top, x, y);
+      const hit = hitTest(geom, scroll.left, scroll.top, x, y);
       switch (hit.region) {
         case 'cell':
           if (e.shiftKey) {
@@ -311,7 +331,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       }
       rootRef.current?.focus();
     },
-    [controller, scroll, contentEdge, onCellClick],
+    [controller, geom, scroll, contentEdge, onCellClick],
   );
 
   const onMouseMove = useCallback(
@@ -326,7 +346,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       const y = e.clientY - rect.top;
 
       if (fillDraggingRef.current) {
-        const hit = hitTest(controller.geometry(), scroll.left, scroll.top, x, y);
+        const hit = hitTest(geom, scroll.left, scroll.top, x, y);
         if (hit.region === 'cell') {
           fillTargetRef.current = { row: hit.row, col: hit.col };
         }
@@ -346,7 +366,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       }
 
       if (draggingRef.current) {
-        const hit = hitTest(controller.geometry(), scroll.left, scroll.top, x, y);
+        const hit = hitTest(geom, scroll.left, scroll.top, x, y);
         if (hit.region === 'cell') {
           controller.selection.extendTo({ row: hit.row, col: hit.col });
         }
@@ -354,10 +374,10 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       }
 
       // Idle hover: show a resize cursor when over a header border.
-      const border = hitResizeHandle(controller.geometry(), scroll.left, scroll.top, x, y);
+      const border = hitResizeHandle(geom, scroll.left, scroll.top, x, y);
       root.style.cursor = border === null ? '' : border.type === 'col' ? 'col-resize' : 'row-resize';
     },
-    [controller, scroll],
+    [controller, geom, scroll],
   );
 
   const onMouseUp = useCallback(() => {
@@ -369,6 +389,15 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     draggingRef.current = false;
     resizeRef.current = null;
   }, [controller]);
+
+  const openFilterPanel = useCallback(
+    (col: number, x: number, y: number): void => {
+      const facets = controller.columnFacets(col);
+      setFilterChecked(new Set(facets.map((f) => f.label)));
+      setFilterPanel({ col, x, y });
+    },
+    [controller],
+  );
 
   const defaultMenu = useCallback(
     (hit: HitResult): MenuItemSpec[] => {
@@ -383,15 +412,23 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       // Column-header actions: hide the clicked column / reveal all.
       if (hit.region === 'colHeader' && hit.col >= 0) {
         const col = hit.col;
+        const colX = columnX(geom, scroll.left, col);
+        items.push({ id: 'sep2', separator: true });
+        if (filterable && !showFilterIcons) {
+          items.push({
+            id: 'filter-col',
+            label: 'Filter…',
+            action: () => openFilterPanel(col, colX - geom.rowHeaderWidth, geom.colHeaderHeight),
+          });
+        }
         items.push(
-          { id: 'sep2', separator: true },
           { id: 'hide-col', label: 'Hide column', action: () => controller.hideColumn(col) },
           { id: 'show-all-cols', label: 'Show all columns', action: () => controller.showAllColumns() },
         );
       }
       return items;
     },
-    [controller],
+    [controller, filterable, geom, openFilterPanel, scroll.left, showFilterIcons],
   );
 
   const onContextMenu = useCallback(
@@ -410,11 +447,11 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       if (x >= edge.right || y >= edge.bottom) {
         return;
       }
-      const hit = hitTest(controller.geometry(), scroll.left, scroll.top, x, y);
+      const hit = hitTest(geom, scroll.left, scroll.top, x, y);
       const items = buildMenu(props.contextMenu ? props.contextMenu(hit) : defaultMenu(hit));
       setMenu({ x, y, items });
     },
-    [controller, scroll, props, defaultMenu, contentEdge],
+    [controller, geom, scroll, props, defaultMenu, contentEdge],
   );
 
   const runMenuItem = useCallback((item: MenuItem) => {
@@ -449,18 +486,17 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     (e: ReactWheelEvent<HTMLDivElement>) => {
       setScroll((prev) =>
         clampScroll(
-          controller.geometry(),
+          geom,
           { left: prev.left + e.deltaX, top: prev.top + e.deltaY },
           width,
           height,
         ),
       );
     },
-    [controller, width, height],
+    [geom, width, height],
   );
 
   const layout = headerModelRef.current?.getLayout() ?? null;
-  const geom = controller.geometry();
   const scene = buildScene({
     geom,
     scrollLeft: scroll.left,
@@ -473,7 +509,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     getAlign: (_r, c) => controller.getColumnAlign(c),
     getValue: (r, c) => controller.getValue(r, c),
     getCfStyle: (r, c) => controller.getCellStyle(r, c),
-      getMerge: (r, c) => controller.getMerge(r, c),
+    getMerge: (r, c) => controller.getMerge(r, c),
   });
   const colHeaders = columnHeaderCells(geom, scroll.left, scene.visibleCols, layout);
   const rowHeaders = rowHeaderCells(geom, scroll.top, scene.visibleRows);
@@ -710,6 +746,11 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
                     headerModelRef.current?.toggle(h.id);
                     force();
                   }
+                : sortable && !showSortIcons && h.col !== undefined
+                  ? (e) => {
+                      controller.toggleSort(h.col!, e.shiftKey);
+                      force();
+                    }
                 : undefined
             }
             style={{
@@ -728,48 +769,46 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
               fontFamily: theme.fontFamily,
               fontSize: theme.fontSize,
               color: theme.headerTextColor,
-              cursor: h.collapsible ? 'pointer' : 'default',
+              cursor: h.collapsible || (sortable && !showSortIcons && h.col !== undefined) ? 'pointer' : 'default',
             }}
           >
             {h.collapsible ? (h.collapsed ? '▸ ' : '▾ ') : ''}
             {h.label}
             {!h.isGroup && h.col !== undefined && (
               <>
-                <span
-                  role="button"
-                  aria-label={`filter column ${h.col}`}
-                  data-testid={`lattica-filter-${h.col}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const facets = controller.columnFacets(h.col!);
-                    setFilterChecked(new Set(facets.map((f) => f.label)));
-                    setFilterPanel({
-                      col: h.col!,
-                      x: h.x - geom.rowHeaderWidth,
-                      y: geom.colHeaderHeight,
-                    });
-                  }}
-                  style={{ marginLeft: 'auto', paddingRight: 2, cursor: 'pointer', userSelect: 'none' }}
-                >
-                  ▽
-                </span>
-                <span
-                  role="button"
-                  aria-label={`sort column ${h.col}`}
-                  data-testid={`lattica-sort-${h.col}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    controller.toggleSort(h.col!, e.shiftKey);
-                    force();
-                  }}
-                  style={{ paddingRight: 4, cursor: 'pointer', userSelect: 'none' }}
-                >
-                  {controller.getSortDirection(h.col) === 'asc'
-                    ? '▲'
-                    : controller.getSortDirection(h.col) === 'desc'
-                      ? '▼'
-                      : '⇅'}
-                </span>
+                {filterable && showFilterIcons && (
+                  <span
+                    role="button"
+                    aria-label={`filter column ${h.col}`}
+                    data-testid={`lattica-filter-${h.col}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openFilterPanel(h.col!, h.x - geom.rowHeaderWidth, geom.colHeaderHeight);
+                    }}
+                    style={{ marginLeft: 'auto', paddingRight: 2, cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    ▽
+                  </span>
+                )}
+                {sortable && showSortIcons && (
+                  <span
+                    role="button"
+                    aria-label={`sort column ${h.col}`}
+                    data-testid={`lattica-sort-${h.col}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      controller.toggleSort(h.col!, e.shiftKey);
+                      force();
+                    }}
+                    style={{ paddingRight: 4, cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    {controller.getSortDirection(h.col) === 'asc'
+                      ? '▲'
+                      : controller.getSortDirection(h.col) === 'desc'
+                        ? '▼'
+                        : '⇅'}
+                  </span>
+                )}
               </>
             )}
           </div>
@@ -777,77 +816,81 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       </div>
 
       {/* Row-number gutter (DOM). Ends at the last row. */}
-      <div
-        style={{
-          position: 'absolute',
-          top: geom.colHeaderHeight,
-          left: 0,
-          width: geom.rowHeaderWidth,
-          height: gutterHeight,
-          overflow: 'hidden',
-          background: theme.headerBackground,
-          borderRight: `1px solid ${theme.headerGridLineColor}`,
-        }}
-      >
-        {orderedRowHeaders.map((h) => (
-          <div
-            key={h.row}
-            role="rowheader"
-            style={{
-              position: 'absolute',
-              top: h.y - geom.colHeaderHeight,
-              left: 0,
-              width: geom.rowHeaderWidth,
-              height: h.height,
-              boxSizing: 'border-box',
-              background: theme.headerBackground,
-              borderBottom: `1px solid ${theme.headerGridLineColor}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontFamily: theme.fontFamily,
-              fontSize: theme.fontSize,
-              color: theme.headerTextColor,
-            }}
-          >
-            {controller.isRowParent(h.row) && (
-              <span
-                role="button"
-                aria-label={`toggle row group ${h.row}`}
-                data-testid={`lattica-rowgroup-${h.row}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  controller.toggleRowGroup(h.row);
-                  force();
-                }}
-                style={{
-                  marginLeft: 2 + controller.getRowDepth(h.row) * 8,
-                  marginRight: 2,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
-              >
-                {controller.isRowCollapsed(h.row) ? '▸' : '▾'}
-              </span>
-            )}
-            {h.label}
-          </div>
-        ))}
-      </div>
+      {showRowNumbers && (
+        <div
+          style={{
+            position: 'absolute',
+            top: geom.colHeaderHeight,
+            left: 0,
+            width: geom.rowHeaderWidth,
+            height: gutterHeight,
+            overflow: 'hidden',
+            background: theme.headerBackground,
+            borderRight: `1px solid ${theme.headerGridLineColor}`,
+          }}
+        >
+          {orderedRowHeaders.map((h) => (
+            <div
+              key={h.row}
+              role="rowheader"
+              style={{
+                position: 'absolute',
+                top: h.y - geom.colHeaderHeight,
+                left: 0,
+                width: geom.rowHeaderWidth,
+                height: h.height,
+                boxSizing: 'border-box',
+                background: theme.headerBackground,
+                borderBottom: `1px solid ${theme.headerGridLineColor}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: theme.fontFamily,
+                fontSize: theme.fontSize,
+                color: theme.headerTextColor,
+              }}
+            >
+              {controller.isRowParent(h.row) && (
+                <span
+                  role="button"
+                  aria-label={`toggle row group ${h.row}`}
+                  data-testid={`lattica-rowgroup-${h.row}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    controller.toggleRowGroup(h.row);
+                    force();
+                  }}
+                  style={{
+                    marginLeft: 2 + controller.getRowDepth(h.row) * 8,
+                    marginRight: 2,
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                  }}
+                >
+                  {controller.isRowCollapsed(h.row) ? '▸' : '▾'}
+                </span>
+              )}
+              {h.label}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Top-left corner. */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: geom.rowHeaderWidth,
-          height: geom.colHeaderHeight,
-          background: theme.headerBackground,
-          borderRight: `1px solid ${theme.headerGridLineColor}`,
-          borderBottom: `1px solid ${theme.headerGridLineColor}`,
-        }}
-      />
+      {showRowNumbers && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: geom.rowHeaderWidth,
+            height: geom.colHeaderHeight,
+            background: theme.headerBackground,
+            borderRight: `1px solid ${theme.headerGridLineColor}`,
+            borderBottom: `1px solid ${theme.headerGridLineColor}`,
+          }}
+        />
+      )}
 
       {/* Master/detail panels for expanded, visible rows. */}
       {props.renderDetail !== undefined &&
