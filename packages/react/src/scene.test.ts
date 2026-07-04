@@ -65,6 +65,25 @@ describe('buildScene', () => {
     expect(scene.cells.some((c) => c.selected && c.row === 1 && c.col === 1)).toBe(true);
   });
 
+  it('suppresses selection visuals when hideSelection is set', () => {
+    const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
+    sel.setActive({ row: 1, col: 1 });
+    sel.extendTo({ row: 2, col: 2 });
+    const scene = buildScene({
+      geom: geom(),
+      scrollLeft: 0,
+      scrollTop: 0,
+      clientWidth: 400,
+      clientHeight: 200,
+      selection: sel,
+      getDisplay: () => '',
+      hideSelection: true,
+    });
+    expect(scene.cells.some((c) => c.active)).toBe(false);
+    expect(scene.cells.some((c) => c.selected)).toBe(false);
+    expect(scene.activeRect).toBeNull();
+  });
+
   it('populates type/align/value/cfStyle from accessors when provided', () => {
     const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
     const scene = buildScene({

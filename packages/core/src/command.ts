@@ -51,12 +51,28 @@ export class UndoManager {
 
   private batching = false;
   private batch: Command[] = [];
+  private enabled = true;
 
   constructor(options: UndoManagerOptions = {}) {
     this.limit = options.limit ?? 100;
     if (this.limit < 1) {
       throw new RangeError('limit must be >= 1');
     }
+  }
+
+  /**
+   * Enable or disable history. While disabled, commands passed to
+   * {@link execute} still apply their effect but nothing is recorded, and
+   * {@link undo} / {@link redo} are no-ops. Existing history is retained and
+   * becomes usable again once re-enabled. Useful for temporarily pausing
+   * history (e.g. outside an edit mode, or during programmatic row loads).
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+  }
+
+  isEnabled(): boolean {
+    return this.enabled;
   }
 
   /** Apply a command and push it onto the undo stack (clearing redo). */
@@ -67,6 +83,9 @@ export class UndoManager {
 
   /** Record an already-applied command without re-applying it. */
   private record(command: Command): void {
+    if (!this.enabled) {
+      return;
+    }
     if (this.batching) {
       this.batch.push(command);
       return;
@@ -105,15 +124,18 @@ export class UndoManager {
   }
 
   canUndo(): boolean {
-    return this.undoStack.length > 0;
+    return this.enabled && this.undoStack.length > 0;
   }
 
   canRedo(): boolean {
-    return this.redoStack.length > 0;
+    return this.enabled && this.redoStack.length > 0;
   }
 
   /** Undo the most recent command. Returns the undone command, or null. */
   undo(): Command | null {
+    if (!this.enabled) {
+      return null;
+    }
     const command = this.undoStack.pop();
     if (command === undefined) {
       return null;
@@ -126,6 +148,9 @@ export class UndoManager {
 
   /** Redo the most recently undone command. Returns it, or null. */
   redo(): Command | null {
+    if (!this.enabled) {
+      return null;
+    }
     const command = this.redoStack.pop();
     if (command === undefined) {
       return null;

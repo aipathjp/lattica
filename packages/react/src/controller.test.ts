@@ -15,6 +15,34 @@ describe('formatValue', () => {
   });
 });
 
+describe('GridController behavior options', () => {
+  it('defaults to the historical navigation behavior', () => {
+    const c = make();
+    expect(c.enterMoves).toEqual({ row: 1, col: 0 });
+    expect(c.enterBeginsEditing).toBe(false);
+    expect(c.tabNavigation).toBe(true);
+    expect(c.outsideClickDeselects).toBe(true);
+    expect(c.selectionDisabled).toBe(false);
+  });
+
+  it('stores explicit behavior options', () => {
+    const c = new GridController({
+      rowCount: 3,
+      colCount: 3,
+      enterMoves: { row: 0, col: 1 },
+      enterBeginsEditing: true,
+      tabNavigation: false,
+      outsideClickDeselects: false,
+      selectionDisabled: true,
+    });
+    expect(c.enterMoves).toEqual({ row: 0, col: 1 });
+    expect(c.enterBeginsEditing).toBe(true);
+    expect(c.tabNavigation).toBe(false);
+    expect(c.outsideClickDeselects).toBe(false);
+    expect(c.selectionDisabled).toBe(true);
+  });
+});
+
 describe('GridController basics', () => {
   it('exposes dimensions and geometry', () => {
     const c = make();

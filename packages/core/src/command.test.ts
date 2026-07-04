@@ -140,6 +140,62 @@ describe('transactions', () => {
   });
 });
 
+describe('enable / disable', () => {
+  it('is enabled by default and reports state via isEnabled', () => {
+    const um = new UndoManager();
+    expect(um.isEnabled()).toBe(true);
+    um.setEnabled(false);
+    expect(um.isEnabled()).toBe(false);
+  });
+
+  it('applies but does not record while disabled', () => {
+    const log: number[] = [];
+    const um = new UndoManager();
+    um.setEnabled(false);
+    um.execute(makeSetCommand(log, 1));
+    expect(log).toEqual([1]); // the effect still happens
+    expect(um.undoDepth).toBe(0); // …but no history is kept
+    expect(um.canUndo()).toBe(false);
+  });
+
+  it('makes undo/redo no-ops while disabled and preserves history', () => {
+    const log: number[] = [];
+    const um = new UndoManager();
+    um.execute(makeSetCommand(log, 1));
+    um.undo();
+    expect(log).toEqual([]);
+
+    um.setEnabled(false);
+    expect(um.canUndo()).toBe(false);
+    expect(um.canRedo()).toBe(false); // stacks hidden while disabled
+    expect(um.undo()).toBeNull();
+    expect(um.redo()).toBeNull();
+    expect(log).toEqual([]); // nothing re-applied
+
+    um.setEnabled(true);
+    expect(um.canRedo()).toBe(true); // history survived the pause
+    um.redo();
+    expect(log).toEqual([1]);
+    expect(um.canUndo()).toBe(true);
+    um.undo();
+    expect(log).toEqual([]);
+  });
+
+  it('does not record transactions run while disabled', () => {
+    const log: number[] = [];
+    const um = new UndoManager();
+    um.setEnabled(false);
+    um.transaction(() => {
+      um.execute(makeSetCommand(log, 1));
+      um.execute(makeSetCommand(log, 2));
+    });
+    expect(log).toEqual([1, 2]);
+    expect(um.undoDepth).toBe(0);
+    um.setEnabled(true);
+    expect(um.canUndo()).toBe(false);
+  });
+});
+
 describe('CompositeCommand', () => {
   it('applies in order and inverts in reverse', () => {
     const log: string[] = [];

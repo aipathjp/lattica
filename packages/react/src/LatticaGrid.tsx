@@ -42,12 +42,20 @@ import { buildScene } from './scene.js';
 import { canvasMeasurer } from './measure.js';
 import { paintScene, type Canvas2D } from './painter.js';
 import { cellRect, columnX, hitTest, summaryBandHeight, type GridGeometry, type HitResult } from './geometry.js';
-import { interpretKey, type KeyInput } from './keyboard.js';
+import { interpretKey, type EnterMoves, type KeyInput } from './keyboard.js';
 import { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
 import { columnHeaderCells, computeHeaderRowHeights, rowHeaderCells } from './headers.js';
 import type { EditorRegistry } from './editors.js';
 import { buildMenu, type MenuItem, type MenuItemSpec } from './menu.js';
 import { hitResizeHandle, type ResizeTarget } from './resize.js';
+
+/**
+ * Built-in context-menu presets:
+ * - `'none'` — no grid menu; the browser's own context menu applies.
+ * - `'clipboard-only'` — Copy (and Cut when the active cell is editable) only.
+ * - `'full'` — the built-in default menu (same as omitting the prop).
+ */
+export type ContextMenuPreset = 'none' | 'clipboard-only' | 'full';
 
 export interface LatticaGridProps {
   controller: GridController;
@@ -72,8 +80,23 @@ export interface LatticaGridProps {
   fill?: boolean;
   className?: string;
   style?: CSSProperties;
-  /** Build the right-click context menu for a hit target; defaults to the built-in menu. */
-  contextMenu?: (target: HitResult) => MenuItemSpec[];
+  /**
+   * Right-click context menu: a builder function, or a restriction preset
+   * (`'none' | 'clipboard-only' | 'full'`). Defaults to the built-in menu
+   * (equivalent to `'full'`). Edit items (Cut / Paste / Clear contents) are
+   * omitted automatically when the active cell is not editable.
+   */
+  contextMenu?: ContextMenuPreset | ((target: HitResult) => MenuItemSpec[]);
+  /** Enter movement delta; overrides the controller option. Default {row:1,col:0}. */
+  enterMoves?: EnterMoves;
+  /** Plain Enter begins editing instead of moving; overrides the controller option. */
+  enterBeginsEditing?: boolean;
+  /** Tab moves within the grid; false leaves Tab to the browser. Overrides the controller option. */
+  tabNavigation?: boolean;
+  /** Clicking outside the grid hides selection visuals (default true). Overrides the controller option. */
+  outsideClickDeselects?: boolean;
+  /** View-only mode: no selection visuals / UI selection / UI editing. Overrides the controller option. */
+  selectionDisabled?: boolean;
   /** Render the detail panel for an expanded master row (by physical row index). */
   renderDetail?: (physicalRow: number) => ReactNode;
   /** Pinned summary (footer) rows aggregated over the visible rows. Always
@@ -211,6 +234,12 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   const filterable = props.filterable ?? true;
   const showFilterIcons = props.showFilterIcons ?? true;
   const editSelection = props.editSelection ?? 'all';
+  // Behavior options: an explicit prop wins, then the controller option.
+  const enterMoves = props.enterMoves ?? controller.enterMoves;
+  const enterBeginsEditing = props.enterBeginsEditing ?? controller.enterBeginsEditing;
+  const tabNavigation = props.tabNavigation ?? controller.tabNavigation;
+  const outsideClickDeselects = props.outsideClickDeselects ?? controller.outsideClickDeselects;
+  const selectionDisabled = props.selectionDisabled ?? controller.selectionDisabled;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const editorRef = useRef<HTMLElement | null>(null);
@@ -237,7 +266,11 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   const [filterChecked, setFilterChecked] = useState<Set<string>>(new Set());
   const [measured, setMeasured] = useState<{ w: number; h: number } | null>(null);
   const [tooltip, setTooltip] = useState<{ row: number; col: number; text: string } | null>(null);
+  /** True after a click outside the grid (outsideClickDeselects); hides selection visuals. */
+  const [deselected, setDeselected] = useState(false);
   const [, force] = useReducer((n: number) => n + 1, 0);
+  /** Selection visuals are suppressed in view-only mode or while deselected. */
+  const selectionHidden = selectionDisabled || deselected;
 
   const headerModelRef = useRef<HeaderModel | null>(null);
   if (columns !== undefined && headerModelRef.current === null) {
@@ -347,6 +380,28 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       offEdit();
     };
   }, [controller]);
+
+  // Any selection activity (mouse, keyboard, or programmatic) re-shows it.
+  useEffect(() => controller.selection.subscribe(() => setDeselected(false)), [controller]);
+
+  // Clicking outside the grid hides the selection visuals (Excel-like).
+  useEffect(() => {
+    if (!outsideClickDeselects || selectionDisabled) {
+      return;
+    }
+    const onDocMouseDown = (ev: MouseEvent): void => {
+      const root = rootRef.current;
+      /* v8 ignore next 3 -- the listener's lifetime matches the mounted root */
+      if (root === null) {
+        return;
+      }
+      if (!root.contains(ev.target as Node | null)) {
+        setDeselected(true);
+      }
+    };
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, [outsideClickDeselects, selectionDisabled]);
 
   useEffect(() => {
     if (onViewStateChange === undefined) {
@@ -494,6 +549,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       wrapPaddingX: theme.cellPaddingX,
       hasComment: (r, c) => controller.hasComment(r, c),
       getSummaryDisplay: (s, c) => controller.getSummaryDisplay(s, c),
+      hideSelection: selectionHidden,
     });
     paintScene(ctx, scene, theme, { width, height, dpr });
   });
@@ -549,7 +605,15 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
 
   const dispatchKey = useCallback(
     (input: KeyInput): boolean => {
-      const action = interpretKey(input, controller.getEdit() !== null);
+      // View-only mode: the grid is keyboard-inert (copy stays programmatic).
+      if (selectionDisabled) {
+        return false;
+      }
+      const action = interpretKey(input, controller.getEdit() !== null, {
+        enterMoves,
+        enterBeginsEditing,
+        tabNavigation,
+      });
       switch (action.type) {
         case 'move':
           if (action.extend) {
@@ -591,7 +655,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
           return false;
       }
     },
-    [controller, ensureVisible],
+    [controller, ensureVisible, enterMoves, enterBeginsEditing, tabNavigation, selectionDisabled],
   );
 
   const onKeyDown = useCallback(
@@ -674,6 +738,14 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
         return;
       }
       const hit = hitTest(geom, scroll.left, scroll.top, x, y);
+      // View-only mode: clicks focus (and report) but never mutate selection.
+      if (selectionDisabled) {
+        if (hit.region === 'cell') {
+          onCellClick?.({ row: hit.row, col: hit.col }, e);
+        }
+        root.focus();
+        return;
+      }
       switch (hit.region) {
         case 'cell':
           if (e.shiftKey) {
@@ -697,7 +769,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       }
       rootRef.current?.focus();
     },
-    [controller, geom, scroll, contentEdge, onCellClick],
+    [controller, geom, scroll, contentEdge, onCellClick, selectionDisabled],
   );
 
   const onMouseMove = useCallback(
@@ -792,12 +864,43 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     [controller],
   );
 
+  /** Edit menu items only make sense when the active cell accepts edits. */
+  const activeCellEditable = useCallback((): boolean => {
+    const { active } = controller.selection.getState();
+    return controller.isCellEditable(active.row, active.col);
+  }, [controller]);
+
+  const copyItem = useCallback(
+    (): MenuItem => ({ id: 'copy', label: 'Copy', action: () => void writeClipboard(controller.copySelection()) }),
+    [controller],
+  );
+
+  const cutItem = useCallback(
+    (): MenuItem => ({
+      id: 'cut',
+      label: 'Cut',
+      action: () => {
+        void writeClipboard(controller.copySelection());
+        controller.deleteSelection();
+      },
+    }),
+    [controller],
+  );
+
+  /** The `'clipboard-only'` preset: Copy, plus Cut when editing is allowed. */
+  const clipboardOnlyMenu = useCallback(
+    (): MenuItemSpec[] => [copyItem(), activeCellEditable() && cutItem()],
+    [activeCellEditable, copyItem, cutItem],
+  );
+
   const defaultMenu = useCallback(
     (hit: HitResult): MenuItemSpec[] => {
+      const canEdit = activeCellEditable();
       const items: MenuItemSpec[] = [
-        { id: 'copy', label: 'Copy', action: () => void writeClipboard(controller.copySelection()) },
-        { id: 'paste', label: 'Paste', action: () => void readClipboardInto(controller) },
-        { id: 'clear', label: 'Clear contents', action: () => controller.deleteSelection() },
+        copyItem(),
+        canEdit && cutItem(),
+        canEdit && { id: 'paste', label: 'Paste', action: () => void readClipboardInto(controller) },
+        canEdit && { id: 'clear', label: 'Clear contents', action: () => controller.deleteSelection() },
         { id: 'sep1', separator: true },
         { id: 'undo', label: 'Undo', disabled: !controller.undo.canUndo(), action: () => controller.undoLast() },
         { id: 'redo', label: 'Redo', disabled: !controller.undo.canRedo(), action: () => controller.redoLast() },
@@ -821,11 +924,16 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       }
       return items;
     },
-    [controller, filterable, geom, openFilterPanel, scroll.left, showFilterIcons],
+    [activeCellEditable, controller, copyItem, cutItem, filterable, geom, openFilterPanel, scroll.left, showFilterIcons],
   );
 
   const onContextMenu = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
+      const spec = props.contextMenu;
+      // 'none': no grid menu at all — leave the browser's default menu alone.
+      if (spec === 'none') {
+        return;
+      }
       e.preventDefault();
       const root = rootRef.current;
       /* v8 ignore next 3 -- root ref is always attached when handlers fire */
@@ -841,10 +949,17 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
         return;
       }
       const hit = hitTest(geom, scroll.left, scroll.top, x, y);
-      const items = buildMenu(props.contextMenu ? props.contextMenu(hit) : defaultMenu(hit));
+      const items = buildMenu(
+        typeof spec === 'function' ? spec(hit) : spec === 'clipboard-only' ? clipboardOnlyMenu() : defaultMenu(hit),
+      );
+      // An all-filtered-out menu (e.g. clipboard-only on a read-only grid
+      // could be empty if Copy were removed) renders nothing, not an empty box.
+      if (items.length === 0) {
+        return;
+      }
       setMenu({ x, y, items });
     },
-    [controller, geom, scroll, props, defaultMenu, contentEdge],
+    [controller, geom, scroll, props, clipboardOnlyMenu, defaultMenu, contentEdge],
   );
 
   const runMenuItem = useCallback((item: MenuItem) => {
@@ -857,6 +972,10 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
 
   const onDoubleClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
+      // View-only mode: no UI-initiated editing.
+      if (selectionDisabled) {
+        return;
+      }
       const root = rootRef.current;
       /* v8 ignore next 3 -- root ref is always attached when handlers fire */
       if (root === null) {
@@ -872,7 +991,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       const { active } = controller.selection.getState();
       controller.beginEdit(active.row, active.col);
     },
-    [controller, contentEdge],
+    [controller, contentEdge, selectionDisabled],
   );
 
   const onWheel = useCallback(
@@ -911,6 +1030,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     getCfStyle: (r, c) => controller.getCellStyle(r, c),
     getMerge: (r, c) => controller.getMerge(r, c),
     getSummaryDisplay: (s, c) => controller.getSummaryDisplay(s, c),
+    hideSelection: selectionHidden,
   });
   const colHeaders = columnHeaderCells(
     geom,
@@ -1004,10 +1124,11 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       : null;
   const tooltipRect = tooltip !== null ? getVisibleCellRect(tooltip.row, tooltip.col) : null;
 
-  // Fill handle nub at the bottom-right corner of the selection (hidden while editing).
+  // Fill handle nub at the bottom-right corner of the selection (hidden while
+  // editing and whenever the selection itself is hidden).
   const selBounds = controller.selection.getSelectionBounds();
   const fillNubRect =
-    edit === null
+    edit === null && !selectionHidden
       ? cellRect(geom, scroll.left, scroll.top, selBounds.end.row, selBounds.end.col)
       : null;
 
@@ -1037,12 +1158,16 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       controller.updateDraft(value);
       setEdit(controller.getEdit());
     };
-    const keyDown = (key: string, shiftKey = false): boolean => {
-      const handled = dispatchKey({ key, shiftKey, ctrlKey: false, metaKey: false, altKey: false });
+    // Handled editor keys must not bubble to the root grid handler — the edit
+    // has already ended by then, so the root would interpret the same Enter/Tab
+    // again as a second navigation step.
+    const keyDown = (ev: { key: string; shiftKey: boolean; preventDefault(): void; stopPropagation(): void }): void => {
+      const handled = dispatchKey({ key: ev.key, shiftKey: ev.shiftKey, ctrlKey: false, metaKey: false, altKey: false });
       if (handled) {
+        ev.preventDefault();
+        ev.stopPropagation();
         rootRef.current?.focus();
       }
-      return handled;
     };
 
     if (kind === 'dropdown') {
@@ -1056,7 +1181,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
             controller.commitEdit();
           }}
           onKeyDown={(ev) => {
-            if (keyDown(ev.key, ev.shiftKey)) ev.preventDefault();
+            keyDown(ev);
           }}
           onBlur={() => controller.commitEdit()}
           style={baseStyle}
@@ -1080,7 +1205,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
           value={e.draft}
           onChange={(ev) => change(ev.target.value)}
           onKeyDown={(ev) => {
-            if (keyDown(ev.key, ev.shiftKey)) ev.preventDefault();
+            keyDown(ev);
           }}
           onBlur={() => controller.commitEdit()}
           style={baseStyle}
@@ -1100,7 +1225,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
             onChange={(ev) => change(ev.target.value)}
             onKeyDown={(ev) => {
               if (composingRef.current) return;
-              if (keyDown(ev.key, ev.shiftKey)) ev.preventDefault();
+              keyDown(ev);
             }}
             onCompositionStart={() => {
               composingRef.current = true;
@@ -1145,7 +1270,10 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
             altKey: ev.altKey,
           });
           if (handled) {
+            // Don't bubble to the root handler — the edit has ended, so the
+            // root would re-interpret the same key as a second navigation.
             ev.preventDefault();
+            ev.stopPropagation();
             rootRef.current?.focus();
           }
         }}

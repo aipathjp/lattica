@@ -1968,3 +1968,224 @@ describe('summary (footer) rows', () => {
     expect(c.selection.getState().active).not.toEqual({ row: 0, col: 0 });
   });
 });
+
+describe('LatticaGrid navigation options (P1-4)', () => {
+  it('Enter moves by the enterMoves prop when navigating (shift reverses)', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    renderGrid(c, undefined, { enterMoves: { row: 0, col: 1 } });
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 0, col: 0 });
+    fireEvent.keyDown(grid, { key: 'Enter' });
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 1 });
+    fireEvent.keyDown(grid, { key: 'Enter', shiftKey: true });
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 0 });
+  });
+
+  it('commits an edit and moves by the enterMoves prop', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    renderGrid(c, undefined, { enterMoves: { row: 0, col: 1 } });
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 1, col: 1 });
+    fireEvent.keyDown(grid, { key: 'F2' });
+    const editor = screen.getByTestId('lattica-editor');
+    fireEvent.change(editor, { target: { value: 'abc' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    expect(c.getDisplay(1, 1)).toBe('abc');
+    expect(c.selection.getState().active).toEqual({ row: 1, col: 2 });
+  });
+
+  it('Enter begins editing when the enterBeginsEditing prop is set', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    renderGrid(c, undefined, { enterBeginsEditing: true });
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 1, col: 1 });
+    fireEvent.keyDown(grid, { key: 'Enter' });
+    expect(c.getEdit()).toMatchObject({ row: 1, col: 1 });
+    expect(screen.getByTestId('lattica-editor')).toBeTruthy();
+  });
+
+  it('leaves Tab to the browser when the tabNavigation prop is false', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    renderGrid(c, undefined, { tabNavigation: false });
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 0, col: 0 });
+    const notPrevented = fireEvent.keyDown(grid, { key: 'Tab' });
+    expect(notPrevented).toBe(true); // default not prevented → browser focus nav
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 0 });
+  });
+
+  it('honors controller-level navigation options when no props are given', () => {
+    const c = new GridController({
+      rowCount: 5,
+      colCount: 5,
+      enterMoves: { row: 0, col: 1 },
+      enterBeginsEditing: true,
+      tabNavigation: false,
+    });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 0, col: 0 });
+    fireEvent.keyDown(grid, { key: 'Enter' }); // begins editing
+    expect(c.getEdit()).toMatchObject({ row: 0, col: 0 });
+    fireEvent.keyDown(grid, { key: 'Enter' }); // commits, then moves right
+    expect(c.getEdit()).toBeNull();
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 1 });
+    fireEvent.keyDown(grid, { key: 'Tab' }); // tabNavigation off
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 1 });
+  });
+});
+
+describe('LatticaGrid outside-click deselect (P1-4)', () => {
+  it('hides selection visuals on an outside click by default and restores on re-click', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    renderGrid(c);
+    c.selection.setActive({ row: 1, col: 1 });
+    expect(screen.getByTestId('lattica-fill-handle')).toBeTruthy();
+
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByTestId('lattica-fill-handle')).toBeNull();
+
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.mouseDown(grid, { clientX: 60, clientY: 40 });
+    expect(screen.getByTestId('lattica-fill-handle')).toBeTruthy();
+  });
+
+  it('re-shows the selection on a programmatic selection change', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    renderGrid(c);
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByTestId('lattica-fill-handle')).toBeNull();
+    act(() => c.selection.setActive({ row: 2, col: 2 }));
+    expect(screen.getByTestId('lattica-fill-handle')).toBeTruthy();
+  });
+
+  it('keeps selection visuals when outsideClickDeselects is false', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    renderGrid(c, undefined, { outsideClickDeselects: false });
+    c.selection.setActive({ row: 1, col: 1 });
+    fireEvent.mouseDown(document.body);
+    expect(screen.getByTestId('lattica-fill-handle')).toBeTruthy();
+  });
+});
+
+describe('LatticaGrid selectionDisabled (view-only, P1-4)', () => {
+  it('disables UI selection, keyboard, and editing while reporting cell clicks', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    const onCellClick = vi.fn();
+    renderGrid(c, undefined, { selectionDisabled: true, onCellClick });
+    const grid = screen.getByTestId('lattica-grid');
+
+    // No fill handle in view-only mode.
+    expect(screen.queryByTestId('lattica-fill-handle')).toBeNull();
+
+    // Cell click is reported but the selection does not move.
+    fireEvent.mouseDown(grid, { clientX: 160, clientY: 40 }); // cell (0,1)
+    expect(onCellClick).toHaveBeenCalledWith({ row: 0, col: 1 }, expect.anything());
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 0 });
+
+    // Header click does not select the column.
+    fireEvent.mouseDown(grid, { clientX: 60, clientY: 10 });
+    expect(c.selection.getState().ranges).toEqual([
+      { start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+    ]);
+
+    // Keyboard is inert (nothing handled, nothing prevented).
+    expect(fireEvent.keyDown(grid, { key: 'ArrowDown' })).toBe(true);
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 0 });
+    fireEvent.keyDown(grid, { key: 'F2' });
+    expect(c.getEdit()).toBeNull();
+
+    // Double-click does not begin editing.
+    fireEvent.doubleClick(grid, { clientX: 60, clientY: 40 });
+    expect(c.getEdit()).toBeNull();
+  });
+
+  it('honors controller-level selectionDisabled (no onCellClick given)', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5, selectionDisabled: true });
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    expect(screen.queryByTestId('lattica-fill-handle')).toBeNull();
+    fireEvent.mouseDown(grid, { clientX: 60, clientY: 40 }); // no crash without onCellClick
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 0 });
+  });
+});
+
+describe('LatticaGrid context menu presets (P1-5)', () => {
+  const withClipboard = () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const readText = vi.fn().mockResolvedValue('z');
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText, readText },
+      configurable: true,
+      writable: true,
+    });
+    return { writeText, readText };
+  };
+
+  it("contextMenu='none' shows no grid menu and leaves the event to the browser", () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    renderGrid(c, undefined, { contextMenu: 'none' });
+    const notPrevented = fireEvent.contextMenu(screen.getByTestId('lattica-grid'), { clientX: 60, clientY: 40 });
+    expect(notPrevented).toBe(true);
+    expect(screen.queryByTestId('lattica-menu')).toBeNull();
+  });
+
+  it("contextMenu='clipboard-only' shows Copy and Cut only, and Cut cuts", () => {
+    const { writeText } = withClipboard();
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    c.setCellText(0, 0, 'x');
+    renderGrid(c, undefined, { contextMenu: 'clipboard-only' });
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 0, col: 0 });
+    fireEvent.contextMenu(grid, { clientX: 60, clientY: 40 });
+    expect(screen.getByText('Copy')).toBeTruthy();
+    expect(screen.getByText('Cut')).toBeTruthy();
+    expect(screen.queryByText('Paste')).toBeNull();
+    expect(screen.queryByText('Clear contents')).toBeNull();
+    expect(screen.queryByText('Undo')).toBeNull();
+    expect(screen.queryByText('Redo')).toBeNull();
+
+    fireEvent.mouseDown(screen.getByText('Cut'));
+    expect(writeText).toHaveBeenCalled();
+    expect(c.getDisplay(0, 0)).toBe('');
+  });
+
+  it("omits Cut in 'clipboard-only' when the active cell is read-only", () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    c.setColumnEditable(0, false);
+    renderGrid(c, undefined, { contextMenu: 'clipboard-only' });
+    fireEvent.contextMenu(screen.getByTestId('lattica-grid'), { clientX: 60, clientY: 40 });
+    expect(screen.getByText('Copy')).toBeTruthy();
+    expect(screen.queryByText('Cut')).toBeNull();
+  });
+
+  it("contextMenu='full' shows the built-in menu including Cut", () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    renderGrid(c, undefined, { contextMenu: 'full' });
+    fireEvent.contextMenu(screen.getByTestId('lattica-grid'), { clientX: 60, clientY: 40 });
+    expect(screen.getByText('Copy')).toBeTruthy();
+    expect(screen.getByText('Cut')).toBeTruthy();
+    expect(screen.getByText('Paste')).toBeTruthy();
+    expect(screen.getByText('Undo')).toBeTruthy();
+  });
+
+  it('hides edit items in the default menu when the active cell is read-only', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    c.setCellReadOnly(0, 0, true);
+    renderGrid(c);
+    fireEvent.contextMenu(screen.getByTestId('lattica-grid'), { clientX: 60, clientY: 40 });
+    expect(screen.getByText('Copy')).toBeTruthy();
+    expect(screen.queryByText('Cut')).toBeNull();
+    expect(screen.queryByText('Paste')).toBeNull();
+    expect(screen.queryByText('Clear contents')).toBeNull();
+    // Undo/Redo remain listed but are disabled without history.
+    expect(screen.getByText('Undo')).toBeTruthy();
+  });
+
+  it('does not open an empty custom menu', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    renderGrid(c, undefined, { contextMenu: () => [] });
+    fireEvent.contextMenu(screen.getByTestId('lattica-grid'), { clientX: 60, clientY: 40 });
+    expect(screen.queryByTestId('lattica-menu')).toBeNull();
+  });
+});

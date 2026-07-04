@@ -52,6 +52,76 @@ describe('interpretKey — clipboard and history', () => {
   });
 });
 
+describe('interpretKey — enterMoves', () => {
+  it('moves by the configured delta when navigating', () => {
+    const options = { enterMoves: { row: 0, col: 1 } };
+    expect(interpretKey({ key: 'Enter' }, false, options)).toEqual({
+      type: 'move',
+      dRow: 0,
+      dCol: 1,
+      extend: false,
+    });
+  });
+
+  it('reverses the delta with shift (no -0 leakage)', () => {
+    const options = { enterMoves: { row: 0, col: 1 } };
+    expect(interpretKey({ key: 'Enter', shiftKey: true }, false, options)).toEqual({
+      type: 'move',
+      dRow: 0,
+      dCol: -1,
+      extend: false,
+    });
+  });
+
+  it('commits editing with the configured delta', () => {
+    const options = { enterMoves: { row: 0, col: 1 } };
+    expect(interpretKey({ key: 'Enter' }, true, options)).toEqual({ type: 'commit', dRow: 0, dCol: 1 });
+    expect(interpretKey({ key: 'Enter', shiftKey: true }, true, options)).toEqual({
+      type: 'commit',
+      dRow: 0,
+      dCol: -1,
+    });
+  });
+});
+
+describe('interpretKey — enterBeginsEditing', () => {
+  it('plain Enter begins editing when enabled', () => {
+    expect(interpretKey({ key: 'Enter' }, false, { enterBeginsEditing: true })).toEqual({ type: 'edit' });
+  });
+
+  it('shift+Enter still moves (reverse) when enabled', () => {
+    expect(interpretKey({ key: 'Enter', shiftKey: true }, false, { enterBeginsEditing: true })).toEqual({
+      type: 'move',
+      dRow: -1,
+      dCol: 0,
+      extend: false,
+    });
+  });
+
+  it('Enter while editing still commits when enabled', () => {
+    expect(interpretKey({ key: 'Enter' }, true, { enterBeginsEditing: true })).toEqual({
+      type: 'commit',
+      dRow: 1,
+      dCol: 0,
+    });
+  });
+});
+
+describe('interpretKey — tabNavigation', () => {
+  it('Tab is left to the browser when disabled (navigating)', () => {
+    expect(interpretKey({ key: 'Tab' }, false, { tabNavigation: false })).toEqual({ type: 'none' });
+  });
+
+  it('Tab is left to the browser when disabled (editing)', () => {
+    expect(interpretKey({ key: 'Tab' }, true, { tabNavigation: false })).toEqual({ type: 'none' });
+  });
+
+  it('explicit true keeps the default in-grid moves', () => {
+    expect(interpretKey({ key: 'Tab' }, false, { tabNavigation: true })).toMatchObject({ type: 'move', dCol: 1 });
+    expect(interpretKey({ key: 'Tab' }, true, { tabNavigation: true })).toMatchObject({ type: 'commit', dCol: 1 });
+  });
+});
+
 describe('interpretKey — while editing', () => {
   it('Enter commits and moves down (up with shift)', () => {
     expect(interpretKey({ key: 'Enter' }, true)).toEqual({ type: 'commit', dRow: 1, dCol: 0 });
