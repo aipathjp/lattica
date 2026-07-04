@@ -636,6 +636,20 @@ describe('LatticaGrid editing', () => {
     expect(onInputReject).not.toHaveBeenCalled();
   });
 
+  it('subscribes and unsubscribes onRowsChange', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    const onRowsChange = vi.fn();
+    const view = renderGrid(c, undefined, { onRowsChange });
+    act(() => c.insertRow(1));
+    expect(onRowsChange).toHaveBeenCalledWith({ kind: 'insert', index: 1, count: 1 });
+    act(() => c.removeRow(1));
+    expect(onRowsChange).toHaveBeenCalledWith({ kind: 'remove', index: 1, count: 1 });
+    onRowsChange.mockClear();
+    view.rerender(<LatticaGrid controller={c} width={400} height={200} />);
+    act(() => c.insertRow(0));
+    expect(onRowsChange).not.toHaveBeenCalled();
+  });
+
   it('supports all, end, and preserve edit selection modes', () => {
     const c = new GridController({ rowCount: 20, colCount: 10 });
     c.setCellText(0, 0, 'abc');

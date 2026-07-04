@@ -36,6 +36,7 @@ export {
   type CellMetaProvider,
   type ColumnTypeOptions,
   type InputRejectEvent,
+  type RowsChangeEvent,
 } from './controller.js';
 export {
   sanitizeTimeDraft,

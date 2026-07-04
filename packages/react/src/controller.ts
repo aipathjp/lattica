@@ -269,12 +269,48 @@ export interface InputRejectEvent {
   reason: 'fullwidth' | 'transform' | 'validator';
 }
 
+/**
+ * Emitted after {@link GridController.insertRow} / {@link GridController.removeRow}
+ * (and their undo/redo) mutate the physical row set. `index` is the physical
+ * row index of the insertion/removal point.
+ */
+export interface RowsChangeEvent {
+  kind: 'insert' | 'remove';
+  index: number;
+  count: number;
+}
+
 interface ControllerEvents {
   change: void;
   edit: EditState | null;
   cellcommit: CellCommitEvent;
   viewstate: GridStateSnapshot;
   inputreject: InputRejectEvent;
+  rowschange: RowsChangeEvent;
+}
+
+/**
+ * Everything a physical row carries besides engine content, captured so a
+ * removed row can be restored by a single undo step.
+ */
+interface RowSnapshot {
+  /** Engine content (editable text / literal) per physical column. */
+  cells: CellContent[];
+  /** Row-height override, or null when the row uses the default height. */
+  height: number | null;
+  /** Physical columns whose cells were marked read-only on this row. */
+  readOnlyCols: number[];
+  /** In-cell sparklines attached to this row. */
+  sparklines: { col: number; values: number[]; kind: SparklineKind }[];
+  /** Comments attached to this row. */
+  comments: { col: number; text: string }[];
+  /** Whether the row's master/detail panel was expanded. */
+  detailExpanded: boolean;
+  /**
+   * Exact merge list to restore (captured by remove so undo is lossless), or
+   * null to shift existing merges positionally (fresh inserts).
+   */
+  merges: MergeArea[] | null;
 }
 
 /** Format an engine value for display in a cell. */
@@ -327,6 +363,25 @@ function loadCellText(value: string | number | boolean | null | undefined): stri
     return value ? 'TRUE' : 'FALSE';
   }
   return String(value);
+}
+
+/** Coerce an arbitrary value to the raw text used for cell input. */
+function rawCellText(value: unknown): string {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    value === null ||
+    value === undefined
+  ) {
+    return loadCellText(value);
+  }
+  return String(value);
+}
+
+/** Physical row of a `"row,col"` metadata key. */
+function rowOfCellKey(key: string): number {
+  return Number(key.slice(0, key.indexOf(',')));
 }
 
 function sparseOrder(order: readonly number[], count: number): number[] {
@@ -1817,6 +1872,13 @@ export class GridController {
     fields: readonly string[],
     opts: SetDataOptions = {},
   ): void {
+    // Learn the field → physical-column mapping so Record-shaped values
+    // (insertRow, summary-row keys) resolve without separate column defs.
+    fields.forEach((field, physicalCol) => {
+      if (field !== '') {
+        this.columnFields.set(field, physicalCol);
+      }
+    });
     this.setData(
       records.map((record) =>
         fields.map((field) => {
@@ -1859,6 +1921,328 @@ export class GridController {
     if (options?.source !== undefined) {
       const change = this.cellChange(row, col, prev, this.getPhysicalEditText(p.row, p.col));
       this.emitCellCommit(options.source, change === null ? [] : [change]);
+    }
+  }
+
+  // ── Imperative row insert / remove (physical indices, undoable) ────────────
+  /**
+   * Insert one row at **physical** index `index` (0…rowCount inclusive; the
+   * upper bound appends). Existing rows at/after `index` shift down, together
+   * with their row-keyed metadata (heights, read-only cells, comments,
+   * sparklines, detail expansion, merges). `values` seeds the new row: an
+   * array maps positionally onto physical columns; a record resolves keys via
+   * the `field` mapping learned from {@link applyColumnDefs} / {@link setRecords}
+   * (unknown fields are ignored). Omitted → an empty row.
+   *
+   * Undoable as one command. Emits `change` + `rowschange` (never
+   * `cellcommit`); sort/filter are re-applied so the view is rebuilt.
+   */
+  insertRow(index: number, values?: readonly unknown[] | Record<string, unknown>): void {
+    if (!Number.isInteger(index) || index < 0 || index > this.rowCount) {
+      throw new RangeError(`insertRow index ${index} out of bounds [0, ${this.rowCount}]`);
+    }
+    const snapshot: RowSnapshot = {
+      cells: this.rowValuesToCells(values),
+      height: null,
+      readOnlyCols: [],
+      sparklines: [],
+      comments: [],
+      detailExpanded: false,
+      merges: null,
+    };
+    this.undo.execute(this.makeInsertRowCommand(index, snapshot));
+  }
+
+  /**
+   * Remove the row at **physical** index `index` (0…rowCount-1). Later rows
+   * shift up together with their row-keyed metadata; a selection on or below
+   * the removed row is clamped back into range. Undoable as one command — undo
+   * restores the row's content and metadata (including the exact merge list).
+   * Emits `change` + `rowschange` (never `cellcommit`).
+   */
+  removeRow(index: number): void {
+    if (!Number.isInteger(index) || index < 0 || index >= this.rowCount) {
+      throw new RangeError(`removeRow index ${index} out of bounds [0, ${this.rowCount})`);
+    }
+    this.undo.execute(this.makeRemoveRowCommand(index));
+  }
+
+  /** Build the new row's engine contents from positional or field-keyed values. */
+  private rowValuesToCells(values?: readonly unknown[] | Record<string, unknown>): CellContent[] {
+    const cells: CellContent[] = new Array<CellContent>(this.colCount).fill(null);
+    if (values === undefined) {
+      return cells;
+    }
+    if (Array.isArray(values)) {
+      const limit = Math.min(values.length, this.colCount);
+      for (let col = 0; col < limit; col++) {
+        cells[col] = this.parseInput(rawCellText(values[col]));
+      }
+      return cells;
+    }
+    for (const [field, value] of Object.entries(values)) {
+      const col = this.columnFields.get(field);
+      if (col !== undefined && validIndex(col, this.colCount)) {
+        cells[col] = this.parseInput(rawCellText(value));
+      }
+    }
+    return cells;
+  }
+
+  private makeInsertRowCommand(index: number, snapshot: RowSnapshot): Command {
+    return {
+      label: `insert row ${index}`,
+      apply: () => this.performRowInsert(index, snapshot),
+      invert: () => this.makeRemoveRowCommand(index),
+    };
+  }
+
+  private makeRemoveRowCommand(index: number): Command {
+    let captured: RowSnapshot | null = null;
+    return {
+      label: `remove row ${index}`,
+      apply: () => {
+        captured = this.performRowRemove(index);
+      },
+      invert: () =>
+        // Commands are inverted only after apply() ran (see UndoManager), so
+        // the snapshot is always captured by the time invert() is called.
+        this.makeInsertRowCommand(index, captured!),
+    };
+  }
+
+  /** Mutate the grid for a row insertion at physical `index`. */
+  private performRowInsert(index: number, snapshot: RowSnapshot): void {
+    // Grow the mapper (shifts sort order / filter hides) and the size axis.
+    this.view.rows.insert(index, 1);
+    this.rowCount += 1;
+    this.rowSizes.setCount(this.rowCount);
+    // Shift engine content down from the bottom so nothing is overwritten.
+    for (let row = this.rowCount - 2; row >= index; row--) {
+      for (let col = 0; col < this.colCount; col++) {
+        this.engine.setContent({ row: row + 1, col }, this.engine.getContent({ row, col }));
+      }
+    }
+    // Row-keyed metadata follows its rows, then the freed slot is populated.
+    this.shiftRowMetadata(index, 1);
+    if (snapshot.merges === null) {
+      this.shiftMergesForInsert(index);
+    } else {
+      this.merges.clear();
+      for (const area of snapshot.merges) {
+        this.merges.add(area);
+      }
+    }
+    for (let col = 0; col < this.colCount; col++) {
+      this.engine.setContent({ row: index, col }, snapshot.cells[col] ?? null);
+    }
+    this.restoreRowMetadata(index, snapshot);
+    this.refreshView(false);
+    this.emitter.emit('change', undefined);
+    this.emitter.emit('rowschange', { kind: 'insert', index, count: 1 });
+  }
+
+  /** Mutate the grid for a row removal at physical `index`; returns the snapshot. */
+  private performRowRemove(index: number): RowSnapshot {
+    const snapshot = this.captureRowSnapshot(index);
+    this.clearRowMetadata(index);
+    // Shift engine content up over the removed row, then clear the last row.
+    for (let row = index + 1; row < this.rowCount; row++) {
+      for (let col = 0; col < this.colCount; col++) {
+        this.engine.setContent({ row: row - 1, col }, this.engine.getContent({ row, col }));
+      }
+    }
+    for (let col = 0; col < this.colCount; col++) {
+      this.engine.setContent({ row: this.rowCount - 1, col }, null);
+    }
+    this.shiftRowMetadata(index + 1, -1);
+    this.shiftMergesForRemove(index);
+    this.view.rows.remove([index]);
+    this.rowCount -= 1;
+    this.rowSizes.setCount(this.rowCount);
+    if (this.frozenRows > this.rowCount) {
+      this.frozenRows = this.rowCount;
+    }
+    this.refreshView(false);
+    this.emitter.emit('change', undefined);
+    this.emitter.emit('rowschange', { kind: 'remove', index, count: 1 });
+    return snapshot;
+  }
+
+  /** Capture everything the physical row carries (for lossless undo). */
+  private captureRowSnapshot(index: number): RowSnapshot {
+    const cells: CellContent[] = [];
+    for (let col = 0; col < this.colCount; col++) {
+      cells.push(this.engine.getContent({ row: index, col }));
+    }
+    const readOnlyCols: number[] = [];
+    for (const key of this.cellReadOnly) {
+      if (rowOfCellKey(key) === index) {
+        readOnlyCols.push(Number(key.slice(key.indexOf(',') + 1)));
+      }
+    }
+    const sparklines: RowSnapshot['sparklines'] = [];
+    for (const [key, spec] of this.cellSparklines) {
+      if (rowOfCellKey(key) === index) {
+        sparklines.push({ col: Number(key.slice(key.indexOf(',') + 1)), values: spec.values, kind: spec.kind });
+      }
+    }
+    return {
+      cells,
+      height: this.rowSizes.getOverrides().get(index) ?? null,
+      readOnlyCols,
+      sparklines,
+      comments: this.comments
+        .list()
+        .filter((c) => c.row === index)
+        .map((c) => ({ col: c.col, text: c.text })),
+      detailExpanded: this.details.isExpanded(index),
+      merges: this.merges.list(),
+    };
+  }
+
+  /** Drop all row-keyed metadata of the physical row being removed. */
+  private clearRowMetadata(index: number): void {
+    this.rowSizes.resetSize(index);
+    for (const key of [...this.cellReadOnly]) {
+      if (rowOfCellKey(key) === index) {
+        this.cellReadOnly.delete(key);
+      }
+    }
+    for (const key of [...this.cellSparklines.keys()]) {
+      if (rowOfCellKey(key) === index) {
+        this.cellSparklines.delete(key);
+      }
+    }
+    for (const comment of this.comments.list()) {
+      if (comment.row === index) {
+        this.comments.remove(comment.row, comment.col);
+      }
+    }
+    this.details.collapse(index);
+  }
+
+  /** Re-attach a snapshot's metadata to the (re-)inserted physical row. */
+  private restoreRowMetadata(index: number, snapshot: RowSnapshot): void {
+    if (snapshot.height !== null) {
+      this.rowSizes.setSize(index, snapshot.height);
+    }
+    for (const col of snapshot.readOnlyCols) {
+      this.cellReadOnly.add(`${index},${col}`);
+    }
+    for (const spark of snapshot.sparklines) {
+      this.cellSparklines.set(`${index},${spark.col}`, { values: spark.values, kind: spark.kind });
+    }
+    for (const comment of snapshot.comments) {
+      this.comments.set(index, comment.col, comment.text);
+    }
+    if (snapshot.detailExpanded) {
+      this.details.expand(index);
+    }
+  }
+
+  /**
+   * Move row-keyed metadata (heights, read-only cells, sparklines, comments,
+   * detail expansion) of every physical row >= `from` by `delta` rows. Entries
+   * are removed first and re-added, so moves never collide.
+   */
+  private shiftRowMetadata(from: number, delta: number): void {
+    const movedHeights: [number, number][] = [];
+    for (const [row, size] of this.rowSizes.getOverrides()) {
+      if (row >= from) {
+        this.rowSizes.resetSize(row);
+        movedHeights.push([row + delta, size]);
+      }
+    }
+    for (const [row, size] of movedHeights) {
+      this.rowSizes.setSize(row, size);
+    }
+
+    const movedReadOnly: string[] = [];
+    for (const key of [...this.cellReadOnly]) {
+      const row = rowOfCellKey(key);
+      if (row >= from) {
+        this.cellReadOnly.delete(key);
+        movedReadOnly.push(`${row + delta}${key.slice(key.indexOf(','))}`);
+      }
+    }
+    for (const key of movedReadOnly) {
+      this.cellReadOnly.add(key);
+    }
+
+    const movedSparklines: [string, { values: number[]; kind: SparklineKind }][] = [];
+    for (const [key, spec] of [...this.cellSparklines]) {
+      const row = rowOfCellKey(key);
+      if (row >= from) {
+        this.cellSparklines.delete(key);
+        movedSparklines.push([`${row + delta}${key.slice(key.indexOf(','))}`, spec]);
+      }
+    }
+    for (const [key, spec] of movedSparklines) {
+      this.cellSparklines.set(key, spec);
+    }
+
+    const movedComments = this.comments.list().filter((c) => c.row >= from);
+    for (const comment of movedComments) {
+      this.comments.remove(comment.row, comment.col);
+    }
+    for (const comment of movedComments) {
+      this.comments.set(comment.row + delta, comment.col, comment.text);
+    }
+
+    const movedDetails = this.details.expandedRows().filter((row) => row >= from);
+    for (const row of movedDetails) {
+      this.details.collapse(row);
+    }
+    for (const row of movedDetails) {
+      this.details.expand(row + delta);
+    }
+  }
+
+  /**
+   * Positionally shift merges for an insertion at row `index`: merges at/after
+   * the row move down; merges spanning across it grow by one row. (Merges are
+   * stored in visual coordinates, so this tracks rows only while the view is
+   * the identity — see the row-ops docs.)
+   */
+  private shiftMergesForInsert(index: number): void {
+    const areas = this.merges.list();
+    if (areas.length === 0) {
+      return;
+    }
+    this.merges.clear();
+    for (const area of areas) {
+      if (area.row >= index) {
+        this.merges.add({ ...area, row: area.row + 1 });
+      } else if (area.row + area.rowspan > index) {
+        this.merges.add({ ...area, rowspan: area.rowspan + 1 });
+      } else {
+        this.merges.add(area);
+      }
+    }
+  }
+
+  /**
+   * Positionally shift merges for a removal at row `index`: merges below move
+   * up; merges spanning the row shrink by one; a single-row merge anchored on
+   * the removed row is dropped.
+   */
+  private shiftMergesForRemove(index: number): void {
+    const areas = this.merges.list();
+    if (areas.length === 0) {
+      return;
+    }
+    this.merges.clear();
+    for (const area of areas) {
+      if (area.row > index) {
+        this.merges.add({ ...area, row: area.row - 1 });
+      } else if (area.row + area.rowspan > index) {
+        if (area.rowspan > 1) {
+          this.merges.add({ ...area, rowspan: area.rowspan - 1 });
+        }
+      } else {
+        this.merges.add(area);
+      }
     }
   }
 
