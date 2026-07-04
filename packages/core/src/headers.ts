@@ -40,6 +40,8 @@ export interface ColumnDef {
   readonly width?: number;
   /** Consumer-defined column type (stored only in core). */
   readonly type?: string;
+  /** Custom editor kind registered in the view layer's editor registry. */
+  readonly editor?: string;
   /** Whether UI editing should be allowed for this column. */
   readonly editable?: boolean;
   /** Preferred text alignment. */

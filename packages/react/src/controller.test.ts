@@ -838,6 +838,38 @@ describe('editors, options & validation (Phase A)', () => {
   });
 });
 
+describe('custom editor kinds (P2-1)', () => {
+  it('sets, reads, and clears a column editor kind', () => {
+    const c = make();
+    const changed = vi.fn();
+    c.on('change', changed);
+    expect(c.getColumnEditor(0)).toBeUndefined();
+    c.setColumnEditor(0, 'color');
+    expect(c.getColumnEditor(0)).toBe('color');
+    expect(changed).toHaveBeenCalled();
+    c.setColumnEditor(0, null);
+    expect(c.getColumnEditor(0)).toBeUndefined();
+  });
+
+  it('resolves the editor kind through visual→physical column mapping', () => {
+    const c = make();
+    c.setColumnEditor(2, 'picker');
+    c.moveColumn(2, 0);
+    expect(c.getColumnEditor(0)).toBe('picker');
+    expect(c.getColumnEditor(2)).toBeUndefined();
+  });
+
+  it('applies ColumnDef.editor via applyColumnDefs', () => {
+    const c = make();
+    c.applyColumnDefs([
+      { headerName: 'Color', editor: 'color' },
+      { headerName: 'Plain' },
+    ]);
+    expect(c.getColumnEditor(0)).toBe('color');
+    expect(c.getColumnEditor(1)).toBeUndefined();
+  });
+});
+
 describe('Phase B — column ops, facets, aggregation, replace', () => {
   const seedCol = (c: GridController, col: number, vals: (string | number)[]) =>
     vals.forEach((v, r) => c.setCellText(r, col, String(v)));
