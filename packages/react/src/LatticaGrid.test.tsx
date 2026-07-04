@@ -230,6 +230,71 @@ describe('LatticaGrid interaction', () => {
     expect(ref.current?.getCellClientRect(0, 0)).toMatchObject({ left: 7, top: 35, width: 100, height: 24 });
   });
 
+  it('exposes full-width row client rects that follow scrolling', () => {
+    const c = new GridController({ rowCount: 20, colCount: 3 });
+    const ref = createRef<LatticaGridHandle>();
+    render(<LatticaGrid ref={ref} controller={c} width={400} height={200} />);
+    const grid = screen.getByTestId('lattica-grid');
+    grid.getBoundingClientRect = vi.fn(() => ({
+      left: 10,
+      top: 20,
+      right: 410,
+      bottom: 220,
+      width: 400,
+      height: 200,
+      x: 10,
+      y: 20,
+      toJSON: () => ({}),
+    }));
+
+    // Row header 48 + 3 columns x 100 = data width 300; header band 24.
+    expect(ref.current?.getRowClientRect(0)).toMatchObject({ left: 58, top: 44, width: 300, height: 24 });
+    expect(ref.current?.getRowClientRect(-1)).toBeNull();
+    expect(ref.current?.getRowClientRect(20)).toBeNull();
+    // Below the viewport bottom.
+    expect(ref.current?.getRowClientRect(19)).toBeNull();
+
+    fireEvent.wheel(grid, { deltaX: 0, deltaY: 30 });
+    // Row 0 is now fully above the header edge; row 1 is cut at the top.
+    expect(ref.current?.getRowClientRect(0)).toBeNull();
+    expect(ref.current?.getRowClientRect(1)).toMatchObject({ left: 58, top: 38, width: 300, height: 24 });
+  });
+
+  it('returns null row rects when the client area is narrower than the gutter', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    const ref = createRef<LatticaGridHandle>();
+    render(<LatticaGrid ref={ref} controller={c} width={40} height={100} />);
+    expect(ref.current?.getRowClientRect(0)).toBeNull();
+  });
+
+  it('lists every visible row strip in one call, tracking scroll', () => {
+    const c = new GridController({ rowCount: 20, colCount: 3 });
+    const ref = createRef<LatticaGridHandle>();
+    render(<LatticaGrid ref={ref} controller={c} width={400} height={200} />);
+    const grid = screen.getByTestId('lattica-grid');
+    grid.getBoundingClientRect = vi.fn(() => ({
+      left: 10,
+      top: 20,
+      right: 410,
+      bottom: 220,
+      width: 400,
+      height: 200,
+      x: 10,
+      y: 20,
+      toJSON: () => ({}),
+    }));
+
+    const before = ref.current?.getRowClientRects() ?? [];
+    expect(before).toHaveLength(8); // body 176px / 24px rows -> rows 0-7
+    expect(before[0]).toEqual({ row: 0, top: 44, height: 24 });
+    expect(before[7]).toEqual({ row: 7, top: 44 + 7 * 24, height: 24 });
+
+    fireEvent.wheel(grid, { deltaX: 0, deltaY: 30 });
+    const after = ref.current?.getRowClientRects() ?? [];
+    expect(after[0]).toEqual({ row: 1, top: 38, height: 24 });
+    expect(after.at(-1)).toEqual({ row: 8, top: 38 + 7 * 24, height: 24 });
+  });
+
   it('selects a cell on mouse down', () => {
     const c = new GridController({ rowCount: 20, colCount: 10 });
     renderGrid(c);
@@ -2597,5 +2662,139 @@ describe('LatticaGrid external commit/cancel control', () => {
     // The edit belongs to the controller; nothing swept or committed it.
     expect(c.getEdit()).not.toBeNull();
     c.cancelEdit();
+  });
+});
+
+describe('LatticaGrid onLayoutChange', () => {
+  let frames: Map<number, FrameRequestCallback>;
+  let nextFrameId: number;
+
+  const flushFrames = (): void => {
+    const callbacks = [...frames.values()];
+    frames.clear();
+    callbacks.forEach((cb) => cb(0));
+  };
+
+  beforeEach(() => {
+    frames = new Map();
+    nextFrameId = 1;
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback): number => {
+      const id = nextFrameId++;
+      frames.set(id, cb);
+      return id;
+    });
+    vi.stubGlobal('cancelAnimationFrame', (id: number): void => {
+      frames.delete(id);
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('debounces scroll bursts to one call per animation frame and skips the mount baseline', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    const onLayoutChange = vi.fn();
+    renderGrid(c, undefined, { onLayoutChange });
+    const grid = screen.getByTestId('lattica-grid');
+
+    // Mount is the baseline, not a change: nothing is scheduled.
+    flushFrames();
+    expect(onLayoutChange).not.toHaveBeenCalled();
+
+    fireEvent.wheel(grid, { deltaX: 0, deltaY: 24 });
+    fireEvent.wheel(grid, { deltaX: 0, deltaY: 24 }); // second change inside the same frame
+    expect(onLayoutChange).not.toHaveBeenCalled(); // rAF granularity, not synchronous
+    flushFrames();
+    expect(onLayoutChange).toHaveBeenCalledTimes(1);
+
+    fireEvent.wheel(grid, { deltaX: 10, deltaY: 0 });
+    flushFrames();
+    expect(onLayoutChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('fires on size, count, and grid-resize changes but not content-only edits', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    const onLayoutChange = vi.fn();
+    const { rerender } = render(
+      <LatticaGrid controller={c} width={400} height={200} onLayoutChange={onLayoutChange} />,
+    );
+
+    // Equal-total width redistribution still counts as a layout change.
+    act(() => {
+      c.setColumnWidth(0, 120);
+      c.setColumnWidth(1, 80);
+    });
+    flushFrames();
+    expect(onLayoutChange).toHaveBeenCalledTimes(1);
+
+    act(() => c.setRowCount(9));
+    flushFrames();
+    expect(onLayoutChange).toHaveBeenCalledTimes(2);
+
+    act(() => c.resizeRow(0, 40));
+    flushFrames();
+    expect(onLayoutChange).toHaveBeenCalledTimes(3);
+
+    rerender(<LatticaGrid controller={c} width={500} height={200} onLayoutChange={onLayoutChange} />);
+    flushFrames();
+    expect(onLayoutChange).toHaveBeenCalledTimes(4);
+
+    // Content-only writes repaint but do not move the layout.
+    act(() => c.setCellText(0, 0, 'hello'));
+    flushFrames();
+    expect(onLayoutChange).toHaveBeenCalledTimes(4);
+  });
+
+  it('fires when multi-line header labels expand the header band', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    const onLayoutChange = vi.fn();
+    const { rerender } = render(
+      <LatticaGrid
+        controller={c}
+        columns={[{ headerName: 'A' }, { headerName: 'B' }]}
+        width={300}
+        height={150}
+        onLayoutChange={onLayoutChange}
+      />,
+    );
+    flushFrames();
+    onLayoutChange.mockClear();
+
+    rerender(
+      <LatticaGrid
+        controller={c}
+        columns={[{ headerName: 'A\nunit' }, { headerName: 'B' }]}
+        width={300}
+        height={150}
+        onLayoutChange={onLayoutChange}
+      />,
+    );
+    flushFrames();
+    expect(onLayoutChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a scheduled notification when the callback is removed, and cancels on unmount', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    const onLayoutChange = vi.fn();
+    const { rerender, unmount } = render(
+      <LatticaGrid controller={c} width={400} height={200} onLayoutChange={onLayoutChange} />,
+    );
+    const grid = screen.getByTestId('lattica-grid');
+
+    fireEvent.wheel(grid, { deltaX: 0, deltaY: 24 });
+    expect(frames.size).toBe(1);
+    rerender(<LatticaGrid controller={c} width={400} height={200} />); // callback removed
+    flushFrames(); // pending frame fires but finds no callback
+    expect(onLayoutChange).not.toHaveBeenCalled();
+
+    rerender(
+      <LatticaGrid controller={c} width={400} height={200} onLayoutChange={onLayoutChange} />,
+    );
+    fireEvent.wheel(grid, { deltaX: 0, deltaY: 24 });
+    expect(frames.size).toBe(1);
+    unmount();
+    expect(frames.size).toBe(0); // pending frame cancelled
+    expect(onLayoutChange).not.toHaveBeenCalled();
   });
 });
