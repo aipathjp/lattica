@@ -379,6 +379,85 @@ describe('cellcommit events', () => {
   });
 });
 
+describe('setCellText write options (P0-3)', () => {
+  it('emits a cellcommit carrying a custom source when the value changes', () => {
+    const c = make();
+    const listener = vi.fn();
+    c.on('cellcommit', listener);
+    c.setCellText(1, 2, 'before');
+    expect(listener).not.toHaveBeenCalled(); // no source → legacy silent write
+    c.setCellText(1, 2, 'after', { source: 'time-link' });
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith({
+      source: 'time-link',
+      changes: [{ row: 1, col: 2, physicalRow: 1, physicalCol: 2, prev: 'before', next: 'after' }],
+    });
+  });
+
+  it('does not emit a cellcommit when a sourced write changes nothing', () => {
+    const c = make();
+    c.setCellText(0, 0, 'same');
+    const listener = vi.fn();
+    c.on('cellcommit', listener);
+    c.setCellText(0, 0, 'same', { source: 'sync' });
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('refuses writes to read-only cells and columns unless bypassReadOnly is set', () => {
+    const c = make();
+    const changes = vi.fn();
+    c.setCellText(0, 0, 'cell');
+    c.setCellText(0, 1, 'col');
+    c.setCellReadOnly(0, 0, true);
+    c.setColumnEditable(1, false);
+    c.on('change', changes);
+
+    c.setCellText(0, 0, 'blocked');
+    c.setCellText(0, 1, 'blocked', { bypassReadOnly: false });
+    expect(c.getEditText(0, 0)).toBe('cell');
+    expect(c.getEditText(0, 1)).toBe('col');
+    expect(changes).not.toHaveBeenCalled();
+
+    c.setCellText(0, 0, 'written', { bypassReadOnly: true });
+    c.setCellText(0, 1, 'written', { bypassReadOnly: true });
+    expect(c.getEditText(0, 0)).toBe('written');
+    expect(c.getEditText(0, 1)).toBe('written');
+    expect(changes).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips undo history with undoable: false while default stays undoable', () => {
+    const c = make();
+    c.setCellText(0, 0, 'first'); // default → undoable
+    c.setCellText(0, 0, 'second', { undoable: false });
+    expect(c.getEditText(0, 0)).toBe('second');
+    expect(c.undo.undoDepth).toBe(1);
+    c.undoLast(); // reverts the 'first' write, not the non-undoable one
+    expect(c.getEditText(0, 0)).toBe('');
+    expect(c.undo.canUndo()).toBe(false);
+  });
+
+  it('supports the app revert pattern (ignore own source) without loops', () => {
+    const c = make();
+    c.setCellText(0, 0, 'valid');
+    const sources: string[] = [];
+    c.on('cellcommit', (e) => {
+      sources.push(e.source);
+      if (e.source === 'app-revert') {
+        return; // own programmatic write — ignore to avoid a revert loop
+      }
+      for (const ch of e.changes) {
+        if (ch.next === 'bad') {
+          c.setCellText(ch.row, ch.col, ch.prev, { source: 'app-revert', undoable: false });
+        }
+      }
+    });
+    c.beginEdit(0, 0, 'bad');
+    c.commitEdit(); // user edit commits an invalid value
+    expect(c.getEditText(0, 0)).toBe('valid'); // reverted by the handler
+    expect(sources).toEqual(['edit', 'app-revert']); // exactly one revert, no loop
+  });
+});
+
 describe('read-only UI edit state', () => {
   it('blocks beginEdit for read-only columns and cells', () => {
     const c = make();

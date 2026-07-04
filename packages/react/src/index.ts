@@ -26,6 +26,8 @@ export {
   type EditState,
   type CellChange,
   type CellCommitEvent,
+  type CellCommitSource,
+  type SetCellTextOptions,
   type ColumnInputOptions,
   type DisplayOverride,
   type ColumnTypeOptions,
