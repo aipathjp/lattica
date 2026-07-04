@@ -42,12 +42,19 @@ export interface LatticaGridProps {
   /** Controlled record rows bound through leaf column `field` values. */
   rows?: ReadonlyArray<object>;
   theme?: Partial<GridTheme>;
-  /** Fixed pixel width (ignored when `fill` is set). Defaults to 640. */
+  /** Fixed pixel width (ignored when `autoSize` or `fill` is set). Defaults to 640. */
   width?: number;
-  /** Fixed pixel height (ignored when `fill` is set). Defaults to 400. */
+  /** Fixed pixel height (ignored when `autoSize` or `fill` is set). Defaults to 400. */
   height?: number;
+  /** Size to grid content. When set, `width`, `height`, and `fill` are ignored. */
+  autoSize?: 'content';
+  /** Maximum auto-sized width; overflow remains scrollable. */
+  maxWidth?: number;
+  /** Maximum auto-sized height; overflow remains scrollable. */
+  maxHeight?: number;
   /** Expand to fill the parent element (measured via ResizeObserver). Size the
-   *  parent however you like — e.g. `width:100%; height:100vh`. */
+   *  parent however you like — e.g. `width:100%; height:100vh`. Ignored when
+   *  `autoSize` is set. */
   fill?: boolean;
   className?: string;
   style?: CSSProperties;
@@ -123,6 +130,10 @@ function rectIsVisibleInGrid(rect: { x: number; y: number; width: number; height
   return rect.x + rect.width > geom.rowHeaderWidth && rect.y + rect.height > geom.colHeaderHeight && rect.x < width && rect.y < height;
 }
 
+function clampAutoSize(size: number, max: number | undefined): number {
+  return max === undefined ? size : Math.min(size, Math.max(0, max));
+}
+
 const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function LatticaGrid(
   props,
   ref,
@@ -141,6 +152,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     onCellOverlayClose,
   } = props;
   const theme = resolveTheme(props.theme);
+  const autoSize = props.autoSize;
   const fill = props.fill ?? false;
   const fixedWidth = props.width ?? 640;
   const fixedHeight = props.height ?? 400;
@@ -173,10 +185,23 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   const [measured, setMeasured] = useState<{ w: number; h: number } | null>(null);
   const [, force] = useReducer((n: number) => n + 1, 0);
 
-  // Effective pixel size: the measured container when `fill`, else the fixed size.
-  const width = fill && measured !== null ? measured.w : fixedWidth;
-  const height = fill && measured !== null ? measured.h : fixedHeight;
   const geom = effectiveGeometry(controller.geometry(), showRowNumbers);
+  const contentWidth = geom.rowHeaderWidth + geom.colSizes.getTotalSize();
+  const contentHeight = geom.colHeaderHeight + geom.rowSizes.getTotalSize();
+  // Sizing priority: autoSize='content' ignores width/height/fill, then fill,
+  // then fixed width/height. Clamped auto-size keeps normal scrolling active.
+  const width =
+    autoSize === 'content'
+      ? clampAutoSize(contentWidth, props.maxWidth)
+      : fill && measured !== null
+        ? measured.w
+        : fixedWidth;
+  const height =
+    autoSize === 'content'
+      ? clampAutoSize(contentHeight, props.maxHeight)
+      : fill && measured !== null
+        ? measured.h
+        : fixedHeight;
 
   const getVisibleCellRect = useCallback(
     (row: number, col: number): { x: number; y: number; width: number; height: number } | null => {
@@ -193,7 +218,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   useEffect(() => {
     const el = rootRef.current;
     /* v8 ignore next 3 -- ResizeObserver is present in browsers; absent only in some envs */
-    if (!fill || el === null || typeof ResizeObserver === 'undefined') {
+    if (autoSize === 'content' || !fill || el === null || typeof ResizeObserver === 'undefined') {
       return;
     }
     const ro = new ResizeObserver((entries) => {
@@ -204,7 +229,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [fill]);
+  }, [autoSize, fill]);
 
   const headerModelRef = useRef<HeaderModel | null>(null);
   if (columns !== undefined && headerModelRef.current === null) {
@@ -907,8 +932,8 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       className={props.className}
       style={{
         position: 'relative',
-        width: fill ? '100%' : width,
-        height: fill ? '100%' : height,
+        width: autoSize !== 'content' && fill ? '100%' : width,
+        height: autoSize !== 'content' && fill ? '100%' : height,
         overflow: 'hidden',
         outline: 'none',
         background: theme.background,

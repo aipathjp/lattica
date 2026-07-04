@@ -82,6 +82,11 @@ export function densityOptions(density: Density | DensityTokens): DensitySizing 
   };
 }
 
+/** Stable public layout metrics for consumers that size surrounding UI. */
+export function densityMetrics(density: Density): DensitySizing {
+  return densityOptions(density);
+}
+
 /**
  * Scale a density's spacing by a factor (keeps font size, rounds metrics) —
  * a fine-grained "row spacing" knob on top of the named presets.

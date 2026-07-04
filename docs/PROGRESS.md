@@ -270,3 +270,7 @@
   - `<LatticaGrid>` を `forwardRef` 化し、`LatticaGridHandle`（`getCellClientRect` / `focus` / `scrollCellIntoView`）を追加。セル矩形は visual 座標を受け取り、effective geometry・scroll・root `getBoundingClientRect()` から viewport 座標を返す。
   - controlled `cellOverlay` / `renderCellOverlay` / `onCellOverlayClose` を追加。セル左下に root 内絶対配置し、render ctx にはセルの root 相対 rect を渡す。Escape・active セル移動・明示 close で close callback を呼ぶ。
   - examples/playground `/editors` に、セルクリックで値確認パネルを出す overlay デモを追加。
+- 2026-07-05: **Wave 4b 完了**（密度寸法の公開契約＋コンテンツ準拠 auto size）。
+  - `densityMetrics(density)` を `@ai-path/lattica-react` から公開。`densityOptions` と同じ density token から行高・列幅・行ヘッダ幅・列ヘッダ高を返し、プロダクト側の compact 寸法ハードコードを不要にした。
+  - `<LatticaGrid autoSize="content" maxWidth maxHeight>` を追加。可視列幅合計＋行ヘッダ、可視行高合計＋列ヘッダで自動サイズ化し、上限超過時は既存スクロールで閲覧する。`autoSize` 指定時は `width` / `height` / `fill` より優先。
+  - examples/playground `/binding` を `autoSize="content"` + `maxHeight` の例に更新。`AGENTS.md` に stable `data-testid` / `aria-label` と Wave 1〜4 API の公開契約を追記。

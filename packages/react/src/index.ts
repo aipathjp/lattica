@@ -50,6 +50,7 @@ export {
   getDensity,
   scaleDensity,
   densityOptions,
+  densityMetrics,
   compactDensity,
   comfortableDensity,
   spaciousDensity,

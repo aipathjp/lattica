@@ -4,6 +4,7 @@ import {
   getDensity,
   scaleDensity,
   densityOptions,
+  densityMetrics,
   comfortableDensity,
   compactDensity,
 } from './density.js';
@@ -56,5 +57,19 @@ describe('densityOptions', () => {
     const g = c.geometry();
     expect(g.rowSizes.getSize(0)).toBe(densityPresets.spacious.defaultRowHeight);
     expect(g.rowHeaderWidth).toBe(densityPresets.spacious.rowHeaderWidth);
+  });
+});
+
+describe('densityMetrics', () => {
+  it('publishes compact layout metrics from the density source', () => {
+    expect(densityMetrics('compact')).toEqual(densityOptions('compact'));
+  });
+
+  it('publishes comfortable layout metrics from the density source', () => {
+    expect(densityMetrics('comfortable')).toEqual(densityOptions('comfortable'));
+  });
+
+  it('publishes spacious layout metrics from the density source', () => {
+    expect(densityMetrics('spacious')).toEqual(densityOptions('spacious'));
   });
 });

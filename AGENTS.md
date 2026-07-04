@@ -62,7 +62,7 @@ export default function Demo() {
 ```
 
 - `useGridController(options)` returns a stable headless `GridController`.
-- `<LatticaGrid controller rows columns width height theme renderDetail contextMenu onCellCommit editSelection />`.
+- `<LatticaGrid controller rows columns width height autoSize maxWidth maxHeight fill theme renderDetail contextMenu onCellCommit editSelection cellOverlay renderCellOverlay onCellOverlayClose />`.
 - `columns` are optional multi-level header defs (`ColumnNode` = leaf `{headerName}`
   or group `{headerName, children, collapsible?, showWhen?}`). Leaf defs may carry
   rich metadata such as `field`, `width`, `type`, `editable`, `align`, `format`,
@@ -73,6 +73,30 @@ export default function Demo() {
 - The imperative API remains available for edits and programmatic writes:
   `controller.setCellText(0, 0, 'Apple')`, `controller.setData(matrix)`, and
   `controller.setRecords(records, fields)`.
+- `autoSize="content"` sizes the grid to visible content
+  (`rowHeaderWidth + visible column widths`, `colHeaderHeight + visible row heights`).
+  `maxWidth` / `maxHeight` clamp that size and leave overflow scrollable. When
+  `autoSize` is set, `width`, `height`, and `fill` are ignored.
+
+## Public contract (stable identifiers)
+
+The following DOM hooks are public and stable. Renaming or changing their
+semantics is a breaking change:
+
+- `data-testid="lattica-grid"`
+- `data-testid="lattica-editor"`, `lattica-editor-select`,
+  `lattica-editor-date`, `lattica-editor-autocomplete`, `lattica-editor-datalist`
+- `data-testid="lattica-filter-<col>"`, `lattica-sort-<col>`
+- `data-testid="lattica-cell-overlay"`
+- `data-testid="lattica-colsettings"`, `lattica-colsettings-vis-<physicalCol>`,
+  `lattica-colsettings-width-<physicalCol>`, `lattica-colsettings-showall`,
+  `lattica-colsettings-resetwidths`
+- `data-testid="lattica-static-table"`
+- `data-testid="lattica-rowgroup-<row>"`
+
+ARIA labels are also stable for interactive chrome:
+`filter column N`, `sort column N`, `toggle row group N`, and column-settings
+visibility labels (`Show <column>`). Treat changes to these strings as breaking.
 
 ## The coordinate model (important)
 
@@ -228,15 +252,23 @@ controller.setCellSparkline(0, 1, [3,5,4,7], 'line');
 
 **Themes & density**
 ```ts
-import { buildTheme, densityOptions } from '@lattica/react';
+import { buildTheme, densityMetrics, densityOptions } from '@lattica/react';
 const theme = buildTheme({ palette: 'midnight', density: 'spacious' });
 const editTheme = buildTheme({ overrides: { readOnlyCellBackground: '#f4f4f5' } });
 const c = useGridController({ rowCount: 100, colCount: 8, ...densityOptions('compact') });
+const compactMetrics = densityMetrics('compact'); // row/col/header dimensions for surrounding UI
 <LatticaGrid controller={c} theme={theme} />
 <LatticaStatusBar controller={c} theme={theme} />
 ```
 Palettes: `light dark highContrast midnight sepia solarizedLight solarizedDark`.
 Densities: `compact comfortable spacious`. `buildTheme({ palette, density, fontFamily, overrides })`.
+
+**Content-sized grid**
+```tsx
+<LatticaGrid controller={controller} rows={rows} columns={columns} autoSize="content" maxHeight={320} />
+```
+`autoSize="content"` follows controller `change` events such as row/column count,
+row height, column width, filtering, hiding, and detail expansion changes.
 
 **Column settings panel**
 ```tsx
