@@ -68,6 +68,8 @@ export interface BuildSceneParams {
   getValue?: (row: number, col: number) => unknown;
   /** Conditional-format style accessor (optional). */
   getCfStyle?: (row: number, col: number) => { background?: string; color?: string } | null;
+  /** Lowest-priority per-cell style, below conditional formats and visual rules. */
+  getBaseStyle?: (row: number, col: number) => { background?: string; color?: string } | null;
   /** Visual conditional-format accessor (color scale / data bar / icon set). */
   getVisual?: (row: number, col: number) => CellVisual | null;
   /** Sparkline accessor; receives the cell size for layout. */
@@ -141,11 +143,13 @@ export function buildScene(params: BuildSceneParams): Scene {
       }
       const active = selection.isActive({ row, col });
       const visual = params.getVisual?.(row, col) ?? null;
-      let cfStyle = params.getCfStyle?.(row, col) ?? undefined;
+      const baseStyle = params.getBaseStyle?.(row, col) ?? null;
+      const explicitStyle = params.getCfStyle?.(row, col) ?? null;
+      let cfStyle = baseStyle === null && explicitStyle === null ? undefined : { ...(baseStyle ?? {}), ...(explicitStyle ?? {}) };
       // A color-scale background applies only when no explicit cf/search/invalid
       // background already claimed the cell.
       if (visual?.background !== undefined) {
-        cfStyle = { ...(cfStyle ?? {}), background: cfStyle?.background ?? visual.background };
+        cfStyle = { ...(cfStyle ?? {}), background: explicitStyle?.background ?? visual.background };
       }
       const cell: CellPaint = {
         row,

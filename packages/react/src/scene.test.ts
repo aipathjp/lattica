@@ -189,6 +189,24 @@ describe('buildScene visual conditional formatting', () => {
     });
     expect(scene.cells[0]!.cfStyle?.background).toBe('#ffd6d6');
   });
+
+  it('keeps base backgrounds below visual and explicit styles', () => {
+    const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
+    const scene = buildScene({
+      geom: geom(),
+      scrollLeft: 0,
+      scrollTop: 0,
+      clientWidth: 200,
+      clientHeight: 100,
+      selection: sel,
+      getDisplay: () => '5',
+      getBaseStyle: () => ({ background: '#f8f8f8' }),
+      getCfStyle: (_r, c) => (c === 1 ? { background: '#fee', color: '#900' } : null),
+      getVisual: (_r, c) => (c === 0 ? { background: '#808080' } : null),
+    });
+    expect(scene.cells.find((k) => k.col === 0)!.cfStyle).toEqual({ background: '#808080' });
+    expect(scene.cells.find((k) => k.col === 1)!.cfStyle).toEqual({ background: '#fee', color: '#900' });
+  });
 });
 
 describe('buildScene sparklines', () => {

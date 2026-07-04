@@ -56,6 +56,11 @@
 凡例: ✅完了 / 🚧進行中 / ⏳未着手
 
 ## 変更履歴
+- 2026-07-05: **Momotani Wave 1 編集ライフサイクル / 入力制御**。
+  - `cellcommit` イベントを追加。edit/paste/fill/delete/undo/redo の committed changes を raw 編集テキストの prev/next と visual/physical 座標で通知し、`<LatticaGrid onCellCommit>` から購読可能にした。
+  - UI 編集向け read-only 制御を追加。`setColumnEditable` / `setCellReadOnly` / `isCellEditable` と、テーマの `readOnlyCellBackground` / `editableCellBackground` を低優先度セル背景として結線。
+  - 列入力パイプライン `setColumnInput` と `time` セル型を追加。draft sanitize / maxLength / commitTransform に対応し、`930` / `1330` / `9:30` などを `HH:mm` に正規化する。
+  - `<LatticaGrid editSelection>` を追加し、編集開始時のキャレットを `all` / `end` / `preserve` で制御可能にした。
 - 2026-07-04: **Column Settings UI**。
   - `GridController` に物理 index ベースの `setColumnVisible` / `setColumnWidth` / `resetColumnWidths` を追加し、列表示・幅変更を `viewstate` に反映。
   - `<LatticaColumnSettings>` を追加。一般ユーザ向けの表示列トグルと、管理者向けの列幅編集・幅リセットを提供。

@@ -22,7 +22,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from 'react';
 import { HeaderModel, type ColumnNode, type GridStateSnapshot } from '@ai-path/lattica-core';
-import type { GridController, EditState } from './controller.js';
+import type { CellCommitEvent, GridController, EditState } from './controller.js';
 import { resolveTheme, type GridTheme } from './theme.js';
 import { buildScene } from './scene.js';
 import { paintScene, type Canvas2D } from './painter.js';
@@ -69,6 +69,10 @@ export interface LatticaGridProps {
   onColumnResize?: (change: { col: number; physicalCol: number; width: number }) => void;
   /** Fired when controller view state changes through user-facing view operations. */
   onViewStateChange?: (snapshot: GridStateSnapshot) => void;
+  /** Fired after user-facing cell writes are committed. */
+  onCellCommit?: (event: CellCommitEvent) => void;
+  /** How to place the text cursor when editing begins. Defaults to selecting all text. */
+  editSelection?: 'all' | 'end' | 'preserve';
 }
 
 interface MenuState {
@@ -82,7 +86,7 @@ function effectiveGeometry(geom: GridGeometry, showRowNumbers: boolean): GridGeo
 }
 
 export function LatticaGrid(props: LatticaGridProps): ReactElement {
-  const { controller, columns, onCellClick, onScrollChange, onColumnResize, onViewStateChange } = props;
+  const { controller, columns, onCellClick, onScrollChange, onColumnResize, onViewStateChange, onCellCommit } = props;
   const theme = resolveTheme(props.theme);
   const fill = props.fill ?? false;
   const fixedWidth = props.width ?? 640;
@@ -92,6 +96,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   const showSortIcons = props.showSortIcons ?? true;
   const filterable = props.filterable ?? true;
   const showFilterIcons = props.showFilterIcons ?? true;
+  const editSelection = props.editSelection ?? 'all';
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const editorRef = useRef<HTMLElement | null>(null);
@@ -158,16 +163,30 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     return controller.on('viewstate', onViewStateChange);
   }, [controller, onViewStateChange]);
 
+  useEffect(() => {
+    if (onCellCommit === undefined) {
+      return;
+    }
+    return controller.on('cellcommit', onCellCommit);
+  }, [controller, onCellCommit]);
+
   // Focus the editor when an edit begins. `<select>` has no select() method.
   useEffect(() => {
     const el = editorRef.current;
     if (edit !== null && el !== null) {
       el.focus();
-      if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
+      if (editSelection === 'all' && (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement)) {
         el.select();
+      } else if (
+        editSelection === 'end' &&
+        // Date inputs don't support the selection API (throws in Chrome).
+        (el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && el.type === 'text'))
+      ) {
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
       }
     }
-  }, [edit]);
+  }, [edit, editSelection]);
 
   useEffect(() => {
     onScrollChange?.(scroll);
@@ -191,6 +210,14 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     canvas.height = Math.round(height * dpr);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    const getBaseStyle =
+      theme.readOnlyCellBackground === undefined && theme.editableCellBackground === undefined
+        ? undefined
+        : (r: number, c: number) => {
+            const editable = controller.isCellEditable(r, c);
+            const background = editable ? theme.editableCellBackground : theme.readOnlyCellBackground;
+            return background === undefined ? null : { background };
+          };
     const scene = buildScene({
       geom,
       scrollLeft: scroll.left,
@@ -202,6 +229,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       getType: (_r, c) => controller.getColumnType(c),
       getAlign: (_r, c) => controller.getColumnAlign(c),
       getValue: (r, c) => controller.getValue(r, c),
+      getBaseStyle,
       getCfStyle: (r, c) => controller.getCellStyle(r, c),
       getVisual: (r, c) => controller.getCellVisual(r, c),
       getSparkline: (r, c, w, h) => controller.getCellSparkline(r, c, w, h),
@@ -539,6 +567,14 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     getType: (_r, c) => controller.getColumnType(c),
     getAlign: (_r, c) => controller.getColumnAlign(c),
     getValue: (r, c) => controller.getValue(r, c),
+    getBaseStyle:
+      theme.readOnlyCellBackground === undefined && theme.editableCellBackground === undefined
+        ? undefined
+        : (r, c) => {
+            const editable = controller.isCellEditable(r, c);
+            const background = editable ? theme.editableCellBackground : theme.readOnlyCellBackground;
+            return background === undefined ? null : { background };
+          },
     getCfStyle: (r, c) => controller.getCellStyle(r, c),
     getMerge: (r, c) => controller.getMerge(r, c),
   });
@@ -607,7 +643,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
     };
     const change = (value: string): void => {
       controller.updateDraft(value);
-      setEdit({ ...e, draft: value });
+      setEdit(controller.getEdit());
     };
     const keyDown = (key: string, shiftKey = false): boolean => {
       const handled = dispatchKey({ key, shiftKey, ctrlKey: false, metaKey: false, altKey: false });
