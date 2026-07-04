@@ -1,6 +1,6 @@
 {
   "name": "@ai-path/lattica-react",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "React bindings for Lattica: a canvas-rendered, virtualized data grid with DOM editing overlay, multi-level grouping headers, and IME-aware editing.",
   "license": "MIT",
   "type": "module",
