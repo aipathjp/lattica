@@ -146,9 +146,52 @@ export interface CellChange {
   next: string;
 }
 
+/**
+ * Source of a {@link CellCommitEvent}. Built-in interactions emit the literal
+ * kinds; programmatic writes ({@link GridController.setCellText} with a
+ * `source` option) may carry any app-defined string (e.g. `'revert'`,
+ * `'time-link'`) so a `cellcommit` handler can recognize — and ignore — its
+ * own writes. The `(string & {})` member keeps literal autocompletion while
+ * accepting arbitrary strings.
+ */
+export type CellCommitSource =
+  | 'edit'
+  | 'paste'
+  | 'fill'
+  | 'delete'
+  | 'undo'
+  | 'redo'
+  | (string & {});
+
 export interface CellCommitEvent {
-  source: 'edit' | 'paste' | 'fill' | 'delete' | 'undo' | 'redo';
+  source: CellCommitSource;
   changes: CellChange[];
+}
+
+/** Options for {@link GridController.setCellText} (programmatic writes). */
+export interface SetCellTextOptions {
+  /**
+   * Custom `cellcommit` source, propagated verbatim. When set, the write
+   * emits a `cellcommit` event (only if the stored text actually changed) so
+   * apps can distinguish their own programmatic writes from user edits —
+   * e.g. a validation handler reverting to the previous value tags the
+   * revert write and ignores it when it comes back, avoiding revert loops.
+   * When omitted, no `cellcommit` is emitted (legacy behavior).
+   */
+  source?: string;
+  /**
+   * Write even when the target cell/column is read-only
+   * ({@link GridController.isCellEditable} returns false). Default false —
+   * a write to a read-only cell is a silent no-op. Use true for app-driven
+   * transcription into protected cells (e.g. time-linked cells).
+   */
+  bypassReadOnly?: boolean;
+  /**
+   * Record the write in undo history (default true, the historical
+   * behavior). `false` applies the content without touching the undo/redo
+   * stacks — Ctrl+Z will not resurface the overwritten value.
+   */
+  undoable?: boolean;
 }
 
 export interface ColumnInputOptions {
@@ -1681,10 +1724,29 @@ export class GridController {
     );
   }
 
-  /** Set a single cell's content (undoable) and emit a change. */
-  setCellText(row: number, col: number, raw: string): void {
-    this.undo.execute(this.setContentCommand(this.toPhysical(row, col), raw));
+  /**
+   * Set a single cell's content and emit a change. Undoable by default.
+   * Writes to read-only cells/columns are silent no-ops unless
+   * `bypassReadOnly` is set. With a `source` option the write also emits a
+   * `cellcommit` carrying that source (see {@link SetCellTextOptions}).
+   */
+  setCellText(row: number, col: number, raw: string, options?: SetCellTextOptions): void {
+    if (options?.bypassReadOnly !== true && !this.isCellEditable(row, col)) {
+      return;
+    }
+    const p = this.toPhysical(row, col);
+    const prev = options?.source === undefined ? '' : this.getPhysicalEditText(p.row, p.col);
+    const command = this.setContentCommand(p, raw);
+    if (options?.undoable === false) {
+      command.apply();
+    } else {
+      this.undo.execute(command);
+    }
     this.emitter.emit('change', undefined);
+    if (options?.source !== undefined) {
+      const change = this.cellChange(row, col, prev, this.getPhysicalEditText(p.row, p.col));
+      this.emitCellCommit(options.source, change === null ? [] : [change]);
+    }
   }
 
   /** Clear the currently selected cells (undoable batch). */
