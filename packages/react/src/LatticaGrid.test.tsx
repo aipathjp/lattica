@@ -1719,3 +1719,49 @@ describe('LatticaGrid custom editors (P2-1)', () => {
     act(() => dummy.ctx().cancel());
   });
 });
+
+describe('displayValue prop', () => {
+  it('wires the prop to the controller override and repaints on prop change', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setCellText(0, 0, 'a');
+    const { rerender } = renderGrid(c, undefined, {
+      displayValue: (row, col, base) => (row === 0 && col === 0 ? `*${base}` : null),
+    });
+    expect(c.getDisplay(0, 0)).toBe('*a');
+    expect(c.getDisplay(0, 1)).toBe('');
+    expect(c.getEditText(0, 0)).toBe('a');
+
+    const change = vi.fn();
+    c.on('change', change);
+    rerender(
+      <LatticaGrid controller={c} width={400} height={200} displayValue={() => 'X'} />,
+    );
+    expect(change).toHaveBeenCalled();
+    expect(c.getDisplay(1, 1)).toBe('X');
+  });
+
+  it('clears the override via null and on unmount', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setCellText(0, 0, 'a');
+    const { rerender, unmount } = renderGrid(c, undefined, { displayValue: () => 'X' });
+    expect(c.getDisplay(0, 0)).toBe('X');
+    rerender(<LatticaGrid controller={c} width={400} height={200} displayValue={null} />);
+    expect(c.getDisplay(0, 0)).toBe('a');
+    rerender(
+      <LatticaGrid controller={c} width={400} height={200} displayValue={() => 'Y'} />,
+    );
+    expect(c.getDisplay(0, 0)).toBe('Y');
+    unmount();
+    expect(c.getDisplayOverride()).toBeNull();
+    expect(c.getDisplay(0, 0)).toBe('a');
+  });
+
+  it('leaves a controller-set override alone when the prop is undefined', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    act(() => c.setDisplayOverride(() => 'Z'));
+    const { unmount } = renderGrid(c);
+    expect(c.getDisplay(0, 0)).toBe('Z');
+    unmount();
+    expect(c.getDisplay(0, 0)).toBe('Z');
+  });
+});

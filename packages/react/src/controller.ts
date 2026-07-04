@@ -121,6 +121,19 @@ export interface SetDataOptions {
   resize?: boolean;
 }
 
+/**
+ * Display-only override hook. Called with the **physical** (data) cell
+ * coordinates and the base display text (formatted value). Return a string to
+ * replace the painted text for that cell, or null to keep the base display.
+ * Stored values, edit text ({@link GridController.getEditText}) and copy
+ * output are never affected — this changes presentation only.
+ */
+export type DisplayOverride = (
+  physicalRow: number,
+  physicalCol: number,
+  baseDisplay: string,
+) => string | null;
+
 interface ControllerEvents {
   change: void;
   edit: EditState | null;
@@ -299,6 +312,8 @@ export class GridController {
   private readonly columnInputs = new Map<number, ColumnInputOptions>();
   private readonly columnInputsFromDefs = new Set<number>();
   private readonly searchKeys = new Set<string>();
+  /** Display-only text override (audit snapshots, per-column formatting…). */
+  private displayOverride: DisplayOverride | null = null;
   private readonly emitter = new Emitter<ControllerEvents>();
   private suppressChangeEvents = false;
 
@@ -923,15 +938,41 @@ export class GridController {
     };
   }
 
-  /** Display text of a cell (computed value, formatted). */
+  /**
+   * Display text of a cell (computed value, formatted). When a display
+   * override is set and returns a non-null string for the cell, that string
+   * replaces the painted text; stored values, edit text, and copy output are
+   * unaffected.
+   */
   getDisplay(row: number, col: number): string {
     const p = this.toPhysical(row, col);
     const value = this.engine.getValue(p);
     const fmt = this.columnFormats.get(p.col);
-    if (fmt !== undefined && typeof value === 'number') {
-      return formatNumber(value, fmt);
+    const base = fmt !== undefined && typeof value === 'number' ? formatNumber(value, fmt) : formatValue(value);
+    if (this.displayOverride !== null) {
+      const overridden = this.displayOverride(p.row, p.col, base);
+      if (overridden !== null) {
+        return overridden;
+      }
     }
-    return formatValue(value);
+    return base;
+  }
+
+  /**
+   * Set (or clear with `null`) the display-only text override. The override
+   * receives **physical** (data) coordinates plus the base display text and
+   * returns a replacement string, or null to keep the base display. Display
+   * changes only — {@link getEditText} and {@link copySelection} are
+   * untouched. Emits a change so the grid repaints immediately.
+   */
+  setDisplayOverride(fn: DisplayOverride | null): void {
+    this.displayOverride = fn;
+    this.emitter.emit('change', undefined);
+  }
+
+  /** The current display override, or null when none is set. */
+  getDisplayOverride(): DisplayOverride | null {
+    return this.displayOverride;
   }
 
   /** Raw computed value of a cell (for value-based renderers / formatting). */

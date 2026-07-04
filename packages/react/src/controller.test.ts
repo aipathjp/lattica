@@ -1467,3 +1467,58 @@ describe('column wrap & autoSizeRows', () => {
     expect(c.getRowHeight(0)).toBe(96); // 3 * 30 + 6 > default 24
   });
 });
+
+describe('display override', () => {
+  it('replaces the painted text only — value, edit text, and copy are untouched', () => {
+    const c = make();
+    c.setCellText(0, 0, '=1+1');
+    c.setCellText(0, 1, 'hello');
+    c.setDisplayOverride((row, col, base) => (row === 0 && col === 0 ? `was ${base}` : null));
+    expect(c.getDisplay(0, 0)).toBe('was 2');
+    expect(c.getValue(0, 0)).toBe(2);
+    expect(c.getEditText(0, 0)).toBe('=1+1');
+    // Cells for which the override returns null keep the base display.
+    expect(c.getDisplay(0, 1)).toBe('hello');
+    c.selection.setActive({ row: 0, col: 0 });
+    c.selection.extendTo({ row: 0, col: 1 });
+    expect(c.copySelection()).toEqual([['=1+1', 'hello']]);
+    // Editing starts from the stored text, not the overridden display.
+    c.beginEdit(0, 0);
+    expect(c.getEdit()?.draft).toBe('=1+1');
+    c.cancelEdit();
+  });
+
+  it('receives physical coordinates and the formatted base display', () => {
+    const c = make();
+    c.setData([[3], [1], [2]]);
+    c.setColumnFormat(0, '0.00');
+    const seen: [number, number, string][] = [];
+    c.setDisplayOverride((row, col, base) => {
+      seen.push([row, col, base]);
+      return null;
+    });
+    c.toggleSort(0); // ascending: visual row 0 → physical row 1
+    seen.length = 0;
+    expect(c.getDisplay(0, 0)).toBe('1.00');
+    expect(seen).toEqual([[1, 0, '1.00']]);
+    // Overrides layer on top of the column number format.
+    c.setDisplayOverride((_row, _col, base) => `${base} kg`);
+    expect(c.getDisplay(0, 0)).toBe('1.00 kg');
+  });
+
+  it('emits change on set and clear, and exposes the current override', () => {
+    const c = make();
+    c.setCellText(0, 0, 'x');
+    const change = vi.fn();
+    c.on('change', change);
+    const fn = () => 'masked';
+    c.setDisplayOverride(fn);
+    expect(change).toHaveBeenCalledTimes(1);
+    expect(c.getDisplayOverride()).toBe(fn);
+    expect(c.getDisplay(0, 0)).toBe('masked');
+    c.setDisplayOverride(null);
+    expect(change).toHaveBeenCalledTimes(2);
+    expect(c.getDisplayOverride()).toBeNull();
+    expect(c.getDisplay(0, 0)).toBe('x');
+  });
+});

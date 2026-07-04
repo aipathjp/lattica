@@ -21,6 +21,7 @@ export {
   type CellChange,
   type CellCommitEvent,
   type ColumnInputOptions,
+  type DisplayOverride,
 } from './controller.js';
 export { sanitizeTimeDraft, normalizeTimeInput } from './time-input.js';
 export {
