@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { paintScene } from './painter.js';
-import { defaultTheme } from './theme.js';
+import { defaultTheme, DEFAULT_PLACEHOLDER_COLOR } from './theme.js';
 import { createMockContext } from './test-utils.js';
 import type { Scene } from './scene.js';
 
@@ -576,5 +576,52 @@ describe('paintScene summary (footer) cells', () => {
     expect(separator.length).toBe(1);
     const secondRowSeparator = ctx.calls.filter((c) => c.method === 'moveTo' && c.args[1] === 100.5);
     expect(secondRowSeparator.length).toBe(0);
+  });
+});
+
+describe('paintScene placeholders (P0-4)', () => {
+  const placeholderScene = (): Scene => ({
+    cells: [
+      {
+        row: 0,
+        col: 0,
+        rect: { x: 0, y: 0, width: 80, height: 20 },
+        text: '',
+        selected: false,
+        active: false,
+        placeholder: '0.00',
+      },
+    ],
+    activeRect: null,
+    visibleRows: [0],
+    visibleCols: [0],
+  });
+
+  it('paints the hint text in the theme placeholder color', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, placeholderScene(), defaultTheme, { width: 200, height: 100 });
+    const texts = ctx.calls.filter((c) => c.method === 'fillText').map((c) => c.args[0]);
+    expect(texts).toContain('0.00');
+    // The hint fill is the last fillStyle write of the scene.
+    expect(ctx.fillStyle).toBe(DEFAULT_PLACEHOLDER_COLOR);
+  });
+
+  it('honors a theme placeholderColor override', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, placeholderScene(), { ...defaultTheme, placeholderColor: '#123456' }, { width: 200, height: 100 });
+    expect(ctx.fillStyle).toBe('#123456');
+  });
+
+  it('falls back to the default color when the theme omits the token', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, placeholderScene(), { ...defaultTheme, placeholderColor: undefined }, { width: 200, height: 100 });
+    expect(ctx.fillStyle).toBe(DEFAULT_PLACEHOLDER_COLOR);
+  });
+
+  it('does not paint hint text for cells without a placeholder', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, scene(), defaultTheme, { width: 200, height: 100 });
+    const texts = ctx.calls.filter((c) => c.method === 'fillText').map((c) => c.args[0]);
+    expect(texts).not.toContain('0.00');
   });
 });

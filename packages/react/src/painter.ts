@@ -6,7 +6,7 @@
  */
 
 import { iconColor, lerpColor, type IconMark } from '@ai-path/tb-core';
-import { DEFAULT_COMMENT_MARKER_COLOR, type GridTheme } from './theme.js';
+import { DEFAULT_COMMENT_MARKER_COLOR, DEFAULT_PLACEHOLDER_COLOR, type GridTheme } from './theme.js';
 import type { Scene, CellPaint } from './scene.js';
 import { defaultCellTypes, type CellTypeRegistry } from './cell-types.js';
 import { wrapLineHeight } from './measure.js';
@@ -262,6 +262,20 @@ function paintCell(
   }
   if (cell.lines !== undefined) {
     return;
+  }
+
+  // Empty-cell placeholder hint: painted through the plain text renderer in
+  // the theme's muted placeholder color, over whatever the (empty) cell drew.
+  if (cell.placeholder !== undefined) {
+    registry.resolve(undefined)({
+      ctx,
+      rect,
+      value: cell.placeholder,
+      text: cell.placeholder,
+      theme,
+      align: cell.align ?? 'left',
+      color: theme.placeholderColor ?? DEFAULT_PLACEHOLDER_COLOR,
+    });
   }
 
   // Comment marker: a small triangle in the top-right corner, over the content.

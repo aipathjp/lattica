@@ -446,6 +446,8 @@ export class GridController {
   private readonly columnAligns = new Map<number, CellAlign>();
   /** Text-wrap flags per physical column (default off). */
   private readonly columnWraps = new Map<number, boolean>();
+  /** Empty-cell placeholder hints per physical column (default none). */
+  private readonly columnPlaceholders = new Map<number, string>();
   private readonly columnEditable = new Map<number, boolean>();
   private readonly cellReadOnly = new Set<string>();
   private readonly columnInputs = new Map<number, ColumnInputOptions>();
@@ -1393,6 +1395,28 @@ export class GridController {
     return false;
   }
 
+  /**
+   * Set (or clear with `null`) the placeholder hint painted inside empty
+   * cells of a physical column (e.g. `"0.00"` / `"00:00"` / `"YYYY-MM-DD"`).
+   * Display-only: stored values, copy output, and edit text are unaffected.
+   */
+  setColumnPlaceholder(col: number, hint: string | null): void {
+    if (hint === null) {
+      this.columnPlaceholders.delete(col);
+    } else {
+      this.columnPlaceholders.set(col, hint);
+    }
+    this.emitter.emit('change', undefined);
+  }
+  /** Placeholder hint of a (visual) column, or undefined when none is set. */
+  getColumnPlaceholder(visualCol: number): string | undefined {
+    return this.columnPlaceholders.get(this.view.cols.getPhysicalIndex(visualCol));
+  }
+  /** True when at least one column has a placeholder hint (cheap early-out). */
+  hasPlaceholderColumns(): boolean {
+    return this.columnPlaceholders.size > 0;
+  }
+
   setColumnEditable(visualCol: number, editable: boolean): void {
     this.columnEditable.set(this.view.cols.getPhysicalIndex(visualCol), editable);
     this.emitter.emit('change', undefined);
@@ -1421,6 +1445,9 @@ export class GridController {
       }
       if (def.wrap !== undefined) {
         this.columnWraps.set(physicalCol, def.wrap);
+      }
+      if (def.placeholder !== undefined) {
+        this.columnPlaceholders.set(physicalCol, def.placeholder);
       }
       if (def.format !== undefined) {
         this.columnFormats.set(physicalCol, def.format);

@@ -527,3 +527,39 @@ describe('buildScene summary (footer) cells', () => {
     expect(scene.summaryCells![0]!.rect.height).toBe(0);
   });
 });
+
+describe('buildScene placeholders (P0-4)', () => {
+  it('attaches the hint only to empty cells', () => {
+    const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
+    const scene = buildScene({
+      geom: geom(),
+      scrollLeft: 0,
+      scrollTop: 0,
+      clientWidth: 200,
+      clientHeight: 60,
+      selection: sel,
+      getDisplay: (r, c) => (r === 0 && c === 0 ? '12.50' : ''),
+      getPlaceholder: (_r, c) => (c === 0 ? '0.00' : undefined),
+    });
+    // Value cell: display text wins, no placeholder.
+    expect(scene.cells.find((k) => k.row === 0 && k.col === 0)!.placeholder).toBeUndefined();
+    // Empty cell in the placeholder column: hint attached.
+    expect(scene.cells.find((k) => k.row === 1 && k.col === 0)!.placeholder).toBe('0.00');
+    // Empty cell in another column: accessor returned undefined.
+    expect(scene.cells.find((k) => k.row === 0 && k.col === 1)!.placeholder).toBeUndefined();
+  });
+
+  it('leaves cells untouched when no accessor is supplied', () => {
+    const sel = new SelectionModel({ rowCount: 100, colCount: 100 });
+    const scene = buildScene({
+      geom: geom(),
+      scrollLeft: 0,
+      scrollTop: 0,
+      clientWidth: 200,
+      clientHeight: 60,
+      selection: sel,
+      getDisplay: () => '',
+    });
+    expect(scene.cells.every((k) => k.placeholder === undefined)).toBe(true);
+  });
+});

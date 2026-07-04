@@ -59,6 +59,7 @@ export {
   DEFAULT_HEADER_LINE_HEIGHT,
   DEFAULT_HEADER_PADDING_Y,
   DEFAULT_COMMENT_MARKER_COLOR,
+  DEFAULT_PLACEHOLDER_COLOR,
   type GridTheme,
   type BuildThemeOptions,
 } from './theme.js';
