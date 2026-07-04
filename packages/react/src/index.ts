@@ -6,6 +6,7 @@ export {
   type LatticaGridHandle,
   type LatticaGridProps,
   type ContextMenuPreset,
+  type CellActionEvent,
 } from './LatticaGrid.js';
 export { LatticaStatusBar, type LatticaStatusBarProps } from './StatusBar.js';
 export { LatticaFormulaBar, type LatticaFormulaBarProps } from './FormulaBar.js';
@@ -113,6 +114,7 @@ export {
   numberRenderer,
   booleanRenderer,
   barRenderer,
+  linkRenderer,
   parseBarValue,
   truncateWithEllipsis,
   builtinRenderers,

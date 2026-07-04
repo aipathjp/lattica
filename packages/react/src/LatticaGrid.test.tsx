@@ -2362,3 +2362,131 @@ describe('LatticaGrid empty-cell placeholders (P0-4)', () => {
     expect(texts.filter((t) => t === '0.000').length).toBe(1);
   });
 });
+
+describe('link cells (onCellAction)', () => {
+  const linkGrid = (props?: Partial<Omit<LatticaGridProps, 'controller' | 'columns'>>) => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setColumnType(0, 'link');
+    c.setCellText(0, 0, 'CODE-1');
+    c.setCellText(0, 1, 'plain');
+    const onCellAction = vi.fn();
+    renderGrid(c, undefined, { onCellAction, ...props });
+    return { c, onCellAction, grid: screen.getByTestId('lattica-grid') };
+  };
+
+  it('fires on click with the raw value and display text, without editing', () => {
+    const { onCellAction, grid } = linkGrid();
+    fireEvent.mouseDown(grid, { clientX: 60, clientY: 30 }); // cell (0,0)
+    expect(onCellAction).toHaveBeenCalledTimes(1);
+    expect(onCellAction).toHaveBeenCalledWith({ row: 0, col: 0, value: 'CODE-1', display: 'CODE-1' });
+    expect(screen.queryByTestId('lattica-editor')).toBeNull();
+  });
+
+  it('does not fire for empty link cells or non-link columns', () => {
+    const { onCellAction, grid } = linkGrid();
+    fireEvent.mouseDown(grid, { clientX: 60, clientY: 54 }); // empty link cell (1,0)
+    fireEvent.mouseDown(grid, { clientX: 160, clientY: 30 }); // non-link cell (0,1)
+    expect(onCellAction).not.toHaveBeenCalled();
+  });
+
+  it('supports ColumnDef type "link" bound through rows', async () => {
+    const c = new GridController({ rowCount: 1, colCount: 1 });
+    const onCellAction = vi.fn();
+    renderGrid(c, [{ headerName: 'Code', field: 'code', type: 'link' }], {
+      rows: [{ code: 'X-9' }],
+      onCellAction,
+    });
+    await waitFor(() => expect(c.getDisplay(0, 0)).toBe('X-9'));
+    fireEvent.mouseDown(screen.getByTestId('lattica-grid'), { clientX: 60, clientY: 30 });
+    expect(onCellAction).toHaveBeenCalledWith({ row: 0, col: 0, value: 'X-9', display: 'X-9' });
+  });
+
+  it('fires on plain Enter without beginning an edit', () => {
+    const { c, onCellAction, grid } = linkGrid();
+    act(() => c.selection.setActive({ row: 0, col: 0 }));
+    fireEvent.keyDown(grid, { key: 'Enter' });
+    expect(onCellAction).toHaveBeenCalledWith({ row: 0, col: 0, value: 'CODE-1', display: 'CODE-1' });
+    expect(screen.queryByTestId('lattica-editor')).toBeNull();
+    // Enter was consumed as an action: the active cell did not move.
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 0 });
+  });
+
+  it('fires on Enter even when enterBeginsEditing is true (action wins over edit)', () => {
+    const { c, onCellAction, grid } = linkGrid({ enterBeginsEditing: true });
+    act(() => c.selection.setActive({ row: 0, col: 0 }));
+    fireEvent.keyDown(grid, { key: 'Enter' });
+    expect(onCellAction).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('lattica-editor')).toBeNull();
+  });
+
+  it('does not fire on Enter with a modifier key', () => {
+    const { c, onCellAction, grid } = linkGrid();
+    act(() => c.selection.setActive({ row: 0, col: 0 }));
+    for (const modifier of ['shiftKey', 'ctrlKey', 'metaKey', 'altKey'] as const) {
+      fireEvent.keyDown(grid, { key: 'Enter', [modifier]: true });
+    }
+    expect(onCellAction).not.toHaveBeenCalled();
+  });
+
+  it('does not fire on Enter for empty link cells or non-link columns (Enter falls through)', () => {
+    const { c, onCellAction, grid } = linkGrid();
+    act(() => c.selection.setActive({ row: 0, col: 1 })); // non-link
+    fireEvent.keyDown(grid, { key: 'Enter' });
+    expect(c.selection.getState().active).toEqual({ row: 1, col: 1 }); // normal Enter move
+    act(() => c.selection.setActive({ row: 1, col: 0 })); // empty link cell
+    fireEvent.keyDown(grid, { key: 'Enter' });
+    expect(c.selection.getState().active).toEqual({ row: 2, col: 0 });
+    expect(onCellAction).not.toHaveBeenCalled();
+  });
+
+  it('does not intercept Enter while an edit is in progress', () => {
+    const { c, onCellAction, grid } = linkGrid();
+    act(() => {
+      c.selection.setActive({ row: 0, col: 0 });
+      c.beginEdit(0, 0, 'draft');
+    });
+    fireEvent.keyDown(grid, { key: 'Enter' });
+    expect(onCellAction).not.toHaveBeenCalled();
+    expect(c.getEdit()).toBeNull(); // Enter committed the edit as usual
+  });
+
+  it('fires on click in a view-only (selectionDisabled) grid, but stays keyboard-inert', () => {
+    const { c, onCellAction, grid } = linkGrid({ selectionDisabled: true });
+    fireEvent.mouseDown(grid, { clientX: 60, clientY: 30 });
+    expect(onCellAction).toHaveBeenCalledTimes(1);
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 0 }); // unchanged default
+    fireEvent.keyDown(grid, { key: 'Enter' });
+    expect(onCellAction).toHaveBeenCalledTimes(1); // no second (keyboard) firing
+  });
+
+  it('fires for read-only link cells (click and Enter)', () => {
+    const { c, onCellAction, grid } = linkGrid();
+    act(() => c.setColumnEditable(0, false));
+    fireEvent.mouseDown(grid, { clientX: 60, clientY: 30 });
+    fireEvent.keyDown(grid, { key: 'Enter' });
+    expect(onCellAction).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId('lattica-editor')).toBeNull();
+  });
+
+  it('is harmless without an onCellAction handler (click and Enter are still consumed)', () => {
+    const c = new GridController({ rowCount: 2, colCount: 1 });
+    c.setColumnType(0, 'link');
+    c.setCellText(0, 0, 'CODE-1');
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    expect(() => fireEvent.mouseDown(grid, { clientX: 60, clientY: 30 })).not.toThrow();
+    fireEvent.keyDown(grid, { key: 'Enter' });
+    expect(c.selection.getState().active).toEqual({ row: 0, col: 0 }); // consumed, no move
+    expect(screen.queryByTestId('lattica-editor')).toBeNull();
+  });
+
+  it('shows a pointer cursor over actionable link cells only', () => {
+    const { grid } = linkGrid();
+    fireEvent.mouseMove(grid, { clientX: 60, clientY: 30 }); // link cell with value
+    expect(grid.style.cursor).toBe('pointer');
+    fireEvent.mouseMove(grid, { clientX: 60, clientY: 54 }); // empty link cell
+    expect(grid.style.cursor).toBe('');
+    fireEvent.mouseMove(grid, { clientX: 160, clientY: 30 }); // non-link cell
+    expect(grid.style.cursor).toBe('');
+  });
+});

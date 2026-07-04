@@ -131,6 +131,14 @@ export interface LatticaGridProps {
   onCellCommit?: (event: CellCommitEvent) => void;
   /** Fired when an edit commit is refused (full-width reject / transform / validator). */
   onInputReject?: (event: InputRejectEvent) => void;
+  /**
+   * Fired when a `link`-type cell is activated: clicked, or plain Enter is
+   * pressed while the cell is active. `link` cells treat Enter as an action —
+   * never as edit-begin — independent of `enterBeginsEditing`, and the action
+   * fires regardless of cell editability (read-only view grids included).
+   * Empty cells and non-`link` columns never fire.
+   */
+  onCellAction?: (event: CellActionEvent) => void;
   /** How to place the text cursor when editing begins. Defaults to selecting all text. */
   editSelection?: 'all' | 'end' | 'preserve';
   /**
@@ -192,6 +200,16 @@ export interface LatticaGridProps {
 /** Hover dwell time (ms) before the cell tooltip appears. */
 export const TOOLTIP_DELAY_MS = 500;
 
+/** Payload of {@link LatticaGridProps.onCellAction} (visual coordinates). */
+export interface CellActionEvent {
+  row: number;
+  col: number;
+  /** Raw cell value. */
+  value: unknown;
+  /** Formatted display text. */
+  display: string;
+}
+
 export interface LatticaGridHandle {
   getCellClientRect(row: number, col: number): DOMRect | null;
   focus(): void;
@@ -244,6 +262,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     onViewStateChange,
     onCellCommit,
     onInputReject,
+    onCellAction,
     cellOverlay,
     renderCellOverlay,
     onCellOverlayClose,
@@ -664,6 +683,37 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     );
   }, [controller, geom, width, height]);
 
+  /**
+   * The link-action payload for a (visual) cell, or null when the cell is not
+   * an actionable link: non-`link` column, or empty display text.
+   */
+  const linkActionAt = useCallback(
+    (row: number, col: number): CellActionEvent | null => {
+      if (controller.getColumnType(col) !== 'link') {
+        return null;
+      }
+      const display = controller.getDisplay(row, col);
+      if (display === '') {
+        return null;
+      }
+      return { row, col, value: controller.getValue(row, col), display };
+    },
+    [controller],
+  );
+
+  /** Fire `onCellAction` for an actionable link cell; true when it was one. */
+  const fireLinkAction = useCallback(
+    (row: number, col: number): boolean => {
+      const action = linkActionAt(row, col);
+      if (action === null) {
+        return false;
+      }
+      onCellAction?.(action);
+      return true;
+    },
+    [linkActionAt, onCellAction],
+  );
+
   const dispatchKey = useCallback(
     (input: KeyInput): boolean => {
       // View-only mode: the grid is keyboard-inert (copy stays programmatic).
@@ -729,6 +779,23 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
         e.preventDefault();
         return;
       }
+      // Plain Enter on an actionable `link` cell fires the cell action instead
+      // of editing or navigating — independent of `enterBeginsEditing`.
+      if (
+        e.key === 'Enter' &&
+        !e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        !selectionDisabled &&
+        controller.getEdit() === null
+      ) {
+        const { active } = controller.selection.getState();
+        if (fireLinkAction(active.row, active.col)) {
+          e.preventDefault();
+          return;
+        }
+      }
       const handled = dispatchKey({
         key: e.key,
         shiftKey: e.shiftKey,
@@ -740,7 +807,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
         e.preventDefault();
       }
     },
-    [cellOverlay, dispatchKey, onCellOverlayClose, renderCellOverlay],
+    [cellOverlay, controller, dispatchKey, fireLinkAction, onCellOverlayClose, renderCellOverlay, selectionDisabled],
   );
 
   /**
@@ -800,9 +867,12 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       }
       const hit = hitTest(geom, scroll.left, scroll.top, x, y);
       // View-only mode: clicks focus (and report) but never mutate selection.
+      // Link cells still fire their action — the read-only monthly-list →
+      // detail navigation use case.
       if (selectionDisabled) {
         if (hit.region === 'cell') {
           onCellClick?.({ row: hit.row, col: hit.col }, e);
+          fireLinkAction(hit.row, hit.col);
         }
         root.focus();
         return;
@@ -815,6 +885,9 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
             controller.selection.setActive({ row: hit.row, col: hit.col });
           }
           onCellClick?.({ row: hit.row, col: hit.col }, e);
+          // A click on an actionable link cell fires the action (selection
+          // still updates above; editing never begins on single click).
+          fireLinkAction(hit.row, hit.col);
           // Begin a drag-select from this cell.
           draggingRef.current = true;
           break;
@@ -830,7 +903,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       }
       rootRef.current?.focus();
     },
-    [controller, geom, scroll, contentEdge, onCellClick, selectionDisabled],
+    [controller, geom, scroll, contentEdge, fireLinkAction, onCellClick, selectionDisabled],
   );
 
   const onMouseMove = useCallback(
@@ -872,10 +945,10 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
         return;
       }
 
-      // Idle hover: show a resize cursor when over a header border, and drive
-      // the comment / custom cell tooltip for hovered body cells.
+      // Idle hover: show a resize cursor when over a header border, a pointer
+      // cursor over actionable link cells, and drive the comment / custom cell
+      // tooltip for hovered body cells.
       const border = hitResizeHandle(geom, scroll.left, scroll.top, x, y);
-      root.style.cursor = border === null ? '' : border.type === 'col' ? 'col-resize' : 'row-resize';
       let hoverCell: { row: number; col: number } | null = null;
       if (border === null) {
         const edge = contentEdge();
@@ -886,9 +959,17 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
           }
         }
       }
+      root.style.cursor =
+        border !== null
+          ? border.type === 'col'
+            ? 'col-resize'
+            : 'row-resize'
+          : hoverCell !== null && linkActionAt(hoverCell.row, hoverCell.col) !== null
+            ? 'pointer'
+            : '';
       updateHover(hoverCell);
     },
-    [controller, geom, scroll, contentEdge, updateHover],
+    [controller, geom, scroll, contentEdge, linkActionAt, updateHover],
   );
 
   const onMouseLeave = useCallback(() => {

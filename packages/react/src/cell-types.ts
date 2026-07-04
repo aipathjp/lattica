@@ -241,6 +241,58 @@ export const barRenderer: CellRenderer = (c) => {
   ctx.restore();
 };
 
+// ── Link cells (P0-2) ───────────────────────────────────────────────────────
+
+/**
+ * Link-styled text: the display text drawn in the theme accent color
+ * (`activeBorder`) with an underline, signalling a clickable in-cell action.
+ * Empty cells render exactly like plain text (nothing). This is only the
+ * visual half — the view layer owns the interaction (pointer cursor on hover,
+ * click / Enter firing `onCellAction`).
+ */
+export const linkRenderer: CellRenderer = (c) => {
+  if (c.text === '') {
+    drawCellText(c);
+    return;
+  }
+  const { ctx, rect, theme } = c;
+  const color = theme.activeBorder;
+  drawCellText(c, color);
+  // Underline matching the drawn text: measured width when the context can
+  // measure, an approximation otherwise, clamped to the cell's padded width.
+  const measurable = ctx as MeasuringCanvas;
+  const measured =
+    measurable.measureText !== undefined
+      ? measurable.measureText(c.text).width
+      : c.text.length * theme.fontSize * 0.6;
+  const lineLength = Math.min(measured, Math.max(0, rect.width - theme.cellPaddingX * 2));
+  if (lineLength <= 0) {
+    return;
+  }
+  let x0: number;
+  if (c.align === 'right') {
+    x0 = rect.x + rect.width - theme.cellPaddingX - lineLength;
+  } else if (c.align === 'center') {
+    x0 = rect.x + rect.width / 2 - lineLength / 2;
+  } else {
+    x0 = rect.x + theme.cellPaddingX;
+  }
+  // Text is painted with a 'middle' baseline at the cell's vertical center, so
+  // the underline sits half a font-size below it.
+  const y = rect.y + rect.height / 2 + theme.fontSize / 2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(rect.x, rect.y, rect.width, rect.height);
+  ctx.clip();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x0, y);
+  ctx.lineTo(x0 + lineLength, y);
+  ctx.stroke();
+  ctx.restore();
+};
+
 /** Built-in renderers keyed by cell-type name. */
 export const builtinRenderers: Readonly<Record<string, CellRenderer>> = {
   text: textRenderer,
@@ -249,6 +301,7 @@ export const builtinRenderers: Readonly<Record<string, CellRenderer>> = {
   boolean: booleanRenderer,
   checkbox: booleanRenderer,
   bar: barRenderer,
+  link: linkRenderer,
 };
 
 /** A registry resolving cell-type names to renderers, with a text default. */
