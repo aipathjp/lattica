@@ -3,6 +3,7 @@ import { render, cleanup, fireEvent, screen, waitFor, act } from '@testing-libra
 import { createRef } from 'react';
 import { LatticaGrid } from './LatticaGrid.js';
 import { GridController } from './controller.js';
+import { EditorRegistry, type CustomEditorContext } from './editors.js';
 import { createMockContext } from './test-utils.js';
 import type { ColumnNode } from '@ai-path/tb-core';
 import type { LatticaGridHandle, LatticaGridProps } from './LatticaGrid.js';
@@ -1501,5 +1502,220 @@ describe('LatticaGrid text wrapping', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe('LatticaGrid custom editors (P2-1)', () => {
+  /** A dummy editor: an <input> mounted into the host container. */
+  const makeDummyEditor = () => {
+    const focus = vi.fn();
+    const destroy = vi.fn();
+    let ctx: CustomEditorContext | null = null;
+    const factory = (context: CustomEditorContext) => {
+      ctx = context;
+      const input = context.container.ownerDocument.createElement('input');
+      input.value = context.value;
+      context.container.appendChild(input);
+      return { focus, destroy };
+    };
+    return { factory, focus, destroy, ctx: () => ctx! };
+  };
+
+  it('mounts a registered editor and commits through the normal pipeline', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.setColumnEditor(0, 'color');
+    const editors = new EditorRegistry();
+    const dummy = makeDummyEditor();
+    editors.registerEditor('color', dummy.factory);
+    const onCellCommit = vi.fn();
+    renderGrid(c, undefined, { editors, onCellCommit });
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 0, col: 0 });
+    fireEvent.doubleClick(grid);
+
+    const host = screen.getByTestId('lattica-editor-custom');
+    expect(host.querySelector('input')).not.toBeNull();
+    expect(screen.queryByTestId('lattica-editor')).toBeNull();
+    expect(dummy.focus).toHaveBeenCalledTimes(1);
+    const ctx = dummy.ctx();
+    expect(ctx.row).toBe(0);
+    expect(ctx.col).toBe(0);
+    expect(ctx.value).toBe('');
+    expect(ctx.rect.width).toBeGreaterThan(0);
+    expect(ctx.rect.height).toBeGreaterThan(0);
+
+    act(() => ctx.commit('#ff0000'));
+    expect(screen.queryByTestId('lattica-editor-custom')).toBeNull();
+    expect(dummy.destroy).toHaveBeenCalledTimes(1);
+    expect(c.getDisplay(0, 0)).toBe('#ff0000');
+    expect(onCellCommit).toHaveBeenCalledWith({
+      source: 'edit',
+      changes: [{ row: 0, col: 0, physicalRow: 0, physicalCol: 0, prev: '', next: '#ff0000' }],
+    });
+
+    // Undo joins the normal history.
+    act(() => c.undoLast());
+    expect(c.getDisplay(0, 0)).toBe('');
+  });
+
+  it('cancels a custom edit without writing', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.setColumnEditor(0, 'color');
+    const editors = new EditorRegistry();
+    const dummy = makeDummyEditor();
+    editors.registerEditor('color', dummy.factory);
+    const onCellCommit = vi.fn();
+    renderGrid(c, undefined, { editors, onCellCommit });
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    screen.getByTestId('lattica-editor-custom');
+
+    act(() => dummy.ctx().cancel());
+    expect(screen.queryByTestId('lattica-editor-custom')).toBeNull();
+    expect(dummy.destroy).toHaveBeenCalledTimes(1);
+    expect(c.getDisplay(0, 0)).toBe('');
+    expect(onCellCommit).not.toHaveBeenCalled();
+  });
+
+  it('receives the initial typed character as the draft value', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.setColumnEditor(0, 'color');
+    const editors = new EditorRegistry();
+    const dummy = makeDummyEditor();
+    editors.registerEditor('color', dummy.factory);
+    renderGrid(c, undefined, { editors });
+    fireEvent.keyDown(screen.getByTestId('lattica-grid'), { key: 'x' });
+    expect(dummy.ctx().value).toBe('x');
+    act(() => dummy.ctx().cancel());
+  });
+
+  it('leaves grid Enter/Escape handling to the factory inside the container', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.setColumnEditor(0, 'color');
+    const editors = new EditorRegistry();
+    const dummy = makeDummyEditor();
+    editors.registerEditor('color', dummy.factory);
+    renderGrid(c, undefined, { editors });
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    const input = screen.getByTestId('lattica-editor-custom').querySelector('input')!;
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(c.getEdit()).not.toBeNull();
+    expect(screen.getByTestId('lattica-editor-custom')).toBeTruthy();
+
+    // Mouse-down inside the container also stays with the editor.
+    fireEvent.mouseDown(input);
+    expect(c.getEdit()).not.toBeNull();
+  });
+
+  it('commits on an outside mouse-down when the kind opts in', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.setColumnEditor(0, 'color');
+    const editors = new EditorRegistry();
+    const dummy = makeDummyEditor();
+    editors.registerEditor('color', dummy.factory, { commitOnOutsideClick: true });
+    renderGrid(c, undefined, { editors });
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.keyDown(grid, { key: 'a' });
+    screen.getByTestId('lattica-editor-custom');
+
+    fireEvent.mouseDown(grid, { clientX: 160, clientY: 60 });
+    expect(screen.queryByTestId('lattica-editor-custom')).toBeNull();
+    expect(c.getDisplay(0, 0)).toBe('a');
+  });
+
+  it('does not commit on an outside mouse-down by default', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.setColumnEditor(0, 'color');
+    const editors = new EditorRegistry();
+    const dummy = makeDummyEditor();
+    editors.registerEditor('color', dummy.factory);
+    renderGrid(c, undefined, { editors });
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.keyDown(grid, { key: 'a' });
+    screen.getByTestId('lattica-editor-custom');
+
+    fireEvent.mouseDown(grid, { clientX: 160, clientY: 60 });
+    expect(screen.getByTestId('lattica-editor-custom')).toBeTruthy();
+    expect(c.getEdit()).not.toBeNull();
+    expect(c.getDisplay(0, 0)).toBe('');
+  });
+
+  it('supports factories without focus/destroy hooks', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.setColumnEditor(0, 'bare');
+    const editors = new EditorRegistry();
+    let ctx: CustomEditorContext | null = null;
+    editors.registerEditor('bare', (context) => {
+      ctx = context;
+      return {};
+    });
+    renderGrid(c, undefined, { editors });
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    screen.getByTestId('lattica-editor-custom');
+    act(() => ctx!.commit('done'));
+    expect(c.getDisplay(0, 0)).toBe('done');
+  });
+
+  it('falls back to the text editor for an unregistered kind', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.setColumnEditor(0, 'nope');
+    const editors = new EditorRegistry();
+    renderGrid(c, undefined, { editors });
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    expect(screen.queryByTestId('lattica-editor-custom')).toBeNull();
+    expect(screen.getByTestId('lattica-editor')).toBeTruthy();
+  });
+
+  it('falls back to the text editor when no registry is passed', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.setColumnEditor(0, 'color');
+    renderGrid(c);
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    expect(screen.queryByTestId('lattica-editor-custom')).toBeNull();
+    expect(screen.getByTestId('lattica-editor')).toBeTruthy();
+  });
+
+  it('uses built-in editors for columns without an editor kind', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.setColumnEditor(0, 'color');
+    const editors = new EditorRegistry();
+    const dummy = makeDummyEditor();
+    editors.registerEditor('color', dummy.factory);
+    renderGrid(c, undefined, { editors });
+    c.selection.setActive({ row: 0, col: 1 });
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    expect(screen.queryByTestId('lattica-editor-custom')).toBeNull();
+    expect(screen.getByTestId('lattica-editor')).toBeTruthy();
+  });
+
+  it('destroys the editor when the grid unmounts mid-edit', () => {
+    const c = new GridController({ rowCount: 5, colCount: 3 });
+    c.setColumnEditor(0, 'color');
+    const editors = new EditorRegistry();
+    const dummy = makeDummyEditor();
+    editors.registerEditor('color', dummy.factory);
+    const { unmount } = renderGrid(c, undefined, { editors });
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    screen.getByTestId('lattica-editor-custom');
+    unmount();
+    expect(dummy.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('binds the editor via ColumnNode editor metadata', () => {
+    const c = new GridController({ rowCount: 2, colCount: 2 });
+    const editors = new EditorRegistry();
+    const dummy = makeDummyEditor();
+    editors.registerEditor('color', dummy.factory);
+    const columns: ColumnNode[] = [
+      { headerName: 'Color', field: 'color', editor: 'color' },
+      { headerName: 'Name', field: 'name' },
+    ];
+    renderGrid(c, columns, { editors, rows: [{ color: '#00ff00', name: 'green' }] });
+    c.selection.setActive({ row: 0, col: 0 });
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    expect(screen.getByTestId('lattica-editor-custom')).toBeTruthy();
+    expect(dummy.ctx().value).toBe('#00ff00');
+    act(() => dummy.ctx().cancel());
   });
 });

@@ -38,6 +38,7 @@ import { cellRect, columnX, hitTest, type GridGeometry, type HitResult } from '.
 import { interpretKey, type KeyInput } from './keyboard.js';
 import { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
 import { columnHeaderCells, computeHeaderRowHeights, rowHeaderCells } from './headers.js';
+import type { EditorRegistry } from './editors.js';
 import { buildMenu, type MenuItem, type MenuItemSpec } from './menu.js';
 import { hitResizeHandle, type ResizeTarget } from './resize.js';
 
@@ -90,6 +91,12 @@ export interface LatticaGridProps {
   onCellCommit?: (event: CellCommitEvent) => void;
   /** How to place the text cursor when editing begins. Defaults to selecting all text. */
   editSelection?: 'all' | 'end' | 'preserve';
+  /**
+   * Registry of custom cell editors. Columns whose `editor` kind is registered
+   * here mount the registered factory over the cell instead of a built-in
+   * editor; unregistered kinds silently fall back to the text editor.
+   */
+  editors?: EditorRegistry;
   /** Controlled visual cell anchor for a root-local overlay. */
   cellOverlay?: { row: number; col: number } | null;
   /** Render a controlled overlay anchored to `cellOverlay`. */
@@ -156,6 +163,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     cellOverlay,
     renderCellOverlay,
     onCellOverlayClose,
+    editors,
   } = props;
   const theme = resolveTheme(props.theme);
   const autoSize = props.autoSize;
@@ -171,6 +179,8 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const editorRef = useRef<HTMLElement | null>(null);
+  const customContainerRef = useRef<HTMLDivElement | null>(null);
+  const activeCustomRef = useRef<{ commitOnOutsideClick: boolean } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const composingRef = useRef(false);
   const draggingRef = useRef(false);
@@ -517,6 +527,13 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       if (root === null) {
         return;
       }
+      // A custom editor that opted in commits its draft on any mouse-down
+      // outside its container (inside clicks stop propagation and never reach
+      // this handler). Without the option, the factory owns the lifecycle.
+      const activeCustom = activeCustomRef.current;
+      if (activeCustom !== null && activeCustom.commitOnOutsideClick) {
+        controller.commitEdit();
+      }
       const rect = root.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -801,6 +818,54 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
 
   const editRect =
     edit !== null ? cellRect(geom, scroll.left, scroll.top, edit.row, edit.col) : null;
+
+  // Resolve a custom editor for the edited column: the column must name an
+  // editor kind and the registry must have it. Otherwise the built-in editors
+  // below render as usual (unknown kinds fall back to the plain text editor).
+  const customEditorKind = edit !== null ? controller.getColumnEditor(edit.col) : undefined;
+  const customEntry =
+    customEditorKind !== undefined && editors !== undefined
+      ? (editors.resolve(customEditorKind) ?? null)
+      : null;
+
+  // Mount the custom editor factory into its host container for one edit
+  // session. Commit/cancel run through the controller so custom editors join
+  // the normal pipeline (sanitization, validation, undo, cellcommit 'edit').
+  // `editRect` is intentionally not a dependency: it is a fresh object every
+  // render and only the mount-time rectangle is handed to the factory.
+  useEffect(() => {
+    if (customEntry === null) {
+      return;
+    }
+    const container = customContainerRef.current;
+    /* v8 ignore next 3 -- an active custom entry implies a live edit, its rect, and an attached container */
+    if (edit === null || editRect === null || container === null) {
+      return;
+    }
+    const instance = customEntry.factory({
+      value: edit.draft,
+      rect: editRect,
+      container,
+      row: edit.row,
+      col: edit.col,
+      commit: (next) => {
+        controller.updateDraft(next);
+        controller.commitEdit();
+        rootRef.current?.focus();
+      },
+      cancel: () => {
+        controller.cancelEdit();
+        rootRef.current?.focus();
+      },
+    });
+    activeCustomRef.current = { commitOnOutsideClick: customEntry.commitOnOutsideClick };
+    instance.focus?.();
+    return () => {
+      activeCustomRef.current = null;
+      instance.destroy?.();
+      container.replaceChildren();
+    };
+  }, [controller, customEntry, edit]);
   const overlayRect =
     cellOverlay !== null && cellOverlay !== undefined && renderCellOverlay !== undefined
       ? getVisibleCellRect(cellOverlay.row, cellOverlay.col)
@@ -1189,8 +1254,30 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
             );
           })}
 
-      {/* Active-cell editor overlay (kind depends on the column's cell type). */}
-      {edit !== null && editRect !== null && renderEditor(edit, editRect)}
+      {/* Active-cell editor overlay (kind depends on the column's cell type).
+          A registered custom editor mounts into a host container instead;
+          key events inside it stay with the factory (no grid Enter/Escape). */}
+      {edit !== null &&
+        editRect !== null &&
+        (customEntry !== null ? (
+          <div
+            ref={customContainerRef}
+            data-testid="lattica-editor-custom"
+            onKeyDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute',
+              left: editRect.x,
+              top: editRect.y,
+              width: editRect.width,
+              height: editRect.height,
+              boxSizing: 'border-box',
+              zIndex: 6,
+            }}
+          />
+        ) : (
+          renderEditor(edit, editRect)
+        ))}
 
       {/* Controlled cell overlay, anchored to the target cell's bottom-left. */}
       {cellOverlay !== null && cellOverlay !== undefined && renderCellOverlay !== undefined && overlayRect !== null && (

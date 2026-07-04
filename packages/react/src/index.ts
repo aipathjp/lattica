@@ -93,7 +93,17 @@ export {
   type CellAlign,
 } from './cell-types.js';
 export { interpretKey, type KeyInput, type KeyAction } from './keyboard.js';
-export { editorKindForType, type EditorKind } from './editors.js';
+export {
+  editorKindForType,
+  EditorRegistry,
+  type EditorKind,
+  type CustomEditorRect,
+  type CustomEditorContext,
+  type CustomEditorInstance,
+  type CustomEditorFactory,
+  type RegisterEditorOptions,
+  type RegisteredEditor,
+} from './editors.js';
 export { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
 export {
   columnHeaderCells,

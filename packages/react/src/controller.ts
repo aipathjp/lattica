@@ -289,6 +289,8 @@ export class GridController {
   private readonly filterModel = new FilterModel();
   private readonly nestedRows = new NestedRowModel([]);
   private readonly columnTypes = new Map<number, string>();
+  /** Custom editor kind per physical column (consumed by the React view). */
+  private readonly columnEditors = new Map<number, string>();
   private readonly columnAligns = new Map<number, CellAlign>();
   /** Text-wrap flags per physical column (default off). */
   private readonly columnWraps = new Map<number, boolean>();
@@ -1044,6 +1046,9 @@ export class GridController {
       if (def.type !== undefined) {
         this.columnTypes.set(physicalCol, def.type);
       }
+      if (def.editor !== undefined) {
+        this.columnEditors.set(physicalCol, def.editor);
+      }
       if (def.align !== undefined) {
         this.columnAligns.set(physicalCol, def.align);
       }
@@ -1142,6 +1147,25 @@ export class GridController {
   /** Which DOM editor a column should use, derived from its cell type. */
   getEditorKind(visualCol: number): EditorKind {
     return editorKindForType(this.getColumnType(visualCol));
+  }
+
+  /**
+   * Point a (physical) column at a custom editor kind registered in an
+   * `EditorRegistry` (passed to `<LatticaGrid editors>`). Pass null to clear.
+   * An unregistered kind silently falls back to the built-in text editor.
+   */
+  setColumnEditor(col: number, kind: string | null): void {
+    if (kind === null) {
+      this.columnEditors.delete(col);
+    } else {
+      this.columnEditors.set(col, kind);
+    }
+    this.emitter.emit('change', undefined);
+  }
+
+  /** Custom editor kind for a (visual) column, or undefined when none set. */
+  getColumnEditor(visualCol: number): string | undefined {
+    return this.columnEditors.get(this.view.cols.getPhysicalIndex(visualCol));
   }
 
   /** Set an Excel-style number format pattern for a (physical) column. */
