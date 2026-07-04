@@ -62,6 +62,11 @@
   - `@ai-path/lattica-react` に `renderStaticTable` / `staticTablePrintCss` を追加。現在の controller view（sort/filter/hide/move、列幅、表示値、配置）から SSR/印刷向けの素の HTML table を生成可能にした。
   - multi-level header は `computeHeaderLayout` を流用し、`colSpan`/`rowSpan` を再現。行番号、caption、maxRows 超過時の `tfoot` に対応。
   - playground `/print` を追加し、同じ controller から canvas grid と print preview を並置表示するデモを結線。
+- 2026-07-05: **宣言的データバインディング / リッチ列モデル**。
+  - `GridController.setRowCount` / `setColCount` と `setData` / `setRecords` を追加。データロードは全置換セマンティクスで undo 履歴に積まず、`cellcommit` も発火しない。
+  - `ColumnDef` に `type` / `editable` / `align` / `format` / `options` / `maxLength` を追加し、`<LatticaGrid columns>` から controller へ一括適用するようにした。
+  - `<LatticaGrid rows>` を追加。leaf column の `field` から controlled records を投入し、行数・列数変更を controller 再生成なしで反映する。
+  - playground `/binding` を追加し、Add row / Remove row / Reload data で records state の変更がグリッドに反映されるデモを用意。
 - 2026-07-05: **Momotani Wave 1 編集ライフサイクル / 入力制御**。
   - `cellcommit` イベントを追加。edit/paste/fill/delete/undo/redo の committed changes を raw 編集テキストの prev/next と visual/physical 座標で通知し、`<LatticaGrid onCellCommit>` から購読可能にした。
   - UI 編集向け read-only 制御を追加。`setColumnEditable` / `setCellReadOnly` / `isCellEditable` と、テーマの `readOnlyCellBackground` / `editableCellBackground` を低優先度セル背景として結線。

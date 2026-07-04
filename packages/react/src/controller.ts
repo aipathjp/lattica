@@ -43,6 +43,7 @@ import {
   fillRegion,
   toA1,
   parseA1,
+  type ColumnDef,
 } from '@ai-path/lattica-core';
 import {
   DataView,
@@ -97,6 +98,10 @@ export interface ColumnInputOptions {
   commitTransform?: (raw: string) => string | null;
 }
 
+export interface SetDataOptions {
+  resize?: boolean;
+}
+
 interface ControllerEvents {
   change: void;
   edit: EditState | null;
@@ -144,6 +149,16 @@ function isIdentityOrder(order: readonly number[]): boolean {
 
 function validIndex(index: number, count: number): boolean {
   return Number.isInteger(index) && index >= 0 && index < count;
+}
+
+function loadCellText(value: string | number | boolean | null | undefined): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'TRUE' : 'FALSE';
+  }
+  return String(value);
 }
 
 function sparseOrder(order: readonly number[], count: number): number[] {
@@ -259,8 +274,10 @@ export class GridController {
   private readonly columnEditable = new Map<number, boolean>();
   private readonly cellReadOnly = new Set<string>();
   private readonly columnInputs = new Map<number, ColumnInputOptions>();
+  private readonly columnInputsFromDefs = new Set<number>();
   private readonly searchKeys = new Set<string>();
   private readonly emitter = new Emitter<ControllerEvents>();
+  private suppressChangeEvents = false;
 
   private rowCount: number;
   private colCount: number;
@@ -294,7 +311,11 @@ export class GridController {
     this.colHeaderHeight = options.colHeaderHeight ?? 24;
     this.frozenRows = options.frozenRows ?? 0;
     this.frozenCols = options.frozenCols ?? 0;
-    this.selection.subscribe(() => this.emitter.emit('change', undefined));
+    this.selection.subscribe(() => {
+      if (!this.suppressChangeEvents) {
+        this.emitter.emit('change', undefined);
+      }
+    });
     // Repaint when the invalid-cell set changes (validation runs on commit).
     this.validation.subscribe(() => this.emitter.emit('change', undefined));
     // Expanding/collapsing a detail panel changes row heights.
@@ -304,11 +325,67 @@ export class GridController {
     });
   }
 
+  private setSelectionDimensions(rowCount: number, colCount: number): void {
+    this.suppressChangeEvents = true;
+    try {
+      this.selection.setDimensions(rowCount, colCount);
+    } finally {
+      this.suppressChangeEvents = false;
+    }
+  }
+
   getRowCount(): number {
     return this.view.getRowCount();
   }
   getColCount(): number {
     return this.view.getColCount();
+  }
+
+  private setPhysicalDimensions(rowCount: number, colCount: number, emit: boolean): void {
+    if (rowCount < 0) {
+      throw new RangeError(`rowCount must be >= 0, got ${rowCount}`);
+    }
+    if (colCount < 0) {
+      throw new RangeError(`colCount must be >= 0, got ${colCount}`);
+    }
+    const prevRows = this.rowCount;
+    const prevCols = this.colCount;
+    if (rowCount === prevRows && colCount === prevCols) {
+      return;
+    }
+
+    if (rowCount > prevRows) {
+      this.view.rows.insert(prevRows, rowCount - prevRows);
+    } else if (rowCount < prevRows) {
+      const removed = Array.from({ length: prevRows - rowCount }, (_, i) => rowCount + i);
+      this.view.rows.remove(removed);
+    }
+    if (colCount > prevCols) {
+      this.view.cols.insert(prevCols, colCount - prevCols);
+    } else if (colCount < prevCols) {
+      const removed = Array.from({ length: prevCols - colCount }, (_, i) => colCount + i);
+      this.view.cols.remove(removed);
+    }
+
+    this.rowCount = rowCount;
+    this.colCount = colCount;
+    this.rowSizes.setCount(rowCount);
+    this.colSizes.setCount(colCount);
+    this.rebuildViewSizes();
+    this.setSelectionDimensions(this.view.getRowCount(), this.view.getColCount());
+    if (emit) {
+      this.emitter.emit('change', undefined);
+    }
+  }
+
+  /** Set the physical row count. Engine content outside the view is retained. */
+  setRowCount(rowCount: number): void {
+    this.setPhysicalDimensions(rowCount, this.colCount, true);
+  }
+
+  /** Set the physical column count. Engine content outside the view is retained. */
+  setColCount(colCount: number): void {
+    this.setPhysicalDimensions(this.rowCount, colCount, true);
   }
 
   /** Map a visual cell to its physical address in the engine. */
@@ -358,7 +435,7 @@ export class GridController {
    * sizes/selection, and emit. Managing hidden directly lets multiple sources
    * (column filters and nested-row collapse) combine cleanly.
    */
-  private refreshView(): void {
+  private refreshView(emit = true): void {
     this.view.applySort(this.engineGet, this.sortModel.getConfigs());
     const filterHidden = filteredHiddenRows(
       this.view.rows.length,
@@ -369,8 +446,10 @@ export class GridController {
     this.view.rows.setHidden(this.view.rows.getHidden(), false);
     this.view.rows.setHidden([...hide], true);
     this.rebuildViewSizes();
-    this.selection.setDimensions(this.view.getRowCount(), this.view.getColCount());
-    this.emitter.emit('change', undefined);
+    this.setSelectionDimensions(this.view.getRowCount(), this.view.getColCount());
+    if (emit) {
+      this.emitter.emit('change', undefined);
+    }
   }
 
   /** Toggle the sort on a (visual) column: none→asc→desc→none. */
@@ -410,7 +489,7 @@ export class GridController {
   /** Rebuild sizes + selection dims after a column-mapper change, then emit. */
   private refreshColumns(): void {
     this.rebuildViewSizes();
-    this.selection.setDimensions(this.view.getRowCount(), this.view.getColCount());
+    this.setSelectionDimensions(this.view.getRowCount(), this.view.getColCount());
     this.emitter.emit('change', undefined);
   }
 
@@ -619,7 +698,7 @@ export class GridController {
     }
 
     this.rebuildViewSizes();
-    this.selection.setDimensions(this.view.getRowCount(), this.view.getColCount());
+    this.setSelectionDimensions(this.view.getRowCount(), this.view.getColCount());
     this.emitter.emit('change', undefined);
   }
 
@@ -882,6 +961,43 @@ export class GridController {
     this.emitter.emit('change', undefined);
   }
 
+  /** Apply rich physical column definitions as one non-viewstate update. */
+  applyColumnDefs(defs: readonly ColumnDef[]): void {
+    defs.forEach((def, physicalCol) => {
+      if (!validIndex(physicalCol, this.colCount)) {
+        return;
+      }
+      if (def.width !== undefined) {
+        this.colSizes.setSize(physicalCol, def.width);
+      }
+      if (def.type !== undefined) {
+        this.columnTypes.set(physicalCol, def.type);
+      }
+      if (def.align !== undefined) {
+        this.columnAligns.set(physicalCol, def.align);
+      }
+      if (def.format !== undefined) {
+        this.columnFormats.set(physicalCol, def.format);
+      }
+      if (def.options !== undefined) {
+        this.columnOptions.set(physicalCol, def.options);
+        this.validation.setColumnValidator(physicalCol, validators.list(def.options));
+      }
+      if (def.editable !== undefined) {
+        this.columnEditable.set(physicalCol, def.editable);
+      }
+      if (
+        def.maxLength !== undefined &&
+        (!this.columnInputs.has(physicalCol) || this.columnInputsFromDefs.has(physicalCol))
+      ) {
+        this.columnInputs.set(physicalCol, { maxLength: def.maxLength });
+        this.columnInputsFromDefs.add(physicalCol);
+      }
+    });
+    this.rebuildViewSizes();
+    this.emitter.emit('change', undefined);
+  }
+
   setCellReadOnly(visualRow: number, visualCol: number, readOnly: boolean): void {
     const p = this.toPhysical(visualRow, visualCol);
     const key = `${p.row},${p.col}`;
@@ -903,6 +1019,7 @@ export class GridController {
 
   setColumnInput(visualCol: number, options: ColumnInputOptions | null): void {
     const physicalCol = this.view.cols.getPhysicalIndex(visualCol);
+    this.columnInputsFromDefs.delete(physicalCol);
     if (options === null) {
       this.columnInputs.delete(physicalCol);
     } else {
@@ -1112,6 +1229,61 @@ export class GridController {
       },
     });
     return make(next, previous);
+  }
+
+  /**
+   * Replace grid data from physical (0,0). Data loads are not user edits:
+   * undo history is cleared and no cellcommit event is emitted.
+   */
+  setData(
+    matrix: ReadonlyArray<ReadonlyArray<string | number | boolean | null>>,
+    opts: SetDataOptions = {},
+  ): void {
+    const shouldResize = opts.resize ?? true;
+    const nextRows = matrix.length;
+    const nextCols = matrix.reduce((max, row) => Math.max(max, row.length), 0);
+    if (shouldResize) {
+      this.setPhysicalDimensions(nextRows, nextCols, false);
+    }
+
+    const rows = this.rowCount;
+    const cols = this.colCount;
+    for (let row = 0; row < rows; row++) {
+      const source = matrix[row];
+      for (let col = 0; col < cols; col++) {
+        const raw = source === undefined || col >= source.length ? '' : loadCellText(source[col]);
+        this.engine.setContent({ row, col }, this.parseInput(raw));
+      }
+    }
+    this.undo.clear();
+    this.refreshView(false);
+    this.emitter.emit('change', undefined);
+  }
+
+  /** Replace grid data from record objects using the provided field order. */
+  setRecords(
+    records: ReadonlyArray<object>,
+    fields: readonly string[],
+    opts: SetDataOptions = {},
+  ): void {
+    this.setData(
+      records.map((record) =>
+        fields.map((field) => {
+          const value = (record as Record<string, unknown>)[field];
+          if (
+            typeof value === 'string' ||
+            typeof value === 'number' ||
+            typeof value === 'boolean' ||
+            value === null ||
+            value === undefined
+          ) {
+            return value ?? null;
+          }
+          return String(value);
+        }),
+      ),
+      opts,
+    );
   }
 
   /** Set a single cell's content (undoable) and emit a change. */

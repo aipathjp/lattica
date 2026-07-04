@@ -60,6 +60,100 @@ describe('LatticaGrid rendering', () => {
     fireEvent.mouseDown(grid, { clientX: 10, clientY: 40 });
     expect(c.selection.getState().active).toEqual({ row: 0, col: 0 });
   });
+
+  it('applies rich column definitions to the controller', async () => {
+    const c = new GridController({ rowCount: 2, colCount: 3 });
+    const columns: ColumnNode[] = [
+      {
+        headerName: 'SKU',
+        field: 'sku',
+        width: 160,
+        type: 'text',
+        editable: false,
+        align: 'left',
+        maxLength: 4,
+      },
+      {
+        headerName: 'Qty',
+        field: 'qty',
+        width: 90,
+        type: 'number',
+        align: 'right',
+        format: '#,##0',
+      },
+      {
+        headerName: 'Status',
+        field: 'status',
+        type: 'dropdown',
+        options: ['Open', 'Closed'],
+        align: 'center',
+      },
+    ];
+    renderGrid(c, columns);
+
+    await waitFor(() => expect(c.getColumnWidth(0)).toBe(160));
+    expect(c.getColumnType(0)).toBe('text');
+    expect(c.isCellEditable(0, 0)).toBe(false);
+    expect(c.getColumnAlign(0)).toBe('left');
+    expect(c.getColumnType(1)).toBe('number');
+    expect(c.getColumnAlign(1)).toBe('right');
+    expect(c.getColumnFormat(1)).toBe('#,##0');
+    expect(c.getColumnType(2)).toBe('dropdown');
+    expect(c.getColumnOptions(2)).toEqual(['Open', 'Closed']);
+    expect(c.getColumnAlign(2)).toBe('center');
+
+    c.beginEdit(0, 1, '123456');
+    c.updateDraft('123456');
+    expect(c.getEdit()?.draft).toBe('123456');
+    c.cancelEdit();
+    c.setColumnEditable(0, true);
+    c.beginEdit(0, 0, '');
+    c.updateDraft('abcdef');
+    expect(c.getEdit()?.draft).toBe('abcd');
+  });
+
+  it('does not reapply column definitions when the columns reference is stable', async () => {
+    const c = new GridController({ rowCount: 1, colCount: 1 });
+    const spy = vi.spyOn(c, 'applyColumnDefs');
+    const columns: ColumnNode[] = [{ headerName: 'Name', field: 'name', width: 140 }];
+    const { rerender } = renderGrid(c, columns, {
+      rows: [{ name: 'Apple' }],
+    });
+
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    rerender(<LatticaGrid controller={c} columns={columns} rows={[{ name: 'Pear' }]} width={400} height={200} />);
+    await waitFor(() => expect(c.getDisplay(0, 0)).toBe('Pear'));
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('binds rows through leaf fields and leaves fieldless columns empty', async () => {
+    const c = new GridController({ rowCount: 1, colCount: 1 });
+    const columns: ColumnNode[] = [
+      { headerName: 'Name', field: 'name' },
+      { headerName: 'Empty' },
+    ];
+    const { rerender } = renderGrid(c, columns, {
+      rows: [{ name: 'Apple' }],
+    });
+
+    await waitFor(() => expect(c.getDisplay(0, 0)).toBe('Apple'));
+    expect(c.getColCount()).toBe(2);
+    expect(c.getDisplay(0, 1)).toBe('');
+
+    rerender(<LatticaGrid controller={c} columns={columns} rows={[{ name: 'Pear' }]} width={400} height={200} />);
+    await waitFor(() => expect(c.getDisplay(0, 0)).toBe('Pear'));
+    expect(c.getDisplay(0, 1)).toBe('');
+  });
+
+  it('can attach columns after initially rendering default headers', async () => {
+    const c = new GridController({ rowCount: 1, colCount: 1 });
+    const { rerender } = render(<LatticaGrid controller={c} width={400} height={200} />);
+    expect(screen.getByText('A')).toBeTruthy();
+
+    rerender(<LatticaGrid controller={c} columns={[{ headerName: 'Late', width: 150 }]} width={400} height={200} />);
+    await waitFor(() => expect(c.getColumnWidth(0)).toBe(150));
+    expect(screen.getByText('Late')).toBeTruthy();
+  });
 });
 
 describe('LatticaGrid interaction', () => {

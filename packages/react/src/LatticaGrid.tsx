@@ -23,7 +23,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react';
-import { HeaderModel, type ColumnNode, type GridStateSnapshot } from '@ai-path/lattica-core';
+import { HeaderModel, isGroup, type ColumnDef, type ColumnNode, type GridStateSnapshot } from '@ai-path/lattica-core';
 import type { CellCommitEvent, GridController, EditState } from './controller.js';
 import { resolveTheme, type GridTheme } from './theme.js';
 import { buildScene } from './scene.js';
@@ -39,6 +39,8 @@ export interface LatticaGridProps {
   controller: GridController;
   /** Optional multi-level column definitions; defaults to A, B, C… letters. */
   columns?: readonly ColumnNode[];
+  /** Controlled record rows bound through leaf column `field` values. */
+  rows?: ReadonlyArray<object>;
   theme?: Partial<GridTheme>;
   /** Fixed pixel width (ignored when `fill` is set). Defaults to 640. */
   width?: number;
@@ -100,6 +102,19 @@ interface MenuState {
   items: MenuItem[];
 }
 
+function leafColumnDefs(nodes: readonly ColumnNode[]): ColumnDef[] {
+  const out: ColumnDef[] = [];
+  const visit = (node: ColumnNode): void => {
+    if (isGroup(node)) {
+      node.children.forEach(visit);
+    } else {
+      out.push(node);
+    }
+  };
+  nodes.forEach(visit);
+  return out;
+}
+
 function effectiveGeometry(geom: GridGeometry, showRowNumbers: boolean): GridGeometry {
   return showRowNumbers ? geom : { ...geom, rowHeaderWidth: 0 };
 }
@@ -115,6 +130,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   const {
     controller,
     columns,
+    rows,
     onCellClick,
     onScrollChange,
     onColumnResize,
@@ -194,6 +210,25 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   if (columns !== undefined && headerModelRef.current === null) {
     headerModelRef.current = new HeaderModel(columns);
   }
+
+  useEffect(() => {
+    if (rows === undefined || columns === undefined) {
+      return;
+    }
+    const fields = leafColumnDefs(columns).map((def) => def.field ?? '');
+    controller.setRecords(rows, fields);
+  }, [columns, controller, rows]);
+
+  useEffect(() => {
+    if (columns === undefined) {
+      headerModelRef.current = null;
+      force();
+      return;
+    }
+    headerModelRef.current?.setColumns(columns);
+    controller.applyColumnDefs(leafColumnDefs(columns));
+    force();
+  }, [columns, controller]);
 
   useEffect(() => {
     const offChange = controller.on('change', () => force());

@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 
 const FEATURES: { href: string; title: string; desc: string }[] = [
   { href: '/kitchen-sink', title: 'Kitchen Sink', desc: 'Formulas, checkbox/right-align, conditional format, sort, filter, merge, search, export, AI.' },
+  { href: '/binding', title: 'Data Binding', desc: 'Controlled record rows with rich column metadata for width, type, alignment, and editability.' },
   { href: '/editors', title: 'Editors & Validation', desc: 'Dropdown / date / autocomplete editors and data validation (invalid cells turn red).' },
   { href: '/formatting', title: 'Formatting & Status Bar', desc: 'Number formats, color scales, data bars, icon sets, and a live selection status bar.' },
   { href: '/data-ops', title: 'Sort / Filter / Find', desc: 'Multi-sort, faceted filter dropdown, column hide/move, find & replace, column aggregates.' },

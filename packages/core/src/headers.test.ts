@@ -27,6 +27,32 @@ describe('computeHeaderLayout — flat columns', () => {
     expect(layout.rows[0]!.map((c) => c.colSpan)).toEqual([1, 1, 1]);
   });
 
+  it('keeps rich leaf metadata without changing layout', () => {
+    const layout = computeHeaderLayout([
+      leaf('Amount', {
+        field: 'amount',
+        width: 120,
+        type: 'number',
+        editable: false,
+        align: 'right',
+        format: '#,##0',
+        options: ['1', '2'],
+        maxLength: 8,
+      }),
+    ]);
+    expect(layout.depth).toBe(1);
+    expect(layout.rows[0]![0]).toMatchObject({ label: 'Amount', colSpan: 1, rowSpan: 1 });
+    expect(layout.leaves[0]!.def).toMatchObject({
+      field: 'amount',
+      width: 120,
+      type: 'number',
+      editable: false,
+      align: 'right',
+      format: '#,##0',
+      maxLength: 8,
+    });
+  });
+
   it('returns an empty layout for no columns', () => {
     const layout = computeHeaderLayout([]);
     expect(layout).toEqual({ rows: [], leaves: [], depth: 0 });
