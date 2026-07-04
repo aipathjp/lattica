@@ -35,6 +35,47 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): b
   return aStart < bEnd && bStart < aEnd;
 }
 
+export interface HeaderHeightOptions {
+  /**
+   * Base total header height (the controller's `colHeaderHeight` option).
+   * Divided evenly across `layout.depth` bands, as before.
+   */
+  baseHeight: number;
+  /** Pixel height per label line (`theme.headerLineHeight`). */
+  lineHeight: number;
+  /** Vertical padding above/below the label block (`theme.headerPaddingY`). */
+  paddingY: number;
+}
+
+export interface HeaderRowHeights {
+  /** Height of each header row, top to bottom. Single entry when no layout. */
+  rows: readonly number[];
+  /** Sum of `rows` — the effective `colHeaderHeight` for the geometry. */
+  total: number;
+}
+
+/**
+ * Compute per-row header heights from a layout's `rowLineCounts`.
+ *
+ * Single-line rows keep the legacy uniform band (`baseHeight / depth`) so
+ * existing layouts are pixel-identical. A row containing a multi-line label
+ * (`"\n"` in a `headerName`) expands to fit
+ * `lines * lineHeight + 2 * paddingY`, never shrinking below its band.
+ */
+export function computeHeaderRowHeights(
+  layout: HeaderLayout | null,
+  opts: HeaderHeightOptions,
+): HeaderRowHeights {
+  if (layout === null || layout.depth === 0) {
+    return { rows: [opts.baseHeight], total: opts.baseHeight };
+  }
+  const band = opts.baseHeight / layout.depth;
+  const rows = layout.rowLineCounts.map((lines) =>
+    lines <= 1 ? band : Math.max(band, lines * opts.lineHeight + 2 * opts.paddingY),
+  );
+  return { rows, total: rows.reduce((sum, h) => sum + h, 0) };
+}
+
 /**
  * Position column header cells. When `layout` is provided, multi-level group
  * cells are laid out across `layout.depth` bands; otherwise a single row of
@@ -45,6 +86,10 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): b
  * negative value for hidden leaves) so hidden columns drop out of the header
  * band instead of desyncing it from the canvas. Omitting it assumes the
  * identity mapping (no hidden/moved columns).
+ *
+ * `rowHeights` (from {@link computeHeaderRowHeights}) supplies per-row header
+ * heights so rows with multi-line labels can be taller than the rest. Omitted,
+ * every row gets the uniform band `geom.colHeaderHeight / layout.depth`.
  */
 export function columnHeaderCells(
   geom: GridGeometry,
@@ -52,6 +97,7 @@ export function columnHeaderCells(
   visibleCols: readonly number[],
   layout: HeaderLayout | null,
   leafToVisual: (leaf: number) => number = (leaf) => leaf,
+  rowHeights?: readonly number[],
 ): PositionedHeader[] {
   if (visibleCols.length === 0) {
     return [];
@@ -75,6 +121,11 @@ export function columnHeaderCells(
   }
 
   const bandHeight = geom.colHeaderHeight / layout.depth;
+  // Prefix offsets so a cell's y/height follow the (possibly uneven) rows.
+  const offsets: number[] = [0];
+  for (let r = 0; r < layout.depth; r++) {
+    offsets.push(offsets[r]! + (rowHeights?.[r] ?? bandHeight));
+  }
   const result: PositionedHeader[] = [];
   for (const row of layout.rows) {
     for (const cell of row) {
@@ -102,9 +153,9 @@ export function columnHeaderCells(
         id: cell.id,
         label: cell.label,
         x: left,
-        y: cell.depth * bandHeight,
+        y: offsets[cell.depth]!,
         width: right - left,
-        height: cell.rowSpan * bandHeight,
+        height: offsets[cell.depth + cell.rowSpan]! - offsets[cell.depth]!,
         isGroup: cell.isGroup,
         collapsible: cell.collapsible,
         collapsed: cell.collapsed,

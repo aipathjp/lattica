@@ -287,9 +287,17 @@ export class GridController {
   private viewRowSizes: SizeManager;
   private viewColSizes: SizeManager;
   readonly rowHeaderWidth: number;
-  readonly colHeaderHeight: number;
+  /** Base header height from options, before multi-line auto-expansion. */
+  private readonly baseColHeaderHeight: number;
+  /** Effective header height consumed by {@link geometry}. */
+  private colHeaderHeightPx: number;
   frozenRows: number;
   frozenCols: number;
+
+  /** Effective column-header band height (px). See {@link getHeaderHeight}. */
+  get colHeaderHeight(): number {
+    return this.colHeaderHeightPx;
+  }
 
   private editState: EditState | null = null;
 
@@ -308,7 +316,8 @@ export class GridController {
       colCount: options.colCount,
     });
     this.rowHeaderWidth = options.rowHeaderWidth ?? 48;
-    this.colHeaderHeight = options.colHeaderHeight ?? 24;
+    this.baseColHeaderHeight = options.colHeaderHeight ?? 24;
+    this.colHeaderHeightPx = this.baseColHeaderHeight;
     this.frozenRows = options.frozenRows ?? 0;
     this.frozenCols = options.frozenCols ?? 0;
     this.selection.subscribe(() => {
@@ -854,6 +863,29 @@ export class GridController {
   toggleRowGroup(visualRow: number): void {
     this.nestedRows.toggle(this.view.rows.getPhysicalIndex(visualRow));
     this.refreshView();
+  }
+
+  /**
+   * Effective total header height in px. When `<LatticaGrid>` renders columns
+   * with multi-line labels it auto-expands the header band and syncs the value
+   * here, so external strip UIs can align against the grid body's top edge.
+   */
+  getHeaderHeight(): number {
+    return this.colHeaderHeightPx;
+  }
+
+  /** The `colHeaderHeight` option value, before multi-line auto-expansion. */
+  getBaseHeaderHeight(): number {
+    return this.baseColHeaderHeight;
+  }
+
+  /** Set the effective total header height (px). Emits `change` when it moves. */
+  setHeaderHeight(px: number): void {
+    if (px === this.colHeaderHeightPx) {
+      return;
+    }
+    this.colHeaderHeightPx = px;
+    this.emitter.emit('change', undefined);
   }
 
   /** Geometry snapshot for the renderer (visible-indexed). */

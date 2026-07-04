@@ -27,6 +27,8 @@ export {
   resolveTheme,
   buildTheme,
   DEFAULT_FONT_FAMILY,
+  DEFAULT_HEADER_LINE_HEIGHT,
+  DEFAULT_HEADER_PADDING_Y,
   type GridTheme,
   type BuildThemeOptions,
 } from './theme.js';
@@ -94,7 +96,10 @@ export { editorKindForType, type EditorKind } from './editors.js';
 export { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
 export {
   columnHeaderCells,
+  computeHeaderRowHeights,
   rowHeaderCells,
+  type HeaderHeightOptions,
+  type HeaderRowHeights,
   type PositionedHeader,
   type PositionedRowHeader,
 } from './headers.js';

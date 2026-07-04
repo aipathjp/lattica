@@ -55,7 +55,7 @@ describe('computeHeaderLayout — flat columns', () => {
 
   it('returns an empty layout for no columns', () => {
     const layout = computeHeaderLayout([]);
-    expect(layout).toEqual({ rows: [], leaves: [], depth: 0 });
+    expect(layout).toEqual({ rows: [], leaves: [], depth: 0, rowLineCounts: [] });
   });
 });
 
@@ -109,6 +109,134 @@ describe('computeHeaderLayout — nested groups', () => {
     const id = layout.rows[0]!.find((c) => c.label === 'ID')!;
     expect(id.rowSpan).toBe(3);
     expect(id.isGroup).toBe(false);
+  });
+});
+
+describe('computeHeaderLayout — 3-tier group/item/unit headers', () => {
+  // 大分類 / 項目 / 単位 の 3 段。単位が無い列は leaf を浅い段に直接置く
+  // (省略形) か、`group('項目') → leaf('')` (空文字 leaf は吸収される)。
+  const cols: ColumnNode[] = [
+    leaf('No'), // 単位なし: トップ直下 leaf → 3 段ぶち抜き
+    {
+      headerName: '寸法',
+      children: [
+        { headerName: '幅', children: [leaf('mm', { field: 'w' })] },
+        { headerName: '高さ', children: [leaf('mm', { field: 'h' })] },
+        { headerName: '数量', field: 'qty' }, // 単位なし (省略形) → 2-3 段結合
+      ],
+    },
+    {
+      headerName: '検査',
+      children: [
+        { headerName: '判定', children: [leaf('', { field: 'result' })] }, // 空文字 leaf → 吸収
+      ],
+    },
+  ];
+
+  it('fixes the 3-tier layout: units on row 2, unit-less items span rows 1-2', () => {
+    const layout = computeHeaderLayout(cols);
+    expect(layout.depth).toBe(3);
+    expect(layout.leaves.map((l) => l.def.field)).toEqual([undefined, 'w', 'h', 'qty', 'result']);
+
+    // Row 0: No (rowSpan 3), 寸法 (colSpan 3), 検査 (colSpan 1).
+    expect(layout.rows[0]!.map((c) => [c.label, c.rowSpan, c.colSpan])).toEqual([
+      ['No', 3, 1],
+      ['寸法', 1, 3],
+      ['検査', 1, 1],
+    ]);
+    // Row 1: 幅/高さ (1 row each), 数量 (spans rows 1-2), 判定 (absorbed, spans rows 1-2).
+    expect(layout.rows[1]!.map((c) => [c.label, c.rowSpan, c.isGroup])).toEqual([
+      ['幅', 1, true],
+      ['高さ', 1, true],
+      ['数量', 2, false],
+      ['判定', 2, false],
+    ]);
+    // Row 2: only the real unit cells remain — no empty placeholder cells.
+    expect(layout.rows[2]!.map((c) => c.label)).toEqual(['mm', 'mm']);
+  });
+
+  it('keeps the absorbed leaf metadata and covers exactly one leaf', () => {
+    const layout = computeHeaderLayout(cols);
+    const hantei = layout.rows[1]!.find((c) => c.label === '判定')!;
+    expect(hantei.isGroup).toBe(false);
+    expect(hantei.collapsible).toBe(false);
+    expect(hantei.startLeaf).toBe(4);
+    expect(hantei.endLeaf).toBe(5);
+    expect(layout.leaves[4]!.def).toMatchObject({ field: 'result', headerName: '' });
+  });
+
+  it('absorbs a top-level unit-less group down to depth 1', () => {
+    const layout = computeHeaderLayout([
+      { headerName: 'Only', children: [leaf('', { field: 'x' })] },
+    ]);
+    expect(layout.depth).toBe(1);
+    expect(layout.rows[0]!.map((c) => [c.label, c.rowSpan, c.isGroup])).toEqual([['Only', 1, false]]);
+    expect(layout.leaves[0]!.def.field).toBe('x');
+  });
+
+  it('does not absorb collapsible groups (chevron stays reachable)', () => {
+    const layout = computeHeaderLayout([
+      { headerName: 'G', collapsible: true, children: [leaf('', { field: 'x' })] },
+    ]);
+    expect(layout.depth).toBe(2);
+    const g = layout.rows[0]![0]!;
+    expect(g.isGroup).toBe(true);
+    expect(g.collapsible).toBe(true);
+    expect(layout.rows[1]!.map((c) => c.label)).toEqual(['']);
+  });
+
+  it('does not absorb groups with multiple children or a non-empty leaf label', () => {
+    const multi = computeHeaderLayout([
+      { headerName: 'G', children: [leaf('', { field: 'a' }), leaf('kg', { field: 'b' })] },
+    ]);
+    expect(multi.rows[0]![0]!.isGroup).toBe(true);
+    const named = computeHeaderLayout([
+      { headerName: 'G', children: [leaf('kg', { field: 'a' })] },
+    ]);
+    expect(named.rows[0]![0]!.isGroup).toBe(true);
+    expect(named.rows[1]![0]!.label).toBe('kg');
+  });
+
+  it('does not absorb a group whose only child is itself a group', () => {
+    const layout = computeHeaderLayout([
+      { headerName: 'Outer', children: [{ headerName: 'Inner', children: [leaf('', { field: 'x' })] }] },
+    ]);
+    expect(layout.depth).toBe(2);
+    expect(layout.rows[0]![0]!).toMatchObject({ label: 'Outer', isGroup: true, rowSpan: 1 });
+    // Inner is absorbed at depth 1 and spans to the bottom.
+    expect(layout.rows[1]![0]!).toMatchObject({ label: 'Inner', isGroup: false, rowSpan: 1 });
+  });
+});
+
+describe('computeHeaderLayout — rowLineCounts (multi-line labels)', () => {
+  it('reports 1 for every row of single-line layouts', () => {
+    const layout = computeHeaderLayout([
+      leaf('A'),
+      { headerName: 'G', children: [leaf('B'), leaf('C')] },
+    ]);
+    expect(layout.rowLineCounts).toEqual([1, 1]);
+  });
+
+  it('counts "\\n" lines per header row', () => {
+    const layout = computeHeaderLayout([
+      { headerName: 'グループ', children: [leaf('項目名\n(単位)'), leaf('短い')] },
+    ]);
+    expect(layout.rowLineCounts).toEqual([1, 2]);
+  });
+
+  it('takes the max across cells in the same row', () => {
+    const layout = computeHeaderLayout([leaf('a\nb\nc'), leaf('x\ny'), leaf('z')]);
+    expect(layout.rowLineCounts).toEqual([3]);
+  });
+
+  it('distributes a spanning cell\'s lines across its covered rows', () => {
+    // Leaf at depth 0 spanning 2 rows with 3 lines -> ceil(3/2) = 2 per row.
+    const layout = computeHeaderLayout([
+      leaf('一\n二\n三'),
+      { headerName: 'G', children: [leaf('B')] },
+    ]);
+    expect(layout.depth).toBe(2);
+    expect(layout.rowLineCounts).toEqual([2, 2]);
   });
 });
 

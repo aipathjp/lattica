@@ -1324,3 +1324,34 @@ describe('view-state persistence', () => {
     expect(c.captureViewState().sort).toBeUndefined();
   });
 });
+
+describe('header height APIs', () => {
+  it('exposes the effective and base header heights', () => {
+    const c = new GridController({ rowCount: 2, colCount: 2, colHeaderHeight: 30 });
+    expect(c.getHeaderHeight()).toBe(30);
+    expect(c.getBaseHeaderHeight()).toBe(30);
+    expect(c.colHeaderHeight).toBe(30);
+    expect(c.geometry().colHeaderHeight).toBe(30);
+  });
+
+  it('defaults the header height to 24', () => {
+    const c = new GridController({ rowCount: 1, colCount: 1 });
+    expect(c.getHeaderHeight()).toBe(24);
+    expect(c.getBaseHeaderHeight()).toBe(24);
+  });
+
+  it('setHeaderHeight updates geometry, keeps the base, and emits change once', () => {
+    const c = new GridController({ rowCount: 2, colCount: 2, colHeaderHeight: 30 });
+    const onChange = vi.fn();
+    c.on('change', onChange);
+    c.setHeaderHeight(54);
+    expect(c.getHeaderHeight()).toBe(54);
+    expect(c.colHeaderHeight).toBe(54);
+    expect(c.getBaseHeaderHeight()).toBe(30);
+    expect(c.geometry().colHeaderHeight).toBe(54);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    // Setting the same value again is a no-op.
+    c.setHeaderHeight(54);
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+});
