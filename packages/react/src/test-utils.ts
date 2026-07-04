@@ -8,6 +8,8 @@ export interface RecordedCall {
 export interface MockContext extends Canvas2D {
   calls: RecordedCall[];
   scale(x: number, y: number): void;
+  /** Deterministic measurer (7px per char) so wrap paths run without pixels. */
+  measureText(text: string): { width: number };
 }
 
 /** A recording 2D context for asserting paint output without real pixels. */
@@ -42,5 +44,9 @@ export function createMockContext(): MockContext {
     closePath: record('closePath'),
     fill: record('fill'),
     scale: record('scale'),
+    measureText: (text: string) => {
+      calls.push({ method: 'measureText', args: [text] });
+      return { width: text.length * 7 };
+    },
   };
 }

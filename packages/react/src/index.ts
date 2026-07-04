@@ -16,6 +16,7 @@ export {
   GridController,
   formatValue,
   type GridControllerOptions,
+  type AutoSizeRowsOptions,
   type EditState,
   type CellChange,
   type CellCommitEvent,
@@ -120,6 +121,8 @@ export {
   wrapText,
   autoColumnWidth,
   autoRowHeight,
+  wrapLineHeight,
+  canvasMeasurer,
   type MeasureText,
 } from './measure.js';
 export { I18n, enUS, jaJP, type Locale } from './i18n.js';

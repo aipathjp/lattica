@@ -32,6 +32,7 @@ import {
   type GridTheme,
 } from './theme.js';
 import { buildScene } from './scene.js';
+import { canvasMeasurer } from './measure.js';
 import { paintScene, type Canvas2D } from './painter.js';
 import { cellRect, columnX, hitTest, type GridGeometry, type HitResult } from './geometry.js';
 import { interpretKey, type KeyInput } from './keyboard.js';
@@ -391,6 +392,9 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
             const background = editable ? theme.editableCellBackground : theme.readOnlyCellBackground;
             return background === undefined ? null : { background };
           };
+    // Wrap wiring is only assembled when a wrap column exists — otherwise the
+    // scene builder sees no wrap accessor and pays zero extra cost per cell.
+    const wrapEnabled = controller.hasWrapColumns();
     const scene = buildScene({
       geom,
       scrollLeft: scroll.left,
@@ -407,6 +411,10 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       getVisual: (r, c) => controller.getCellVisual(r, c),
       getSparkline: (r, c, w, h) => controller.getCellSparkline(r, c, w, h),
       getMerge: (r, c) => controller.getMerge(r, c),
+      getWrap: wrapEnabled ? (_r, c) => controller.getColumnWrap(c) : undefined,
+      measureText: wrapEnabled ? canvasMeasurer(ctx) : undefined,
+      font: `${theme.fontSize}px ${theme.fontFamily}`,
+      wrapPaddingX: theme.cellPaddingX,
     });
     paintScene(ctx, scene, theme, { width, height, dpr });
   });

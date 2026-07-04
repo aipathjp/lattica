@@ -14,6 +14,7 @@ import {
   type SparklineShape,
 } from '@ai-path/tb-core';
 import { cellRect, type GridGeometry, type Rect } from './geometry.js';
+import { wrapText, type MeasureText } from './measure.js';
 
 export interface CellPaint {
   row: number;
@@ -36,6 +37,9 @@ export interface CellPaint {
   icon?: IconMark;
   /** In-cell sparkline shape (cell-local coordinates), if any. */
   sparkline?: SparklineShape;
+  /** Wrapped text lines for a wrap-enabled column. Present only when the text
+   *  actually broke into 2+ lines; single-line text paints the normal path. */
+  lines?: string[];
   /** True for pinned (frozen) rows/columns — painted last, over scrolled cells. */
   frozen?: boolean;
   /** True when pinned on both axes (the frozen corner) — painted last of all,
@@ -76,6 +80,15 @@ export interface BuildSceneParams {
   getSparkline?: (row: number, col: number, width: number, height: number) => SparklineShape | null;
   /** Merge-area accessor (optional); covered cells are skipped, anchors span. */
   getMerge?: (row: number, col: number) => MergeArea | null;
+  /** Wrap flag per cell (optional). With `measureText` + `font`, wrap-enabled
+   *  text cells get their display text broken into {@link CellPaint.lines}. */
+  getWrap?: (row: number, col: number) => boolean;
+  /** Text measurer used to wrap text (required for wrapping). */
+  measureText?: MeasureText;
+  /** CSS font the cells are painted with (required for wrapping). */
+  font?: string;
+  /** Horizontal cell padding (per side) subtracted from the wrap width. */
+  wrapPaddingX?: number;
 }
 
 /** Sum the sizes of `count` indices starting at `start`. */
@@ -129,6 +142,18 @@ export function buildScene(params: BuildSceneParams): Scene {
   let activeRect: Rect | null = null;
   const state = selection.getState();
 
+  // Wrapping is active only when all three inputs are supplied — grids without
+  // wrap columns pass none of them and skip the per-cell wrap check entirely.
+  const wrapCtx =
+    params.getWrap !== undefined && params.measureText !== undefined && params.font !== undefined
+      ? {
+          getWrap: params.getWrap,
+          measure: params.measureText,
+          font: params.font,
+          padX: params.wrapPaddingX ?? 0,
+        }
+      : null;
+
   for (const row of visibleRows) {
     for (const col of visibleCols) {
       const merge = params.getMerge?.(row, col) ?? null;
@@ -168,6 +193,20 @@ export function buildScene(params: BuildSceneParams): Scene {
         frozen: row < geom.frozenRows || col < geom.frozenCols,
         frozenCorner: row < geom.frozenRows && col < geom.frozenCols,
       };
+      // Wrap only the default text paint path (undefined type or 'text');
+      // typed cells keep their renderer's single-line behavior.
+      if (
+        wrapCtx !== null &&
+        (cell.type === undefined || cell.type === 'text') &&
+        cell.text !== '' &&
+        wrapCtx.getWrap(row, col)
+      ) {
+        const maxWidth = Math.max(1, rect.width - wrapCtx.padX * 2);
+        const lines = wrapText(cell.text, maxWidth, wrapCtx.font, wrapCtx.measure);
+        if (lines.length > 1) {
+          cell.lines = lines;
+        }
+      }
       cells.push(cell);
       if (active && state.active.row === row && state.active.col === col) {
         activeRect = rect;
