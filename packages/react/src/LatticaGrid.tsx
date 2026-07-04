@@ -24,7 +24,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from 'react';
 import { HeaderModel, isGroup, type ColumnDef, type ColumnNode, type GridStateSnapshot } from '@ai-path/tb-core';
-import type { CellCommitEvent, GridController, EditState } from './controller.js';
+import type { CellCommitEvent, DisplayOverride, GridController, EditState } from './controller.js';
 import {
   DEFAULT_HEADER_LINE_HEIGHT,
   DEFAULT_HEADER_PADDING_Y,
@@ -97,6 +97,16 @@ export interface LatticaGridProps {
    * editor; unregistered kinds silently fall back to the text editor.
    */
   editors?: EditorRegistry;
+  /**
+   * Display-only cell text override, wired to
+   * {@link GridController.setDisplayOverride}. Called with the physical (data)
+   * coordinates and the base display text; return a string to replace the
+   * painted text, or null to keep the base display. Stored values, edit text,
+   * and copy output are unaffected. Pass `null` to clear an override set
+   * earlier; leave undefined to keep any override set directly on the
+   * controller.
+   */
+  displayValue?: DisplayOverride | null;
   /** Controlled visual cell anchor for a root-local overlay. */
   cellOverlay?: { row: number; col: number } | null;
   /** Render a controlled overlay anchored to `cellOverlay`. */
@@ -164,6 +174,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     renderCellOverlay,
     onCellOverlayClose,
     editors,
+    displayValue,
   } = props;
   const theme = resolveTheme(props.theme);
   const autoSize = props.autoSize;
@@ -305,6 +316,17 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     }
     return controller.on('viewstate', onViewStateChange);
   }, [controller, onViewStateChange]);
+
+  // Wire the displayValue prop to the controller's display override. Setting
+  // it emits a controller change, so the canvas repaints on every prop change.
+  // An undefined prop leaves overrides set directly on the controller alone.
+  useEffect(() => {
+    if (displayValue === undefined) {
+      return;
+    }
+    controller.setDisplayOverride(displayValue);
+    return () => controller.setDisplayOverride(null);
+  }, [controller, displayValue]);
 
   useEffect(() => {
     if (onCellCommit === undefined) {
