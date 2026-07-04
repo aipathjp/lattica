@@ -32,6 +32,21 @@ tayca-okayama-qc の Handsontable 16 置換調査 (`docs/PRODUCT_REQUIREMENTS_TA
 - #62: PR #61 で誤混入した `.claude/` ハーネスを untrack し `.gitignore` へ追加 (D-49 非コミット運用)。
 - P0 (cellMeta 層 / アクションセル / autoHeight / commit 強制 / 行座標 API / insertRow 等) は未着手 — 次バッチ。
 
+## 2026-07-05 — tayca 移行要件バッチ第2弾 (P0 全 8 機能)
+
+P1/P2 バッチに続き、置換の成立に必須の P0 要件を 8 並列 worktree エージェントで実装・逐次統合。統合後 **2449 テスト・100% 維持**。これで `docs/PRODUCT_REQUIREMENTS_TAYCA.md` の P0/P1/P2 全 20 項目が完了。
+
+| PR | 機能 | 要件 |
+|---|---|---|
+| #70 | `setCellText` options (custom source / bypassReadOnly / undoable) | P0-3 |
+| #71 | セル単位メタ層 `cellMeta` provider + `refreshCellMeta` (cells() 相当) | P0-1 |
+| #72 | 空セルプレースホルダ (`placeholder` / placeholderMode / placeholderColor) | P0-4 |
+| #73 | `link` セル型 + `onCellAction` (click/Enter・readOnly でも発火) | P0-2 |
+| #74 | `commitEditing`/`cancelEditing` + `commitAllEditing` 全グリッド一括 | P0-5 |
+| #75 | `getRowClientRect(s)` / `getColumnWidth(s)` / `onLayoutChange` | P0-7 |
+| #76 | `autoHeight` 全行表示モード (内部縦スクロールなし) | P0-6 |
+| #77 | `insertRow`/`removeRow` (undo・rowschange・メタシフト) | P0-8 |
+
 ## サマリ
 
 | 区分 | 状態 |

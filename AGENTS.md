@@ -494,6 +494,95 @@ controller.setColumnType(6, 'bar');
 // Spans merged ranges; malformed JSON falls back to plain text. Drag-to-resize is future work.
 ```
 
+## P0 batch — Handsontable-replacement critical APIs (2026-07-05)
+
+Eight additive features completing the tayca P0 requirements
+(`docs/PRODUCT_REQUIREMENTS_TAYCA.md`, PRs #70–#77).
+
+### Cell-level meta layer (`cells()` equivalent)
+
+```tsx
+const pending = new Map<string, true>(); // "row:col" (physical)
+<LatticaGrid
+  cellMeta={(row, col) =>
+    pending.has(`${row}:${col}`) ? { background: '#dbeafe', readOnly: true } : null}
+  ...
+/>
+// pending.set('3:2', true); controller.refreshCellMeta();  // explicit repaint
+```
+
+`CellMeta = { background?, color?, fontWeight?, readOnly? }`, physical
+coordinates, re-evaluated every scene build (no flicker by construction).
+Style priority: read-only theme background < conditional format / search /
+validation < **cellMeta** < selection/active chrome. `readOnly` ORs with
+`setCellReadOnly` / `setColumnEditable`.
+
+### Link / action cells
+
+```ts
+controller.setColumnType(0, 'link');   // or ColumnDef { type: 'link' }
+```
+
+```tsx
+<LatticaGrid onCellAction={(e) => openDetail(e.value)} ... />
+// e: { row, col, value, display }. Click or plain Enter on the active cell.
+// Fires on read-only cells and view-only grids; hover shows a pointer cursor.
+```
+
+### Programmatic writes with options
+
+```ts
+controller.setCellText(r, c, '09:30', {
+  source: 'my-revert',      // propagated to cellcommit (ignore your own writes)
+  bypassReadOnly: true,     // write into read-only cells (linked time cells)
+  undoable: false,          // keep out of the undo history
+});
+```
+
+### Empty-cell placeholder hints
+
+```ts
+controller.setColumnPlaceholder(2, '0.00');   // or ColumnDef { placeholder: '00:00' }
+// placeholderMode: 'editable' (default) | 'always'; theme token placeholderColor.
+// Display-only: stored values, copy and edit text are unaffected.
+```
+
+### External edit commit / cancel
+
+```ts
+gridRef.current?.commitEditing();   // true if an edit was committed
+gridRef.current?.cancelEditing();
+import { commitAllEditing, cancelAllEditing } from '@ai-path/tb-react';
+commitAllEditing();                 // sweep every mounted grid (open a modal safely)
+```
+
+### autoHeight (show all rows)
+
+```tsx
+<LatticaGrid autoHeight ... />
+// Grid height = header + all rows + summary band. No internal vertical
+// scroll (wheel passes through to the page). Horizontal scroll unchanged.
+// Virtualization is bypassed — intended for report-sized row counts.
+```
+
+### Pixel-layout APIs
+
+```ts
+gridRef.current?.getRowClientRect(row);   // { left, top, width, height } | null
+gridRef.current?.getRowClientRects();     // visible rows: [{ row, top, height }]
+controller.getColumnWidth(col); controller.getColumnWidths();
+<LatticaGrid onLayoutChange={() => repositionRail()} ... />  // rAF-debounced
+```
+
+### Imperative row insert / remove
+
+```ts
+controller.insertRow(3, { date: '2026-07-05' });  // array or field-record values
+controller.removeRow(3);
+// Single-command undo/redo; 'rowschange' event / onRowsChange prop;
+// row-keyed cell meta (readOnly, comments) shifts with the rows.
+```
+
 ## If you modify this repo
 
 - Tests: **Vitest**, unit tests next to source (`foo.ts` → `foo.test.ts`).
