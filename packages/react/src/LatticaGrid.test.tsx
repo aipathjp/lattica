@@ -1201,6 +1201,64 @@ describe('LatticaGrid fill (auto-size to container)', () => {
   });
 });
 
+describe('LatticaGrid autoSize content', () => {
+  it('uses the content width and height and follows column visibility changes', () => {
+    const c = new GridController({ rowCount: 2, colCount: 3 });
+    render(<LatticaGrid controller={c} autoSize="content" />);
+    const root = screen.getByTestId('lattica-grid');
+    const canvas = root.querySelector('canvas')!;
+    expect(root.style.width).toBe('348px');
+    expect(root.style.height).toBe('72px');
+    expect(canvas.style.width).toBe('348px');
+    expect(canvas.style.height).toBe('72px');
+
+    act(() => c.hideColumn(1));
+    expect(root.style.width).toBe('248px');
+    expect(canvas.style.width).toBe('248px');
+  });
+
+  it('follows column width changes and setRowCount changes', () => {
+    const c = new GridController({ rowCount: 2, colCount: 2 });
+    render(<LatticaGrid controller={c} autoSize="content" />);
+    const root = screen.getByTestId('lattica-grid');
+    expect(root.style.width).toBe('248px');
+    expect(root.style.height).toBe('72px');
+
+    act(() => c.setColumnWidth(1, 160));
+    expect(root.style.width).toBe('308px');
+
+    act(() => c.setRowCount(4));
+    expect(root.style.height).toBe('120px');
+  });
+
+  it('clamps auto-sized dimensions with maxWidth and maxHeight', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    render(<LatticaGrid controller={c} autoSize="content" maxWidth={320} maxHeight={90} />);
+    const root = screen.getByTestId('lattica-grid');
+    const canvas = root.querySelector('canvas')!;
+    expect(root.style.width).toBe('320px');
+    expect(root.style.height).toBe('90px');
+    expect(canvas.style.width).toBe('320px');
+    expect(canvas.style.height).toBe('90px');
+  });
+
+  it('shrinks width when row numbers are hidden', () => {
+    const c = new GridController({ rowCount: 2, colCount: 2 });
+    render(<LatticaGrid controller={c} autoSize="content" showRowNumbers={false} />);
+    const root = screen.getByTestId('lattica-grid');
+    expect(root.style.width).toBe('200px');
+    expect(root.style.height).toBe('72px');
+  });
+
+  it('ignores width, height, and fill when autoSize is content', () => {
+    const c = new GridController({ rowCount: 1, colCount: 2 });
+    render(<LatticaGrid controller={c} autoSize="content" width={999} height={888} fill />);
+    const root = screen.getByTestId('lattica-grid');
+    expect(root.style.width).toBe('248px');
+    expect(root.style.height).toBe('48px');
+  });
+});
+
 describe('LatticaGrid content edge (area past the last column/row)', () => {
   // A 2×2 grid in a 400×200 container: content ends at x = 48 + 2×100 = 248
   // and y = 24 + 2×24 = 72, leaving empty space to the right and below.

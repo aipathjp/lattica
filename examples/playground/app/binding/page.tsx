@@ -64,7 +64,7 @@ export default function BindingDemo(): ReactElement {
         <button type="button" onClick={() => setRecords(records.slice(0, -1))}>Remove row</button>
         <button type="button" onClick={() => setRecords(reloadedRows)}>Reload data</button>
       </div>
-      <LatticaGrid controller={controller} rows={records} columns={richColumns} width={760} height={320} />
+      <LatticaGrid controller={controller} rows={records} columns={richColumns} autoSize="content" maxHeight={220} />
     </main>
   );
 }
