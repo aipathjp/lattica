@@ -1,6 +1,6 @@
 {
   "name": "@ai-path/tb-ai",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "AI-native spreadsheet primitives for Taible: provider-agnostic AI client, undoable AICommand with provenance, NL<->formula, AI columns, smart fill, schema inference, semantic search.",
   "license": "MIT",
   "type": "module",

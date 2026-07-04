@@ -1,6 +1,6 @@
 {
   "name": "@ai-path/tb-formula",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Clean-room, dependency-free Excel-compatible formula engine for Taible: lexer, Pratt parser, evaluator, and an incremental dependency graph.",
   "license": "MIT",
   "type": "module",
