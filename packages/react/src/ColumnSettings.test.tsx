@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { ColumnNode } from '@ai-path/lattica-core';
+import type { ColumnNode } from '@ai-path/tb-core';
 import { LatticaColumnSettings } from './ColumnSettings.js';
 import { GridController } from './controller.js';
 

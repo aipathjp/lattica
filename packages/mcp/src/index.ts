@@ -1,4 +1,4 @@
-/** @ai-path/lattica-mcp — expose a Lattica grid to AI agents via a tool registry. */
+/** @ai-path/tb-mcp — expose a Taible grid to AI agents via a tool registry. */
 
 export {
   createGridTools,

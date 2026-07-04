@@ -1,7 +1,7 @@
 {
-  "name": "@ai-path/lattica-formula",
-  "version": "0.1.1",
-  "description": "Clean-room, dependency-free Excel-compatible formula engine for Lattica: lexer, Pratt parser, evaluator, and an incremental dependency graph.",
+  "name": "@ai-path/tb-formula",
+  "version": "0.2.0",
+  "description": "Clean-room, dependency-free Excel-compatible formula engine for Taible: lexer, Pratt parser, evaluator, and an incremental dependency graph.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -23,9 +23,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-path/lattica-core": "workspace:*"
+    "@ai-path/tb-core": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aipathjp/lattica.git",
+    "directory": "packages/formula"
+  },
+  "homepage": "https://github.com/aipathjp/lattica#readme",
+  "bugs": {
+    "url": "https://github.com/aipathjp/lattica/issues"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   }
 }

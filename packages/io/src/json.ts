@@ -1,5 +1,5 @@
 /**
- * JSON import/export for Lattica matrices.
+ * JSON import/export for Taible matrices.
  *
  * Two interchange shapes are supported:
  *  - A plain 2D array (row-major) of {@link CellValue}, round-tripped via
@@ -13,7 +13,7 @@
  * single failure mode regardless of how the input was wrong.
  */
 
-import type { CellValue } from '@ai-path/lattica-core';
+import type { CellValue } from '@ai-path/tb-core';
 
 /** True when `value` is a valid {@link CellValue} (string, number, boolean, or null). */
 function isCellValue(value: unknown): value is CellValue {

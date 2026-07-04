@@ -1,5 +1,5 @@
 import { useEffect, useReducer, type CSSProperties, type ReactElement } from 'react';
-import { columnIndexToLabel, type ColumnNode } from '@ai-path/lattica-core';
+import { columnIndexToLabel, type ColumnNode } from '@ai-path/tb-core';
 import type { GridController } from './controller.js';
 import { resolveTheme, type GridTheme } from './theme.js';
 

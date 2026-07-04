@@ -1,14 +1,14 @@
 /**
  * Pixel ↔ cell geometry, including frozen (pinned) leading rows/columns and the
  * row-number / column-letter header bands. All functions are pure and operate
- * on {@link SizeManager}s from `@ai-path/lattica-core`, so they are unit-testable
+ * on {@link SizeManager}s from `@ai-path/tb-core`, so they are unit-testable
  * without a DOM or canvas.
  *
  * Coordinate space: pixel (0,0) is the top-left of the grid's own client area.
  * The body region begins at `(rowHeaderWidth, colHeaderHeight)`.
  */
 
-import type { SizeManager } from '@ai-path/lattica-core';
+import type { SizeManager } from '@ai-path/tb-core';
 
 export interface GridGeometry {
   rowSizes: SizeManager;

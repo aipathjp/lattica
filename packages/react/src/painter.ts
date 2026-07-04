@@ -5,7 +5,7 @@
  * lightweight recording mock in tests.
  */
 
-import { iconColor, lerpColor, type IconMark } from '@ai-path/lattica-core';
+import { iconColor, lerpColor, type IconMark } from '@ai-path/tb-core';
 import type { GridTheme } from './theme.js';
 import type { Scene, CellPaint } from './scene.js';
 import { defaultCellTypes, type CellTypeRegistry } from './cell-types.js';

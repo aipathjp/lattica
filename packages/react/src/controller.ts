@@ -44,7 +44,7 @@ import {
   toA1,
   parseA1,
   type ColumnDef,
-} from '@ai-path/lattica-core';
+} from '@ai-path/tb-core';
 import {
   DataView,
   SortModel,
@@ -54,8 +54,8 @@ import {
   type SortDirection,
   type FilterCondition,
   type NestedRowNode,
-} from '@ai-path/lattica-data';
-import { SheetEngine, FormulaError, type CellContent } from '@ai-path/lattica-formula';
+} from '@ai-path/tb-data';
+import { SheetEngine, FormulaError, type CellContent } from '@ai-path/tb-formula';
 import type { GridGeometry } from './geometry.js';
 import type { CellAlign } from './cell-types.js';
 import { editorKindForType, type EditorKind } from './editors.js';

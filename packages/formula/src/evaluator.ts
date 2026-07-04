@@ -7,7 +7,7 @@
  * functions such as `IF` and `IFERROR`.
  */
 
-import type { A1Reference } from '@ai-path/lattica-core';
+import type { A1Reference } from '@ai-path/tb-core';
 import type { AstNode } from './ast.js';
 import { FormulaError, DIV0, NAME, NUM, VALUE } from './errors.js';
 import {

@@ -2,20 +2,20 @@
 
 /**
  * Kitchen-sink demo — a single App Router page that exercises a broad slice of
- * the Lattica public API so reviewers can see the headless {@link GridController}
+ * the Taible public API so reviewers can see the headless {@link GridController}
  * features (formulas, column types/alignment, conditional formatting, sort,
  * filter, merge, search), the canvas {@link LatticaGrid} view, the
- * {@link serializeDelimited}/{@link matrixToXlsx} export paths from `@ai-path/lattica-io`,
- * and the provider-agnostic NL→formula helper from `@ai-path/lattica-ai` driven by a
+ * {@link serializeDelimited}/{@link matrixToXlsx} export paths from `@ai-path/tb-io`,
+ * and the provider-agnostic NL→formula helper from `@ai-path/tb-ai` driven by a
  * deterministic {@link MockProvider}. It is consumer code only — it imports the
- * published `@ai-path/lattica-*` packages and never reaches into their internals.
+ * published `@ai-path/tb-*` packages and never reaches into their internals.
  */
 
 import { useEffect, useState } from 'react';
-import { LatticaGrid, LatticaFormulaBar, useGridController } from '@ai-path/lattica-react';
-import type { ColumnNode } from '@ai-path/lattica-core';
-import { serializeDelimited, matrixToXlsx } from '@ai-path/lattica-io';
-import { AIClient, MockProvider, nlToFormula } from '@ai-path/lattica-ai';
+import { LatticaGrid, LatticaFormulaBar, useGridController } from '@ai-path/tb-react';
+import type { ColumnNode } from '@ai-path/tb-core';
+import { serializeDelimited, matrixToXlsx } from '@ai-path/tb-io';
+import { AIClient, MockProvider, nlToFormula } from '@ai-path/tb-ai';
 
 const columns: readonly ColumnNode[] = [
   { headerName: 'Score', field: 'score' },
@@ -122,7 +122,7 @@ export default function KitchenSinkPage(): React.ReactElement {
 
   return (
     <main style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <h1 style={{ margin: 0 }}>Lattica Kitchen Sink</h1>
+      <h1 style={{ margin: 0 }}>Taible Kitchen Sink</h1>
       <p style={{ margin: 0, color: '#52606d' }}>
         Seeded grid with a <code>=SUM(...)</code> column, a checkbox column, a
         right-aligned column, and a conditional-format rule (score &gt; 70). Use

@@ -8,7 +8,7 @@
 ## 前提: momotani 側の現状
 
 - lattica 利用箇所は押印・ピッキング画面のみ。`@lattica/react`（LatticaGrid / GridController / densityOptions / cellRect）と `@lattica/core`（ColumnNode 型）を使用
-- **相対 workspace（`../lattica/packages/*`）+ 旧スコープ `@lattica/*` で直結**。lattica は `@ai-path/lattica-*` に改名・npm 公開済みのため、再 install で解決が壊れる。→ npm 公開版への移行が別途必要（運用課題）
+- **相対 workspace（`../lattica/packages/*`）+ 旧スコープ `@lattica/*` で直結**。lattica は `@ai-path/tb-*` に改名・npm 公開済みのため、再 install で解決が壊れる。→ npm 公開版への移行が別途必要（運用課題）
 - controller の public メソッド（beginEdit/updateDraft/commitEdit/getCellStyle）を WeakMap 保持で**多段モンキーパッチ**する構造が定着しており、ライブラリ更新のたびに追随リスクがある
 
 ## P0 — モンキーパッチ・内部 DOM 依存を殺すテーマ（最優先）
@@ -54,7 +54,7 @@
 
 ### T11: 印刷 / 静的 HTML レンダリング
 - 現状: canvas グリッドは印刷不可のため、**素の HTML table を別実装**（157 行）+ 印刷専用の列幅・列 index を二重定義（stamping-print-columns.ts 91 行）。グリッド列とのズレは人手同期
-- 提案: `renderStaticTable(controller, columns, opts): ReactElement`（@ai-path/lattica-react）or `tableToHtml`（io）。列幅・列定義・書式は controller/columns から自動導出し、`@media print` 用の推奨 CSS を同梱。既存 io の tableToPdf / writeStyledXlsx と姉妹の「HTML 出力」
+- 提案: `renderStaticTable(controller, columns, opts): ReactElement`（@ai-path/tb-react）or `tableToHtml`（io）。列幅・列定義・書式は controller/columns から自動導出し、`@media print` 用の推奨 CSS を同梱。既存 io の tableToPdf / writeStyledXlsx と姉妹の「HTML 出力」
 - 規模: 中。scene のセル値/スタイル解決系を再利用
 
 ### T10: SSR セーフ化
@@ -87,4 +87,4 @@
 4. **Wave 4**: T11（印刷）、T9（autoSize）、T12（契約明文化）
 
 各 Wave は独立 PR 分割・カバレッジ 100% 維持・クリーンルーム遵守。momotani 側は Wave 1-2 完了時点で
-モンキーパッチ層と DOM 依存が全廃でき、npm 公開版 `@ai-path/lattica-*` への移行と同時に刷新するのが効率的。
+モンキーパッチ層と DOM 依存が全廃でき、npm 公開版 `@ai-path/tb-*` への移行と同時に刷新するのが効率的。

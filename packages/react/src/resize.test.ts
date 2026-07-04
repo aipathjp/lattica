@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SizeManager } from '@ai-path/lattica-core';
+import { SizeManager } from '@ai-path/tb-core';
 import { hitColumnBorder, hitRowBorder, hitResizeHandle } from './resize.js';
 import type { GridGeometry } from './geometry.js';
 

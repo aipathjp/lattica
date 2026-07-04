@@ -1,6 +1,6 @@
-# @ai-path/lattica-data
+# @ai-path/tb-data
 
-Index-mapping and data-source binding for Lattica. This package decouples the
+Index-mapping and data-source binding for Taible. This package decouples the
 *physical* order of rows/columns (how data is stored) from the *visual* order
 (how it is displayed) so that sorting, filtering, and nested-row grouping can be
 applied as a view transform without mutating the underlying data. The
@@ -10,7 +10,7 @@ applied as a view transform without mutating the underlying data. The
 ## Install
 
 ```sh
-pnpm add @ai-path/lattica-data
+pnpm add @ai-path/tb-data
 ```
 
 ## API overview
@@ -20,7 +20,7 @@ pnpm add @ai-path/lattica-data
 `DataView` maps between visual and physical indices on both axes.
 
 ```ts
-import { DataView } from '@ai-path/lattica-data';
+import { DataView } from '@ai-path/tb-data';
 
 const view = new DataView(100, 10); // rowCount, colCount
 view.cols.getPhysicalIndex(0);      // physical column behind visual column 0
@@ -34,7 +34,7 @@ view.rows.getPhysicalIndex(5);      // physical row behind visual row 5
 sorts numbers numerically and everything else lexicographically.
 
 ```ts
-import { SortModel, sortPhysicalOrder, type SortDirection } from '@ai-path/lattica-data';
+import { SortModel, sortPhysicalOrder, type SortDirection } from '@ai-path/tb-data';
 
 const sort = new SortModel();
 sort.toggle(2);        // cycle column 2: asc -> desc -> cleared
@@ -49,7 +49,7 @@ by a conjunction (default `'and'`). `matchesCondition` is the pure predicate;
 `filteredHiddenRows` computes which physical rows are hidden.
 
 ```ts
-import { FilterModel, matchesCondition, type FilterCondition } from '@ai-path/lattica-data';
+import { FilterModel, matchesCondition, type FilterCondition } from '@ai-path/tb-data';
 
 const filter = new FilterModel();
 const conditions: FilterCondition[] = [

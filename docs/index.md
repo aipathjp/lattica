@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: Lattica
+  name: Taible
   text: Data grid & spreadsheet engine
   tagline: High-performance, framework-agnostic, clean-room. Zero copyleft, MIT licensed, fully owned IP.
   actions:
@@ -30,20 +30,20 @@ features:
   - title: AI & MCP ready
     details: Provider-agnostic NL→formula helpers and an MCP surface so agents can drive the grid programmatically.
   - title: No license traps
-    details: Independent of any GPL/commercial grid or formula library — Lattica is self-contained and MIT.
+    details: Independent of any GPL/commercial grid or formula library — Taible is self-contained and MIT.
   - title: Strict, tested core
     details: TypeScript strict ESM monorepo with a 100% coverage gate on the published engine packages.
 ---
 
 ## Packages
 
-Lattica is a pnpm monorepo of focused, framework-agnostic packages:
+Taible is a pnpm monorepo of focused, framework-agnostic packages:
 
-- [`@ai-path/lattica-core`](/packages/core) — engine: A1 coords, virtualization math, sparse data store, selection, command/undo, header flattening.
-- [`@ai-path/lattica-formula`](/packages/formula) — clean-room Excel-compatible formula engine (~55 functions).
-- [`@ai-path/lattica-react`](/packages/react) — React bindings: canvas grid, DOM editing overlay, grouping headers, `GridController`.
-- [`@ai-path/lattica-io`](/packages/io) — CSV/TSV, clipboard, dependency-free XLSX export.
-- [`@ai-path/lattica-data`](/packages/data) — data layer utilities.
-- [`@ai-path/lattica-collab`](/packages/collab) — realtime LWW CRDT, fractional indexing, presence, transport abstraction.
-- [`@ai-path/lattica-ai`](/packages/ai) — provider-agnostic AI helpers (NL→formula).
-- [`@ai-path/lattica-mcp`](/packages/mcp) — Model Context Protocol surface for agent-driven grids.
+- [`@ai-path/tb-core`](/packages/core) — engine: A1 coords, virtualization math, sparse data store, selection, command/undo, header flattening.
+- [`@ai-path/tb-formula`](/packages/formula) — clean-room Excel-compatible formula engine (~55 functions).
+- [`@ai-path/tb-react`](/packages/react) — React bindings: canvas grid, DOM editing overlay, grouping headers, `GridController`.
+- [`@ai-path/tb-io`](/packages/io) — CSV/TSV, clipboard, dependency-free XLSX export.
+- [`@ai-path/tb-data`](/packages/data) — data layer utilities.
+- [`@ai-path/tb-collab`](/packages/collab) — realtime LWW CRDT, fractional indexing, presence, transport abstraction.
+- [`@ai-path/tb-ai`](/packages/ai) — provider-agnostic AI helpers (NL→formula).
+- [`@ai-path/tb-mcp`](/packages/mcp) — Model Context Protocol surface for agent-driven grids.

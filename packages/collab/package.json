@@ -1,7 +1,7 @@
 {
-  "name": "@ai-path/lattica-collab",
-  "version": "0.1.0",
-  "description": "Realtime collaboration primitives for Lattica: a table-specific LWW CRDT, fractional indexing for stable row/column order, presence, and a transport abstraction.",
+  "name": "@ai-path/tb-collab",
+  "version": "0.2.0",
+  "description": "Realtime collaboration primitives for Taible: a table-specific LWW CRDT, fractional indexing for stable row/column order, presence, and a transport abstraction.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -21,9 +21,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-path/lattica-core": "workspace:*"
+    "@ai-path/tb-core": "workspace:*"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aipathjp/lattica.git",
+    "directory": "packages/collab"
+  },
+  "homepage": "https://github.com/aipathjp/lattica#readme",
+  "bugs": {
+    "url": "https://github.com/aipathjp/lattica/issues"
   }
 }

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, type ReactElement } from 'react';
-import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
-import type { ColumnNode } from '@ai-path/lattica-core';
+import { LatticaGrid, useGridController } from '@ai-path/tb-react';
+import type { ColumnNode } from '@ai-path/tb-core';
 
 interface ProductRecord {
   sku: string;

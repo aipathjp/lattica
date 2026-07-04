@@ -1,8 +1,8 @@
-# Lattica Usage Guide
+# Taible Usage Guide
 
-An end-to-end tour of building a spreadsheet with Lattica — from a basic React
+An end-to-end tour of building a spreadsheet with Taible — from a basic React
 grid to AI-assisted editing. Every example uses real exported names from the
-`@ai-path/lattica-*` packages. Lattica is ESM and TypeScript-first.
+`@ai-path/tb-*` packages. Taible is ESM and TypeScript-first.
 
 ## Contents
 
@@ -23,11 +23,11 @@ grid to AI-assisted editing. Every example uses real exported names from the
 ## Install
 
 ```sh
-pnpm add @ai-path/lattica-react @ai-path/lattica-core @ai-path/lattica-data @ai-path/lattica-formula
-pnpm add @ai-path/lattica-io @ai-path/lattica-collab @ai-path/lattica-ai @ai-path/lattica-mcp
+pnpm add @ai-path/tb-react @ai-path/tb-core @ai-path/tb-data @ai-path/tb-formula
+pnpm add @ai-path/tb-io @ai-path/tb-collab @ai-path/tb-ai @ai-path/tb-mcp
 ```
 
-`@ai-path/lattica-react` depends on the core/data/formula engines transitively; add the
+`@ai-path/tb-react` depends on the core/data/formula engines transitively; add the
 others as you adopt their features.
 
 ---
@@ -38,7 +38,7 @@ others as you adopt their features.
 formula engine, sizing, selection, and undo); `<LatticaGrid>` renders it.
 
 ```tsx
-import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
+import { LatticaGrid, useGridController } from '@ai-path/tb-react';
 
 export function Spreadsheet() {
   const controller = useGridController({
@@ -63,7 +63,7 @@ builder. You can drive the controller directly outside the render path.
 ## Editing and formulas
 
 Edits go through the controller as undoable commands. The embedded
-`@ai-path/lattica-formula` `SheetEngine` evaluates formulas with leading `=`.
+`@ai-path/tb-formula` `SheetEngine` evaluates formulas with leading `=`.
 
 ```ts
 controller.setCellText(0, 0, 'Sales');
@@ -86,12 +86,12 @@ you build a custom editor.
 
 ## Cell types and alignment
 
-`@ai-path/lattica-react` ships a `CellTypeRegistry` (`defaultCellTypes`) with `text`,
+`@ai-path/tb-react` ships a `CellTypeRegistry` (`defaultCellTypes`) with `text`,
 `number`, and `boolean` renderers. Register custom renderers and assign a type
 (and alignment) per **physical** column.
 
 ```ts
-import { defaultCellTypes, drawCellText, type CellRenderer } from '@ai-path/lattica-react';
+import { defaultCellTypes, drawCellText, type CellRenderer } from '@ai-path/tb-react';
 
 const currency: CellRenderer = (ctx) =>
   drawCellText({ ...ctx, align: ctx.align === 'left' ? 'right' : ctx.align });
@@ -111,7 +111,7 @@ Add `CfRule`s (first match wins); the grid applies them automatically, and a
 search hit overlays a yellow tint on top of any rule style.
 
 ```ts
-import type { CfRule } from '@ai-path/lattica-core';
+import type { CfRule } from '@ai-path/tb-core';
 
 const highValue: CfRule = { kind: 'gt', value: 1000, style: { background: '#fde', bold: true } };
 const negative: CfRule = { kind: 'lt', value: 0, style: { color: '#c00' } };
@@ -147,11 +147,11 @@ regex yields zero hits rather than throwing).
 
 ## Sort and filter
 
-Sort and filter are **view transforms** (powered by `@ai-path/lattica-data`), addressed
+Sort and filter are **view transforms** (powered by `@ai-path/tb-data`), addressed
 by **visual** column index. They do not mutate the underlying data.
 
 ```ts
-import type { FilterCondition } from '@ai-path/lattica-data';
+import type { FilterCondition } from '@ai-path/tb-data';
 
 // Sort: cycles asc -> desc -> cleared. Pass `true` for an additive (secondary) key.
 controller.toggleSort(1);
@@ -186,20 +186,20 @@ controller.fillTo(/* targetRow */ 10, /* targetCol */ 0);
 ```
 
 Under the hood this uses the pure `fillRegion` / `detectSeries` / `extendSeries`
-helpers from `@ai-path/lattica-core` (with `FillDirection` `'down' | 'up' | 'right' | 'left'`),
+helpers from `@ai-path/tb-core` (with `FillDirection` `'down' | 'up' | 'right' | 'left'`),
 so series like `1, 2, 3…` extend automatically.
 
 ---
 
 ## CSV and XLSX import/export
 
-Use `@ai-path/lattica-io` for file interop. It works on plain string/value matrices, so
+Use `@ai-path/tb-io` for file interop. It works on plain string/value matrices, so
 you map between matrices and the grid yourself.
 
 ### Import CSV/XLSX
 
 ```ts
-import { parseDelimited, readXlsx } from '@ai-path/lattica-io';
+import { parseDelimited, readXlsx } from '@ai-path/tb-io';
 
 const rows = parseDelimited(csvText); // string[][]
 rows.forEach((line, r) =>
@@ -216,7 +216,7 @@ firstSheet?.rows.forEach((line, r) =>
 ### Export CSV/XLSX
 
 ```ts
-import { serializeDelimited, matrixToXlsx } from '@ai-path/lattica-io';
+import { serializeDelimited, matrixToXlsx } from '@ai-path/tb-io';
 
 const matrix: string[][] = [];
 for (let r = 0; r < controller.getRowCount(); r++) {
@@ -236,12 +236,12 @@ pair with the controller's `copySelection()` and `paste(matrix)`.
 
 ## Realtime collaboration
 
-`@ai-path/lattica-collab` provides a CRDT document, presence, and a transport. A
+`@ai-path/tb-collab` provides a CRDT document, presence, and a transport. A
 `CollabSession` is the object your UI talks to; `InMemoryNetwork` connects
 sessions in-process (perfect for demos and tests).
 
 ```ts
-import { CollabSession, InMemoryNetwork } from '@ai-path/lattica-collab';
+import { CollabSession, InMemoryNetwork } from '@ai-path/tb-collab';
 
 const network = new InMemoryNetwork();
 
@@ -273,7 +273,7 @@ tests/offline; swap in your own `AIProvider` in production. `AIClient` enforces 
 call budget and accumulates token usage.
 
 ```ts
-import { MockProvider, AIClient } from '@ai-path/lattica-ai';
+import { MockProvider, AIClient } from '@ai-path/tb-ai';
 
 const client = new AIClient(new MockProvider({
   texts: ['…'],
@@ -284,7 +284,7 @@ const client = new AIClient(new MockProvider({
 ### Natural language → formula
 
 ```ts
-import { nlToFormula } from '@ai-path/lattica-ai';
+import { nlToFormula } from '@ai-path/tb-ai';
 
 const r = await nlToFormula(client, 'sum of column A', { context: 'A1:A10 holds sales' });
 if (r.valid) controller.setCellText(11, 0, r.formula); // r.formula is parse-validated
@@ -293,7 +293,7 @@ if (r.valid) controller.setCellText(11, 0, r.formula); // r.formula is parse-val
 ### Generate a column
 
 ```ts
-import { generateColumn } from '@ai-path/lattica-ai';
+import { generateColumn } from '@ai-path/tb-ai';
 
 const rows = [['Acme', 'NY'], ['Globex', 'CA']];
 const cells = await generateColumn(client, rows, {
@@ -306,7 +306,7 @@ cells.forEach((cell, r) => controller.setCellText(r, 2, cell.value));
 ### Smart fill
 
 ```ts
-import { smartFill } from '@ai-path/lattica-ai';
+import { smartFill } from '@ai-path/tb-ai';
 
 // Deterministic rule when one fits; AI fallback otherwise.
 const filled = await smartFill(
@@ -319,7 +319,7 @@ const filled = await smartFill(
 ### Semantic search
 
 ```ts
-import { SemanticIndex, type Embedder } from '@ai-path/lattica-ai';
+import { SemanticIndex, type Embedder } from '@ai-path/tb-ai';
 
 const embedder: Embedder = (text) => embed(text); // your embedding model
 const index = new SemanticIndex(embedder);
@@ -333,7 +333,7 @@ const hits = await index.search('earnings', 5); // [{ id, score }] by similarity
 Expose the grid's formula engine to an agent as callable tools.
 
 ```ts
-import { createGridTools, ToolDispatcher } from '@ai-path/lattica-mcp';
+import { createGridTools, ToolDispatcher } from '@ai-path/tb-mcp';
 
 const dispatcher = new ToolDispatcher(createGridTools(controller.engine));
 
@@ -352,7 +352,7 @@ tool names; `WorkflowRunner` executes only approved steps and records an audit
 trail.
 
 ```ts
-import { planWorkflow, WorkflowRunner } from '@ai-path/lattica-ai';
+import { planWorkflow, WorkflowRunner } from '@ai-path/tb-ai';
 
 const toolNames = dispatcher.list().map((t) => t.name);
 const steps = await planWorkflow(client, 'sum each column and sort by total', toolNames);

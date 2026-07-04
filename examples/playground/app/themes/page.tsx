@@ -9,8 +9,8 @@ import {
   densityOptions,
   type Density,
   type PaletteName,
-} from '@ai-path/lattica-react';
-import type { ColumnNode } from '@ai-path/lattica-core';
+} from '@ai-path/tb-react';
+import type { ColumnNode } from '@ai-path/tb-core';
 
 const PALETTES: PaletteName[] = ['light', 'dark', 'highContrast', 'midnight', 'sepia', 'solarizedLight', 'solarizedDark'];
 const DENSITIES: Density[] = ['compact', 'comfortable', 'spacious'];

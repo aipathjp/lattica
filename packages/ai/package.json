@@ -1,7 +1,7 @@
 {
-  "name": "@ai-path/lattica-ai",
-  "version": "0.1.0",
-  "description": "AI-native spreadsheet primitives for Lattica: provider-agnostic AI client, undoable AICommand with provenance, NL<->formula, AI columns, smart fill, schema inference, semantic search.",
+  "name": "@ai-path/tb-ai",
+  "version": "0.2.0",
+  "description": "AI-native spreadsheet primitives for Taible: provider-agnostic AI client, undoable AICommand with provenance, NL<->formula, AI columns, smart fill, schema inference, semantic search.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -11,6 +11,9 @@
   "types": "./dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" } },
   "scripts": { "build": "tsup", "typecheck": "tsc --noEmit" },
-  "dependencies": { "@ai-path/lattica-core": "workspace:*", "@ai-path/lattica-formula": "workspace:*", "@ai-path/lattica-data": "workspace:*" },
-  "publishConfig": { "access": "public" }
+  "repository": { "type": "git", "url": "https://github.com/aipathjp/lattica.git", "directory": "packages/ai" },
+  "homepage": "https://github.com/aipathjp/lattica#readme",
+  "bugs": { "url": "https://github.com/aipathjp/lattica/issues" },
+  "dependencies": { "@ai-path/tb-core": "workspace:*", "@ai-path/tb-formula": "workspace:*", "@ai-path/tb-data": "workspace:*" },
+  "publishConfig": { "access": "public", "provenance": true }
 }

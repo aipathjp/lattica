@@ -1,4 +1,4 @@
-/** Shared structural types for the Lattica core engine. */
+/** Shared structural types for the Taible core engine. */
 
 import type { CellAddress } from './coords.js';
 

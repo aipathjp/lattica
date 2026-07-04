@@ -1,7 +1,7 @@
 /** Tests for the grid tool registry, exercised against a real SheetEngine. */
 
 import { describe, it, expect } from 'vitest';
-import { SheetEngine } from '@ai-path/lattica-formula';
+import { SheetEngine } from '@ai-path/tb-formula';
 import { createGridTools, formatValue, type GridTool } from './tools.js';
 
 function toolMap(engine: SheetEngine): Map<string, GridTool> {

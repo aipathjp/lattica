@@ -1,4 +1,4 @@
-/** @ai-path/lattica-io — import/export and clipboard interop for Lattica. */
+/** @ai-path/tb-io — import/export and clipboard interop for Taible. */
 
 export {
   parseDelimited,

@@ -1,8 +1,8 @@
 {
-  "name": "lattica-monorepo",
+  "name": "taible-monorepo",
   "version": "0.0.0",
   "private": true,
-  "description": "Lattica — high-performance, framework-agnostic data grid & spreadsheet engine for React/Next.js. Clean-room, zero-copyleft, fully owned IP.",
+  "description": "Taible — high-performance, framework-agnostic data grid & spreadsheet engine for React/Next.js. Clean-room, zero-copyleft, fully owned IP.",
   "license": "MIT",
   "type": "module",
   "engines": {

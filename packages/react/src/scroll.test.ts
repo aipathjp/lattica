@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SizeManager } from '@ai-path/lattica-core';
+import { SizeManager } from '@ai-path/tb-core';
 import { scrollToCell, clampScroll } from './scroll.js';
 import type { GridGeometry } from './geometry.js';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { ColumnNode } from '@ai-path/lattica-core';
+import type { ColumnNode } from '@ai-path/tb-core';
 import { GridController } from './controller.js';
 import { renderStaticTable, staticTablePrintCss } from './static-table.js';
 

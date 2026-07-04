@@ -4,7 +4,7 @@
  * dependency graph can track fine-grained precedents.
  */
 
-import { addressKey, type A1Reference } from '@ai-path/lattica-core';
+import { addressKey, type A1Reference } from '@ai-path/tb-core';
 import type { AstNode } from './ast.js';
 
 export interface ExtractOptions {

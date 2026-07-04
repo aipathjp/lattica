@@ -1,5 +1,5 @@
 /**
- * Coordinate utilities for the Lattica grid.
+ * Coordinate utilities for the Taible grid.
  *
  * Cells are addressed internally by zero-based `{ row, col }` integer pairs.
  * Spreadsheet-style A1 notation (e.g. `A1`, `$B$2`, `AA10`) is supported for
@@ -14,7 +14,7 @@ export interface CellAddress {
   readonly col: number;
 }
 
-/** Maximum column index Lattica addresses with A1 notation (Excel parity: XFD = 16383). */
+/** Maximum column index Taible addresses with A1 notation (Excel parity: XFD = 16383). */
 export const MAX_COLUMN_INDEX = 16383;
 
 const A_CHAR_CODE = 65; // 'A'

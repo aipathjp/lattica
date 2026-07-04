@@ -1,9 +1,9 @@
-# Lattica
+# Taible
 
 > High-performance, framework-agnostic **data grid & spreadsheet engine** for React / Next.js.
 > Clean-room, **zero copyleft**, fully owned IP — MIT licensed.
 
-Lattica is an independent alternative to Handsontable / AG Grid built from the
+Taible is an independent alternative to Handsontable / AG Grid built from the
 ground up: a **canvas-rendered** body for large-scale scrolling, a **clean-room
 Excel-compatible formula engine**, a **table CRDT** for realtime collaboration,
 **XLSX/CSV** interop, and **multi-level grouping headers** — with no dependency
@@ -16,11 +16,11 @@ on any GPL/commercial grid or formula library.
 
 | Package | Description | Runtime deps |
 |---------|-------------|--------------|
-| [`@ai-path/lattica-core`](packages/core) | Framework-agnostic engine: A1 coords, virtualization math, sparse data store, selection, command/undo, multi-level header flattening, typed emitter | **none** |
-| [`@ai-path/lattica-formula`](packages/formula) | Clean-room Excel-compatible formula engine: lexer → Pratt parser → evaluator + incremental dependency graph (`#CYCLE!` detection), 150 functions, dynamic-array spill, LAMBDA, structured references | core |
-| [`@ai-path/lattica-react`](packages/react) | React bindings: canvas-rendered virtualized grid, DOM editing overlay (IME-aware), multi-level grouping headers, `GridController` | core, formula |
-| [`@ai-path/lattica-io`](packages/io) | CSV/TSV (RFC 4180), clipboard (TSV + HTML), dependency-free XLSX export (stored-ZIP + CRC-32) | core |
-| [`@ai-path/lattica-collab`](packages/collab) | Realtime: LWW table CRDT, fractional indexing for stable row/col order, presence, transport abstraction | core |
+| [`@ai-path/tb-core`](packages/core) | Framework-agnostic engine: A1 coords, virtualization math, sparse data store, selection, command/undo, multi-level header flattening, typed emitter | **none** |
+| [`@ai-path/tb-formula`](packages/formula) | Clean-room Excel-compatible formula engine: lexer → Pratt parser → evaluator + incremental dependency graph (`#CYCLE!` detection), 150 functions, dynamic-array spill, LAMBDA, structured references | core |
+| [`@ai-path/tb-react`](packages/react) | React bindings: canvas-rendered virtualized grid, DOM editing overlay (IME-aware), multi-level grouping headers, `GridController` | core, formula |
+| [`@ai-path/tb-io`](packages/io) | CSV/TSV (RFC 4180), clipboard (TSV + HTML), dependency-free XLSX export (stored-ZIP + CRC-32) | core |
+| [`@ai-path/tb-collab`](packages/collab) | Realtime: LWW table CRDT, fractional indexing for stable row/col order, presence, transport abstraction | core |
 
 ## Why
 
@@ -28,7 +28,7 @@ on any GPL/commercial grid or formula library.
   reconciliation, so hundreds of thousands of cells scroll smoothly (DOM-virtualized
   grids stall once they create/destroy hundreds of DOM nodes per frame).
 - **No license traps** — Handsontable and HyperFormula are GPL/commercial; AG Grid
-  Enterprise is paid. Lattica is MIT and self-contained.
+  Enterprise is paid. Taible is MIT and self-contained.
 - **Real spreadsheet semantics** — dependency graph, topological recalculation,
   minimal re-evaluation, circular-reference detection, Excel error propagation.
 - **Collaboration-ready** — a tombstone-free LWW CRDT converges deterministically;
@@ -41,12 +41,12 @@ on any GPL/commercial grid or formula library.
 ## Quick start
 
 ```bash
-pnpm add @ai-path/lattica-react @ai-path/lattica-core @ai-path/lattica-formula
+pnpm add @ai-path/tb-react @ai-path/tb-core @ai-path/tb-formula
 ```
 
 ```tsx
 'use client';
-import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
+import { LatticaGrid, useGridController } from '@ai-path/tb-react';
 
 export default function Sheet() {
   const controller = useGridController({ rowCount: 1000, colCount: 50 });
@@ -82,7 +82,7 @@ const columns = [
 ### Headless usage (no React)
 
 ```ts
-import { SheetEngine } from '@ai-path/lattica-formula';
+import { SheetEngine } from '@ai-path/tb-formula';
 const sheet = new SheetEngine();
 sheet.setContent({ row: 0, col: 0 }, 5);
 sheet.setContent({ row: 0, col: 1 }, '=A1*2');
@@ -92,14 +92,14 @@ sheet.getValue({ row: 0, col: 1 }); // 10
 ### Export & clipboard
 
 ```ts
-import { matrixToXlsx, serializeTsv, parseClipboard } from '@ai-path/lattica-io';
+import { matrixToXlsx, serializeTsv, parseClipboard } from '@ai-path/tb-io';
 const bytes = matrixToXlsx([['Name', 'Score'], ['Ann', 92]]); // valid .xlsx
 ```
 
 ### Realtime collaboration
 
 ```ts
-import { CollabSession, InMemoryNetwork } from '@ai-path/lattica-collab';
+import { CollabSession, InMemoryNetwork } from '@ai-path/tb-collab';
 const net = new InMemoryNetwork(); // swap for a Supabase Realtime transport
 const a = new CollabSession('a', net.connect());
 const b = new CollabSession('b', net.connect());
