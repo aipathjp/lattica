@@ -72,6 +72,7 @@ import {
 import { formatElapsedDisplay, normalizeElapsedInput, sanitizeElapsedDraft } from './elapsed-time.js';
 import { autoRowHeight, type MeasureText } from './measure.js';
 import { hasFullWidthNumeric, normalizeFullWidth, type FullWidthMode } from './input-normalize.js';
+import type { EnterMoves } from './keyboard.js';
 
 export interface GridControllerOptions {
   rowCount: number;
@@ -82,6 +83,34 @@ export interface GridControllerOptions {
   colHeaderHeight?: number;
   frozenRows?: number;
   frozenCols?: number;
+  /**
+   * Direction Enter moves the active cell (navigation and post-commit).
+   * Shift+Enter moves the opposite way. Default `{ row: 1, col: 0 }` (down);
+   * `{ row: 0, col: 1 }` gives Excel-style rightward entry.
+   */
+  enterMoves?: EnterMoves;
+  /**
+   * When true, a plain Enter on a cell begins editing instead of moving.
+   * Default false (Enter only moves — the historical behavior).
+   */
+  enterBeginsEditing?: boolean;
+  /**
+   * When false, Tab is not handled by the grid, so the browser's default
+   * focus navigation applies. Default true (Tab moves within the grid).
+   */
+  tabNavigation?: boolean;
+  /**
+   * When true (default), clicking outside the grid hides the selection
+   * visuals until the grid is interacted with again. Set false to keep the
+   * selection highlighted while other UI (e.g. a toolbar) is used.
+   */
+  outsideClickDeselects?: boolean;
+  /**
+   * View-only mode: selection is neither drawn nor mutable through the UI,
+   * and UI-initiated editing is blocked. Programmatic APIs (selection,
+   * copySelection, setCellText, …) keep working. Default false.
+   */
+  selectionDisabled?: boolean;
 }
 
 export interface EditState {
@@ -374,6 +403,16 @@ export class GridController {
   private colHeaderHeightPx: number;
   frozenRows: number;
   frozenCols: number;
+  /** Enter-key movement delta (see {@link GridControllerOptions.enterMoves}). */
+  readonly enterMoves: EnterMoves;
+  /** Whether a plain Enter begins editing instead of moving. */
+  readonly enterBeginsEditing: boolean;
+  /** Whether Tab navigates within the grid. */
+  readonly tabNavigation: boolean;
+  /** Whether clicking outside the grid hides the selection visuals. */
+  readonly outsideClickDeselects: boolean;
+  /** View-only mode: no selection visuals and no UI selection/edit operations. */
+  readonly selectionDisabled: boolean;
 
   /** Effective column-header band height (px). See {@link getHeaderHeight}. */
   get colHeaderHeight(): number {
@@ -401,6 +440,11 @@ export class GridController {
     this.colHeaderHeightPx = this.baseColHeaderHeight;
     this.frozenRows = options.frozenRows ?? 0;
     this.frozenCols = options.frozenCols ?? 0;
+    this.enterMoves = options.enterMoves ?? { row: 1, col: 0 };
+    this.enterBeginsEditing = options.enterBeginsEditing ?? false;
+    this.tabNavigation = options.tabNavigation ?? true;
+    this.outsideClickDeselects = options.outsideClickDeselects ?? true;
+    this.selectionDisabled = options.selectionDisabled ?? false;
     this.selection.subscribe(() => {
       if (!this.suppressChangeEvents) {
         this.emitter.emit('change', undefined);

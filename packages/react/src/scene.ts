@@ -100,6 +100,8 @@ export interface BuildSceneParams {
   hasComment?: (row: number, col: number) => boolean;
   /** Display text for a pinned summary (footer) cell (optional). */
   getSummaryDisplay?: (summaryRow: number, col: number) => string;
+  /** Suppress selection visuals: no selected/active flags, no activeRect. */
+  hideSelection?: boolean;
 }
 
 /** Sum the sizes of `count` indices starting at `start`. */
@@ -133,6 +135,7 @@ export function visibleIndices(
 export function buildScene(params: BuildSceneParams): Scene {
   const { geom, scrollLeft, scrollTop, clientWidth, clientHeight, selection, getDisplay } = params;
   const overscan = params.overscan ?? 2;
+  const hideSelection = params.hideSelection ?? false;
 
   const visibleRows = visibleIndices(
     geom.rowSizes,
@@ -177,7 +180,7 @@ export function buildScene(params: BuildSceneParams): Scene {
         rect.width = spanSize(geom.colSizes, merge.col, merge.colspan);
         rect.height = spanSize(geom.rowSizes, merge.row, merge.rowspan);
       }
-      const active = selection.isActive({ row, col });
+      const active = !hideSelection && selection.isActive({ row, col });
       const visual = params.getVisual?.(row, col) ?? null;
       const baseStyle = params.getBaseStyle?.(row, col) ?? null;
       const explicitStyle = params.getCfStyle?.(row, col) ?? null;
@@ -192,7 +195,7 @@ export function buildScene(params: BuildSceneParams): Scene {
         col,
         rect,
         text: getDisplay(row, col),
-        selected: selection.isSelected({ row, col }),
+        selected: !hideSelection && selection.isSelected({ row, col }),
         active,
         type: params.getType?.(row, col),
         align: params.getAlign?.(row, col),

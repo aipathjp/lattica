@@ -25,6 +25,36 @@ export type KeyAction =
   | { type: 'undo' }
   | { type: 'redo' };
 
+/** Row/column delta applied by Enter (move and post-commit move). */
+export interface EnterMoves {
+  row: number;
+  col: number;
+}
+
+/**
+ * Configurable keyboard behavior for {@link interpretKey}. Every option
+ * defaults to the historical behavior, so passing nothing changes nothing.
+ */
+export interface KeyBehaviorOptions {
+  /**
+   * Direction Enter moves the active cell — both when navigating and after
+   * committing an edit. Shift+Enter moves the opposite way. Default
+   * `{ row: 1, col: 0 }` (down); use `{ row: 0, col: 1 }` for rightward entry.
+   */
+  enterMoves?: EnterMoves;
+  /**
+   * When true, a plain Enter (no shift) on a cell begins editing instead of
+   * moving. Default false: Enter only moves the selection.
+   */
+  enterBeginsEditing?: boolean;
+  /**
+   * When false, Tab is not handled by the grid at all (no in-grid move, no
+   * commit-and-move) so the browser's default focus navigation applies.
+   * Default true.
+   */
+  tabNavigation?: boolean;
+}
+
 const ARROWS: Record<string, { dRow: number; dCol: number }> = {
   ArrowUp: { dRow: -1, dCol: 0 },
   ArrowDown: { dRow: 1, dCol: 0 },
@@ -32,17 +62,26 @@ const ARROWS: Record<string, { dRow: number; dCol: number }> = {
   ArrowRight: { dRow: 0, dCol: 1 },
 };
 
+/** Negate a delta without producing -0 (keeps equality assertions sane). */
+function negate(n: number): number {
+  return n === 0 ? 0 : -n;
+}
+
 /** Interpret a key press into an action. */
-export function interpretKey(input: KeyInput, editing: boolean): KeyAction {
+export function interpretKey(input: KeyInput, editing: boolean, options: KeyBehaviorOptions = {}): KeyAction {
   const mod = input.ctrlKey === true || input.metaKey === true;
   const shift = input.shiftKey === true;
+  const enterMoves = options.enterMoves ?? { row: 1, col: 0 };
+  const tabNavigation = options.tabNavigation ?? true;
+  const enterRow = shift ? negate(enterMoves.row) : enterMoves.row;
+  const enterCol = shift ? negate(enterMoves.col) : enterMoves.col;
 
   if (editing) {
     switch (input.key) {
       case 'Enter':
-        return { type: 'commit', dRow: shift ? -1 : 1, dCol: 0 };
+        return { type: 'commit', dRow: enterRow, dCol: enterCol };
       case 'Tab':
-        return { type: 'commit', dRow: 0, dCol: shift ? -1 : 1 };
+        return tabNavigation ? { type: 'commit', dRow: 0, dCol: shift ? -1 : 1 } : { type: 'none' };
       case 'Escape':
         return { type: 'cancel' };
       default:
@@ -57,9 +96,12 @@ export function interpretKey(input: KeyInput, editing: boolean): KeyAction {
 
   switch (input.key) {
     case 'Tab':
-      return { type: 'move', dRow: 0, dCol: shift ? -1 : 1, extend: false };
+      return tabNavigation ? { type: 'move', dRow: 0, dCol: shift ? -1 : 1, extend: false } : { type: 'none' };
     case 'Enter':
-      return { type: 'move', dRow: shift ? -1 : 1, dCol: 0, extend: false };
+      if ((options.enterBeginsEditing ?? false) && !shift) {
+        return { type: 'edit' };
+      }
+      return { type: 'move', dRow: enterRow, dCol: enterCol, extend: false };
     case 'F2':
       return { type: 'edit' };
     case 'Backspace':

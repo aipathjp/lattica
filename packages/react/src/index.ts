@@ -1,6 +1,12 @@
 /** @ai-path/tb-react — canvas-rendered, virtualized React data grid. */
 
-export { LatticaGrid, TOOLTIP_DELAY_MS, type LatticaGridHandle, type LatticaGridProps } from './LatticaGrid.js';
+export {
+  LatticaGrid,
+  TOOLTIP_DELAY_MS,
+  type LatticaGridHandle,
+  type LatticaGridProps,
+  type ContextMenuPreset,
+} from './LatticaGrid.js';
 export { LatticaStatusBar, type LatticaStatusBarProps } from './StatusBar.js';
 export { LatticaFormulaBar, type LatticaFormulaBarProps } from './FormulaBar.js';
 export { LatticaColumnSettings, type LatticaColumnSettingsProps } from './ColumnSettings.js';
@@ -112,7 +118,13 @@ export {
   type CellRenderContext,
   type CellAlign,
 } from './cell-types.js';
-export { interpretKey, type KeyInput, type KeyAction } from './keyboard.js';
+export {
+  interpretKey,
+  type KeyInput,
+  type KeyAction,
+  type EnterMoves,
+  type KeyBehaviorOptions,
+} from './keyboard.js';
 export {
   editorKindForType,
   EditorRegistry,
