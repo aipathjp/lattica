@@ -58,6 +58,7 @@ import { SheetEngine, FormulaError, type CellContent } from '@ai-path/lattica-fo
 import type { GridGeometry } from './geometry.js';
 import type { CellAlign } from './cell-types.js';
 import { editorKindForType, type EditorKind } from './editors.js';
+import { normalizeTimeInput, sanitizeTimeDraft } from './time-input.js';
 
 export interface GridControllerOptions {
   rowCount: number;
@@ -76,9 +77,30 @@ export interface EditState {
   draft: string;
 }
 
+export interface CellChange {
+  row: number;
+  col: number;
+  physicalRow: number;
+  physicalCol: number;
+  prev: string;
+  next: string;
+}
+
+export interface CellCommitEvent {
+  source: 'edit' | 'paste' | 'fill' | 'delete' | 'undo' | 'redo';
+  changes: CellChange[];
+}
+
+export interface ColumnInputOptions {
+  sanitizeDraft?: (draft: string, prev: string) => string;
+  maxLength?: number;
+  commitTransform?: (raw: string) => string | null;
+}
+
 interface ControllerEvents {
   change: void;
   edit: EditState | null;
+  cellcommit: CellCommitEvent;
   viewstate: GridStateSnapshot;
 }
 
@@ -234,6 +256,9 @@ export class GridController {
   private readonly nestedRows = new NestedRowModel([]);
   private readonly columnTypes = new Map<number, string>();
   private readonly columnAligns = new Map<number, CellAlign>();
+  private readonly columnEditable = new Map<number, boolean>();
+  private readonly cellReadOnly = new Set<string>();
+  private readonly columnInputs = new Map<number, ColumnInputOptions>();
   private readonly searchKeys = new Set<string>();
   private readonly emitter = new Emitter<ControllerEvents>();
 
@@ -787,6 +812,55 @@ export class GridController {
     return content === null ? '' : String(content);
   }
 
+  private getPhysicalEditText(row: number, col: number): string {
+    const content = this.engine.getContent({ row, col });
+    return content === null ? '' : String(content);
+  }
+
+  private cellChange(row: number, col: number, prev: string, next: string): CellChange | null {
+    if (prev === next) {
+      return null;
+    }
+    const p = this.toPhysical(row, col);
+    return { row, col, physicalRow: p.row, physicalCol: p.col, prev, next };
+  }
+
+  private emitCellCommit(source: CellCommitEvent['source'], changes: CellChange[]): void {
+    if (changes.length > 0) {
+      this.emitter.emit('cellcommit', { source, changes });
+    }
+  }
+
+  private captureContent(): Map<string, string> {
+    const snapshot = new Map<string, string>();
+    for (let row = 0; row < this.rowCount; row++) {
+      for (let col = 0; col < this.colCount; col++) {
+        const text = this.getPhysicalEditText(row, col);
+        if (text !== '') {
+          snapshot.set(`${row},${col}`, text);
+        }
+      }
+    }
+    return snapshot;
+  }
+
+  private diffContent(before: ReadonlyMap<string, string>): CellChange[] {
+    const changes: CellChange[] = [];
+    for (let row = 0; row < this.rowCount; row++) {
+      for (let col = 0; col < this.colCount; col++) {
+        const key = `${row},${col}`;
+        const prev = before.get(key) ?? '';
+        const next = this.getPhysicalEditText(row, col);
+        if (prev !== next) {
+          const visualRow = this.view.rows.getVisualIndex(row);
+          const visualCol = this.view.cols.getVisualIndex(col);
+          changes.push({ row: visualRow, col: visualCol, physicalRow: row, physicalCol: col, prev, next });
+        }
+      }
+    }
+    return changes;
+  }
+
   // ── Column type & alignment (keyed by physical column) ─────────────────────
   setColumnType(col: number, type: string): void {
     this.columnTypes.set(col, type);
@@ -801,6 +875,55 @@ export class GridController {
   }
   getColumnAlign(visualCol: number): CellAlign | undefined {
     return this.columnAligns.get(this.view.cols.getPhysicalIndex(visualCol));
+  }
+
+  setColumnEditable(visualCol: number, editable: boolean): void {
+    this.columnEditable.set(this.view.cols.getPhysicalIndex(visualCol), editable);
+    this.emitter.emit('change', undefined);
+  }
+
+  setCellReadOnly(visualRow: number, visualCol: number, readOnly: boolean): void {
+    const p = this.toPhysical(visualRow, visualCol);
+    const key = `${p.row},${p.col}`;
+    if (readOnly) {
+      this.cellReadOnly.add(key);
+    } else {
+      this.cellReadOnly.delete(key);
+    }
+    this.emitter.emit('change', undefined);
+  }
+
+  isCellEditable(visualRow: number, visualCol: number): boolean {
+    const p = this.toPhysical(visualRow, visualCol);
+    if (this.cellReadOnly.has(`${p.row},${p.col}`)) {
+      return false;
+    }
+    return this.columnEditable.get(p.col) ?? true;
+  }
+
+  setColumnInput(visualCol: number, options: ColumnInputOptions | null): void {
+    const physicalCol = this.view.cols.getPhysicalIndex(visualCol);
+    if (options === null) {
+      this.columnInputs.delete(physicalCol);
+    } else {
+      this.columnInputs.set(physicalCol, options);
+    }
+  }
+
+  private inputOptionsFor(visualCol: number): ColumnInputOptions | undefined {
+    const physicalCol = this.view.cols.getPhysicalIndex(visualCol);
+    const explicit = this.columnInputs.get(physicalCol);
+    if (explicit !== undefined) {
+      return explicit;
+    }
+    if (this.columnTypes.get(physicalCol) === 'time') {
+      return {
+        sanitizeDraft: sanitizeTimeDraft,
+        maxLength: 5,
+        commitTransform: normalizeTimeInput,
+      };
+    }
+    return undefined;
   }
 
   // ── Editors, options & validation ──────────────────────────────────────────
@@ -1000,34 +1123,45 @@ export class GridController {
   /** Clear the currently selected cells (undoable batch). */
   deleteSelection(): void {
     const ranges = this.selection.getState().ranges;
+    const changes: CellChange[] = [];
     this.undo.transaction(() => {
       for (const range of ranges) {
         forEachCell(range, (addr) => {
           const p = this.toPhysical(addr.row, addr.col);
-          if (this.engine.getContent(p) !== null) {
+          const prev = this.getPhysicalEditText(p.row, p.col);
+          if (prev !== '') {
             this.undo.execute(this.setContentCommand(p, ''));
+            const change = this.cellChange(addr.row, addr.col, prev, this.getPhysicalEditText(p.row, p.col));
+            if (change !== null) changes.push(change);
           }
         });
       }
     }, 'delete');
     this.emitter.emit('change', undefined);
+    this.emitCellCommit('delete', changes);
   }
 
   /** Paste a matrix of text starting at the active cell (undoable batch). */
   paste(matrix: ReadonlyArray<readonly string[]>): void {
     const { active } = this.selection.getState();
+    const changes: CellChange[] = [];
     this.undo.transaction(() => {
       matrix.forEach((line, r) => {
         line.forEach((text, c) => {
           const row = active.row + r;
           const col = active.col + c;
           if (row < this.getRowCount() && col < this.getColCount()) {
-            this.undo.execute(this.setContentCommand(this.toPhysical(row, col), text));
+            const p = this.toPhysical(row, col);
+            const prev = this.getPhysicalEditText(p.row, p.col);
+            this.undo.execute(this.setContentCommand(p, text));
+            const change = this.cellChange(row, col, prev, this.getPhysicalEditText(p.row, p.col));
+            if (change !== null) changes.push(change);
           }
         });
       });
     }, 'paste');
     this.emitter.emit('change', undefined);
+    this.emitCellCommit('paste', changes);
   }
 
   /**
@@ -1056,7 +1190,7 @@ export class GridController {
       const seed = this.readBlock(b.top, b.left, b.bottom, b.right);
       const produced = fillRegion(seed, direction, count);
       const baseRow = direction === 'down' ? b.bottom + 1 : b.top - count;
-      this.writeBlock(produced, baseRow, b.left);
+      const changes = this.writeBlock(produced, baseRow, b.left);
       if (direction === 'down') {
         this.selection.setActive({ row: b.top, col: b.left });
         this.selection.extendTo({ row: b.bottom + count, col: b.right });
@@ -1064,13 +1198,14 @@ export class GridController {
         this.selection.setActive({ row: b.bottom, col: b.right });
         this.selection.extendTo({ row: b.top - count, col: b.left });
       }
+      this.emitCellCommit('fill', changes);
     } else {
       const direction: FillDirection = right >= left ? 'right' : 'left';
       const count = direction === 'right' ? right : left;
       const seed = this.readBlock(b.top, b.left, b.bottom, b.right);
       const produced = fillRegion(seed, direction, count);
       const baseCol = direction === 'right' ? b.right + 1 : b.left - count;
-      this.writeBlock(produced, b.top, baseCol);
+      const changes = this.writeBlock(produced, b.top, baseCol);
       if (direction === 'right') {
         this.selection.setActive({ row: b.top, col: b.left });
         this.selection.extendTo({ row: b.bottom, col: b.right + count });
@@ -1078,6 +1213,7 @@ export class GridController {
         this.selection.setActive({ row: b.bottom, col: b.right });
         this.selection.extendTo({ row: b.top, col: b.left - count });
       }
+      this.emitCellCommit('fill', changes);
     }
     this.emitter.emit('change', undefined);
   }
@@ -1094,9 +1230,10 @@ export class GridController {
     return out;
   }
 
-  private writeBlock(block: readonly (readonly CellValue[])[], baseRow: number, baseCol: number): void {
+  private writeBlock(block: readonly (readonly CellValue[])[], baseRow: number, baseCol: number): CellChange[] {
     const toRaw = (v: CellValue): string =>
       v === null ? '' : typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v);
+    const changes: CellChange[] = [];
     this.undo.transaction(() => {
       block.forEach((line, r) => {
         line.forEach((value, c) => {
@@ -1105,11 +1242,16 @@ export class GridController {
           // fillTo only ever produces non-negative bases, so only the upper
           // grid bound can be exceeded.
           if (row < this.getRowCount() && col < this.getColCount()) {
-            this.undo.execute(this.setContentCommand(this.toPhysical(row, col), toRaw(value)));
+            const p = this.toPhysical(row, col);
+            const prev = this.getPhysicalEditText(p.row, p.col);
+            this.undo.execute(this.setContentCommand(p, toRaw(value)));
+            const change = this.cellChange(row, col, prev, this.getPhysicalEditText(p.row, p.col));
+            if (change !== null) changes.push(change);
           }
         });
       });
     }, 'fill');
+    return changes;
   }
 
   /** Extract the selection bounding box as a matrix of edit text (for copy). */
@@ -1127,13 +1269,22 @@ export class GridController {
   }
 
   undoLast(): void {
+    // Snapshotting the whole grid is O(rows×cols); only pay it when someone listens.
+    const before = this.emitter.listenerCount('cellcommit') > 0 ? this.captureContent() : null;
     if (this.undo.undo()) {
       this.emitter.emit('change', undefined);
+      if (before !== null) {
+        this.emitCellCommit('undo', this.diffContent(before));
+      }
     }
   }
   redoLast(): void {
+    const before = this.emitter.listenerCount('cellcommit') > 0 ? this.captureContent() : null;
     if (this.undo.redo()) {
       this.emitter.emit('change', undefined);
+      if (before !== null) {
+        this.emitCellCommit('redo', this.diffContent(before));
+      }
     }
   }
 
@@ -1143,6 +1294,9 @@ export class GridController {
   }
 
   beginEdit(row: number, col: number, initial?: string): void {
+    if (!this.isCellEditable(row, col)) {
+      return;
+    }
     this.editState = {
       row,
       col,
@@ -1153,7 +1307,12 @@ export class GridController {
 
   updateDraft(draft: string): void {
     if (this.editState !== null) {
-      this.editState = { ...this.editState, draft };
+      const options = this.inputOptionsFor(this.editState.col);
+      let next = options?.sanitizeDraft?.(draft, this.editState.draft) ?? draft;
+      if (options?.maxLength !== undefined && next.length > options.maxLength) {
+        next = next.slice(0, options.maxLength);
+      }
+      this.editState = { ...this.editState, draft: next };
     }
   }
 
@@ -1161,12 +1320,22 @@ export class GridController {
     if (this.editState === null) {
       return;
     }
-    const { row, col, draft } = this.editState;
+    const { row, col } = this.editState;
+    const options = this.inputOptionsFor(col);
+    const transformed =
+      options?.commitTransform === undefined ? this.editState.draft : options.commitTransform(this.editState.draft);
     this.editState = null;
-    this.setCellText(row, col, draft);
-    // Validate the committed value against the column/cell validator (if any).
-    const p = this.toPhysical(row, col);
-    void this.validation.validate(p.row, p.col, this.parseInput(draft) as CellValue);
+    if (transformed !== null) {
+      const p = this.toPhysical(row, col);
+      const prev = this.getPhysicalEditText(p.row, p.col);
+      this.undo.execute(this.setContentCommand(p, transformed));
+      const next = this.getPhysicalEditText(p.row, p.col);
+      this.emitter.emit('change', undefined);
+      const change = this.cellChange(row, col, prev, next);
+      this.emitCellCommit('edit', change === null ? [] : [change]);
+      // Validate the committed value against the column/cell validator (if any).
+      void this.validation.validate(p.row, p.col, this.parseInput(transformed) as CellValue);
+    }
     this.emitter.emit('edit', null);
   }
 

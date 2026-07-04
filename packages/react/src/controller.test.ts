@@ -179,6 +179,136 @@ describe('edit lifecycle', () => {
   });
 });
 
+describe('cellcommit events', () => {
+  it('emits edit changes only when the raw edit text changes', () => {
+    const c = make();
+    const listener = vi.fn();
+    c.on('cellcommit', listener);
+    c.beginEdit(1, 2, 'abc');
+    c.commitEdit();
+    expect(listener).toHaveBeenCalledWith({
+      source: 'edit',
+      changes: [{ row: 1, col: 2, physicalRow: 1, physicalCol: 2, prev: '', next: 'abc' }],
+    });
+    listener.mockClear();
+    c.beginEdit(1, 2);
+    c.commitEdit();
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('emits paste, delete, fill, undo, and redo sources', () => {
+    const c = make();
+    const events: unknown[] = [];
+    c.on('cellcommit', (event) => events.push(event));
+    c.selection.setActive({ row: 0, col: 0 });
+    c.paste([['1', '2']]);
+    c.selection.extendTo({ row: 0, col: 1 });
+    c.deleteSelection();
+    c.setCellText(0, 0, '1');
+    c.setCellText(1, 0, '2');
+    c.selection.setActive({ row: 0, col: 0 });
+    c.selection.extendTo({ row: 1, col: 0 });
+    c.fillTo(3, 0);
+    c.undoLast();
+    c.redoLast();
+    expect(events.map((e) => (e as { source: string }).source)).toEqual([
+      'paste',
+      'delete',
+      'fill',
+      'undo',
+      'redo',
+    ]);
+    expect((events[0] as { changes: unknown[] }).changes).toHaveLength(2);
+  });
+
+  it('does not emit paste or delete events when no cell changes', () => {
+    const c = make();
+    const listener = vi.fn();
+    c.on('cellcommit', listener);
+    c.paste([['']]);
+    c.deleteSelection();
+    expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+describe('read-only UI edit state', () => {
+  it('blocks beginEdit for read-only columns and cells', () => {
+    const c = make();
+    c.setColumnEditable(0, false);
+    c.beginEdit(0, 0);
+    expect(c.getEdit()).toBeNull();
+    c.beginEdit(0, 1);
+    expect(c.getEdit()).not.toBeNull();
+    c.cancelEdit();
+    c.setCellReadOnly(0, 1, true);
+    c.beginEdit(0, 1);
+    expect(c.getEdit()).toBeNull();
+  });
+
+  it('cell read-only has priority over column editable state', () => {
+    const c = make();
+    expect(c.isCellEditable(0, 0)).toBe(true);
+    c.setColumnEditable(0, false);
+    expect(c.isCellEditable(0, 0)).toBe(false);
+    c.setColumnEditable(0, true);
+    c.setCellReadOnly(0, 0, true);
+    expect(c.isCellEditable(0, 0)).toBe(false);
+    c.setCellReadOnly(0, 0, false);
+    expect(c.isCellEditable(0, 0)).toBe(true);
+  });
+});
+
+describe('column input pipeline', () => {
+  it('sanitizes drafts, applies max length, and transforms commits', () => {
+    const c = make();
+    c.setColumnInput(0, {
+      sanitizeDraft: (draft, prev) => `${prev}${draft.replace(/\D/g, '')}`,
+      maxLength: 3,
+      commitTransform: (raw) => `#${raw}`,
+    });
+    c.beginEdit(0, 0, '');
+    c.updateDraft('a1');
+    expect(c.getEdit()?.draft).toBe('1');
+    c.updateDraft('b234');
+    expect(c.getEdit()?.draft).toBe('123');
+    c.commitEdit();
+    expect(c.getEditText(0, 0)).toBe('#123');
+  });
+
+  it('cancels a commit when commitTransform returns null and clears explicit options', () => {
+    const c = make();
+    const listener = vi.fn();
+    c.on('cellcommit', listener);
+    c.setColumnInput(0, { commitTransform: () => null });
+    c.beginEdit(0, 0, 'x');
+    c.commitEdit();
+    expect(c.getEditText(0, 0)).toBe('');
+    expect(listener).not.toHaveBeenCalled();
+    c.setColumnInput(0, null);
+    c.beginEdit(0, 0, 'x');
+    c.commitEdit();
+    expect(c.getEditText(0, 0)).toBe('x');
+  });
+
+  it('normalizes the built-in time type end-to-end', () => {
+    const c = make();
+    c.setColumnType(0, 'time');
+    c.beginEdit(0, 0);
+    c.updateDraft('1330');
+    c.commitEdit();
+    expect(c.getEditText(0, 0)).toBe('13:30');
+  });
+
+  it('explicit column input takes priority over the built-in time pipeline', () => {
+    const c = make();
+    c.setColumnType(0, 'time');
+    c.setColumnInput(0, { commitTransform: (raw) => raw });
+    c.beginEdit(0, 0, '1330');
+    c.commitEdit();
+    expect(c.getEditText(0, 0)).toBe('1330');
+  });
+});
+
 describe('resizing', () => {
   it('resizes rows and columns and emits change', () => {
     const c = make();

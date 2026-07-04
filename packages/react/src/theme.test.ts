@@ -8,9 +8,10 @@ describe('resolveTheme', () => {
     expect(resolveTheme()).toBe(defaultTheme);
   });
   it('merges a partial override', () => {
-    const theme = resolveTheme({ textColor: '#000', fontSize: 16 });
+    const theme = resolveTheme({ textColor: '#000', fontSize: 16, readOnlyCellBackground: '#eee' });
     expect(theme.textColor).toBe('#000');
     expect(theme.fontSize).toBe(16);
+    expect(theme.readOnlyCellBackground).toBe('#eee');
     expect(theme.background).toBe(defaultTheme.background);
   });
 });
@@ -38,9 +39,13 @@ describe('buildTheme', () => {
   });
 
   it('applies field overrides last', () => {
-    const theme = buildTheme({ palette: 'dark', overrides: { activeBorder: '#ff0000', defaultColWidth: 200 } });
+    const theme = buildTheme({
+      palette: 'dark',
+      overrides: { activeBorder: '#ff0000', defaultColWidth: 200, editableCellBackground: '#fafafa' },
+    });
     expect(theme.activeBorder).toBe('#ff0000');
     expect(theme.defaultColWidth).toBe(200);
+    expect(theme.editableCellBackground).toBe('#fafafa');
   });
 
   it('produces exactly the GridTheme key set', () => {

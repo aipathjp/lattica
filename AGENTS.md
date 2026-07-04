@@ -61,7 +61,7 @@ export default function Demo() {
 ```
 
 - `useGridController(options)` returns a stable headless `GridController`.
-- `<LatticaGrid controller columns width height theme renderDetail contextMenu />`.
+- `<LatticaGrid controller columns width height theme renderDetail contextMenu onCellCommit editSelection />`.
 - `columns` are optional multi-level header defs (`ColumnNode` = leaf `{headerName}`
   or group `{headerName, children, collapsible?, showWhen?}`). Omit for A,B,C… letters.
 
@@ -85,15 +85,18 @@ getRowCount() / getColCount()
 // selection / edit / clipboard / undo
 selection.setActive({row,col}); selection.extendTo({row,col})
 beginEdit/updateDraft/commitEdit/cancelEdit
+on('cellcommit', e => ...)             // source + raw prev/next cell changes
 copySelection(): string[][]; paste(matrix); deleteSelection()
 undoLast(); redoLast()
 
 // columns
-setColumnType(col, 'text'|'number'|'checkbox'|'dropdown'|'date'|'autocomplete')
+setColumnType(col, 'text'|'number'|'checkbox'|'dropdown'|'date'|'autocomplete'|'time')
 setColumnAlign(col, 'left'|'center'|'right')
 setColumnOptions(col, string[])        // dropdown/autocomplete + list validator
 setColumnFormat(col, '#,##0.00')       // Excel number format
 setColumnValidator(col, v => boolean)  // invalid cells tint red
+setColumnEditable(visualCol, boolean); setCellReadOnly(row, col, boolean); isCellEditable(row, col)
+setColumnInput(visualCol, { sanitizeDraft?, maxLength?, commitTransform? } | null)
 hideColumn(visualCol); showColumn(physicalCol); showAllColumns()
 setColumnVisible(physicalCol, visible); setColumnWidth(physicalCol, width); resetColumnWidths()
 moveColumn(fromVisual, toVisual)
@@ -155,6 +158,19 @@ controller.setColumnType(1, 'date');
 controller.setColumnValidator(2, v => typeof v === 'number' && v > 0);
 ```
 
+**Edit lifecycle and input control** — subscribe to committed writes, restrict UI editing, or normalize drafts:
+```tsx
+<LatticaGrid controller={controller} onCellCommit={(e) => saveAudit(e)} editSelection="end" />
+controller.setColumnEditable(0, false);        // UI beginEdit is blocked
+controller.setCellReadOnly(2, 1, true);        // cell-level read-only wins
+controller.setColumnInput(1, {
+  sanitizeDraft: (draft) => draft.replace(/\D/g, ''),
+  maxLength: 8,
+  commitTransform: (raw) => raw === '' ? null : raw,
+});
+controller.setColumnType(2, 'time');           // accepts 930/1330/9:30 and stores HH:mm
+```
+
 **Faceted filter / hide / move** — UI is built in (`▽` header button, header context menu),
 or drive headlessly via `setColumnSetFilter` / `hideColumn` / `moveColumn`.
 
@@ -176,6 +192,7 @@ controller.setCellSparkline(0, 1, [3,5,4,7], 'line');
 ```ts
 import { buildTheme, densityOptions } from '@lattica/react';
 const theme = buildTheme({ palette: 'midnight', density: 'spacious' });
+const editTheme = buildTheme({ overrides: { readOnlyCellBackground: '#f4f4f5' } });
 const c = useGridController({ rowCount: 100, colCount: 8, ...densityOptions('compact') });
 <LatticaGrid controller={c} theme={theme} />
 <LatticaStatusBar controller={c} theme={theme} />

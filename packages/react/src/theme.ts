@@ -16,6 +16,8 @@ export interface GridTheme {
   selectionFill: string;
   selectionBorder: string;
   activeBorder: string;
+  readOnlyCellBackground?: string;
+  editableCellBackground?: string;
   cellPaddingX: number;
   rowHeaderWidth: number;
   colHeaderHeight: number;
@@ -35,6 +37,8 @@ export const defaultTheme: GridTheme = {
   selectionFill: 'rgba(37, 99, 235, 0.12)',
   selectionBorder: '#2563eb',
   activeBorder: '#2563eb',
+  readOnlyCellBackground: undefined,
+  editableCellBackground: undefined,
   cellPaddingX: 6,
   rowHeaderWidth: 48,
   colHeaderHeight: 24,
@@ -79,6 +83,8 @@ export function buildTheme(options: BuildThemeOptions = {}): GridTheme {
     colHeaderHeight: density.colHeaderHeight,
     defaultRowHeight: density.defaultRowHeight,
     defaultColWidth: density.defaultColWidth,
+    readOnlyCellBackground: undefined,
+    editableCellBackground: undefined,
     ...palette,
     ...options.overrides,
   };

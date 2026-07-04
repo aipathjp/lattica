@@ -297,6 +297,105 @@ describe('LatticaGrid editing', () => {
     fireEvent.blur(editor);
     expect(c.getDisplay(0, 0)).toBe('blurred');
   });
+
+  it('subscribes and unsubscribes onCellCommit', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    const onCellCommit = vi.fn();
+    const view = renderGrid(c, undefined, { onCellCommit });
+    c.beginEdit(0, 0, 'x');
+    c.commitEdit();
+    expect(onCellCommit).toHaveBeenCalledWith({
+      source: 'edit',
+      changes: [{ row: 0, col: 0, physicalRow: 0, physicalCol: 0, prev: '', next: 'x' }],
+    });
+    onCellCommit.mockClear();
+    view.rerender(<LatticaGrid controller={c} width={400} height={200} />);
+    c.beginEdit(0, 0, 'y');
+    c.commitEdit();
+    expect(onCellCommit).not.toHaveBeenCalled();
+  });
+
+  it('supports all, end, and preserve edit selection modes', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    c.setCellText(0, 0, 'abc');
+    const view = renderGrid(c, undefined, { editSelection: 'all' });
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.keyDown(grid, { key: 'F2' });
+    let editor = screen.getByTestId('lattica-editor') as HTMLTextAreaElement;
+    expect(editor.selectionStart).toBe(0);
+    expect(editor.selectionEnd).toBe(3);
+
+    fireEvent.keyDown(editor, { key: 'Escape' });
+    view.rerender(<LatticaGrid controller={c} width={400} height={200} editSelection="end" />);
+    fireEvent.keyDown(grid, { key: 'F2' });
+    editor = screen.getByTestId('lattica-editor') as HTMLTextAreaElement;
+    expect(editor.selectionStart).toBe(3);
+    expect(editor.selectionEnd).toBe(3);
+
+    fireEvent.keyDown(editor, { key: 'Escape' });
+    view.rerender(<LatticaGrid controller={c} width={400} height={200} editSelection="preserve" />);
+    const selectSpy = vi.spyOn(HTMLTextAreaElement.prototype, 'select');
+    const rangeSpy = vi.spyOn(HTMLTextAreaElement.prototype, 'setSelectionRange');
+    fireEvent.keyDown(grid, { key: 'F2' });
+    editor = screen.getByTestId('lattica-editor') as HTMLTextAreaElement;
+    expect(editor.value).toBe('abc');
+    expect(selectSpy).not.toHaveBeenCalled();
+    expect(rangeSpy).not.toHaveBeenCalled();
+    selectSpy.mockRestore();
+    rangeSpy.mockRestore();
+  });
+
+  it('skips the end selection range on date inputs (no selection API support)', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    c.setColumnType(0, 'date');
+    const rangeSpy = vi.spyOn(HTMLInputElement.prototype, 'setSelectionRange');
+    renderGrid(c, undefined, { editSelection: 'end' });
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    expect(screen.getByTestId('lattica-editor-date')).toBeTruthy();
+    expect(rangeSpy).not.toHaveBeenCalled();
+    rangeSpy.mockRestore();
+  });
+
+  it('places the caret at the end of text inputs (autocomplete) in end mode', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    c.setColumnType(0, 'autocomplete');
+    c.setColumnOptions(0, ['Alpha']);
+    c.setCellText(0, 0, 'Alpha');
+    renderGrid(c, undefined, { editSelection: 'end' });
+    fireEvent.keyDown(screen.getByTestId('lattica-grid'), { key: 'F2' });
+    const editor = screen.getByTestId('lattica-editor-autocomplete') as HTMLInputElement;
+    expect(editor.selectionStart).toBe(5);
+    expect(editor.selectionEnd).toBe(5);
+  });
+
+  it('focuses select editors without setting an end selection range', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    c.setColumnType(0, 'dropdown');
+    c.setColumnOptions(0, ['A']);
+    const rangeSpy = vi.spyOn(HTMLInputElement.prototype, 'setSelectionRange');
+    renderGrid(c, undefined, { editSelection: 'end' });
+    fireEvent.doubleClick(screen.getByTestId('lattica-grid'));
+    expect(screen.getByTestId('lattica-editor-select')).toBeTruthy();
+    expect(rangeSpy).not.toHaveBeenCalled();
+    rangeSpy.mockRestore();
+  });
+
+  it('uses read-only background tokens only when configured', () => {
+    const c = new GridController({ rowCount: 2, colCount: 2 });
+    const spy = vi.spyOn(c, 'isCellEditable');
+    const view = renderGrid(c);
+    expect(spy).not.toHaveBeenCalled();
+    c.setColumnEditable(0, false);
+    view.rerender(
+      <LatticaGrid
+        controller={c}
+        width={400}
+        height={200}
+        theme={{ readOnlyCellBackground: '#eeeeee' }}
+      />,
+    );
+    expect(spy).toHaveBeenCalled();
+  });
 });
 
 describe('LatticaGrid multi-level headers', () => {
