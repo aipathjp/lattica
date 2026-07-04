@@ -1522,3 +1522,42 @@ describe('display override', () => {
     expect(c.getDisplay(0, 0)).toBe('x');
   });
 });
+
+describe('GridController comments', () => {
+  it('sets, reads, and deletes comments, emitting change on mutations only', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    let changes = 0;
+    c.on('change', () => changes++);
+    c.setComment(1, 1, 'check this');
+    expect(changes).toBe(1);
+    expect(c.getComment(1, 1)).toBe('check this');
+    expect(c.hasComment(1, 1)).toBe(true);
+    expect(c.getComment(0, 0)).toBeNull();
+    expect(c.hasComment(0, 0)).toBe(false);
+    expect(c.deleteComment(1, 1)).toBe(true);
+    expect(changes).toBe(2);
+    expect(c.getComment(1, 1)).toBeNull();
+    // Deleting a missing comment is a no-op (no change event).
+    expect(c.deleteComment(1, 1)).toBe(false);
+    expect(changes).toBe(2);
+  });
+
+  it('removes a comment when set with empty text', () => {
+    const c = new GridController({ rowCount: 2, colCount: 1 });
+    c.setComment(0, 0, 'note');
+    c.setComment(0, 0, '   ');
+    expect(c.hasComment(0, 0)).toBe(false);
+  });
+
+  it('keys comments by physical cell so they follow sorted rows', () => {
+    const c = new GridController({ rowCount: 3, colCount: 1 });
+    c.setCellText(0, 0, '30');
+    c.setCellText(1, 0, '10');
+    c.setCellText(2, 0, '20');
+    c.setComment(0, 0, 'top'); // physical row 0 (value 30)
+    c.toggleSort(0); // asc: 10, 20, 30 → physical row 0 is now visual row 2
+    expect(c.getComment(2, 0)).toBe('top');
+    expect(c.hasComment(0, 0)).toBe(false);
+    expect(c.comments.list()).toEqual([{ row: 0, col: 0, text: 'top' }]);
+  });
+});

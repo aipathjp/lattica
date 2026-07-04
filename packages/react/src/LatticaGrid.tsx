@@ -118,7 +118,16 @@ export interface LatticaGridProps {
   }) => ReactNode;
   /** Called when the grid requests that the controlled cell overlay close. */
   onCellOverlayClose?: () => void;
+  /**
+   * Generic hover tooltip content for a (visual) cell. Return a string to show
+   * it in the shared tooltip overlay after the hover delay, or null for none.
+   * A cell comment (see `controller.setComment`) takes priority when both exist.
+   */
+  cellTooltip?: (row: number, col: number) => string | null;
 }
+
+/** Hover dwell time (ms) before the cell tooltip appears. */
+export const TOOLTIP_DELAY_MS = 500;
 
 export interface LatticaGridHandle {
   getCellClientRect(row: number, col: number): DOMRect | null;
@@ -175,6 +184,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     onCellOverlayClose,
     editors,
     displayValue,
+    cellTooltip,
   } = props;
   const theme = resolveTheme(props.theme);
   const autoSize = props.autoSize;
@@ -203,6 +213,8 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     startSize: number;
     physicalIndex: number;
   } | null>(null);
+  const hoverCellRef = useRef<{ row: number; col: number } | null>(null);
+  const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [scroll, setScroll] = useState<ScrollOffset>({ left: 0, top: 0 });
   const [edit, setEdit] = useState<EditState | null>(null);
@@ -210,6 +222,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   const [filterPanel, setFilterPanel] = useState<{ col: number; x: number; y: number } | null>(null);
   const [filterChecked, setFilterChecked] = useState<Set<string>>(new Set());
   const [measured, setMeasured] = useState<{ w: number; h: number } | null>(null);
+  const [tooltip, setTooltip] = useState<{ row: number; col: number; text: string } | null>(null);
   const [, force] = useReducer((n: number) => n + 1, 0);
 
   const headerModelRef = useRef<HeaderModel | null>(null);
@@ -447,9 +460,52 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       measureText: wrapEnabled ? canvasMeasurer(ctx) : undefined,
       font: `${theme.fontSize}px ${theme.fontFamily}`,
       wrapPaddingX: theme.cellPaddingX,
+      hasComment: (r, c) => controller.hasComment(r, c),
     });
     paintScene(ctx, scene, theme, { width, height, dpr });
   });
+
+  const clearTooltipTimer = useCallback(() => {
+    if (tooltipTimerRef.current !== null) {
+      clearTimeout(tooltipTimerRef.current);
+      tooltipTimerRef.current = null;
+    }
+  }, []);
+
+  // Cancel a pending tooltip timer on unmount.
+  useEffect(() => clearTooltipTimer, [clearTooltipTimer]);
+
+  /**
+   * Track the hovered cell and drive the shared tooltip overlay: entering a
+   * cell with content (comment first, then `cellTooltip`) schedules the
+   * tooltip after {@link TOOLTIP_DELAY_MS}; leaving hides it immediately.
+   * Moves within the same cell keep the pending timer / visible tooltip.
+   */
+  const updateHover = useCallback(
+    (cell: { row: number; col: number } | null) => {
+      const prev = hoverCellRef.current;
+      if (cell === null) {
+        hoverCellRef.current = null;
+        clearTooltipTimer();
+        setTooltip(null);
+        return;
+      }
+      if (prev !== null && prev.row === cell.row && prev.col === cell.col) {
+        return;
+      }
+      hoverCellRef.current = cell;
+      clearTooltipTimer();
+      setTooltip(null);
+      const text = controller.getComment(cell.row, cell.col) ?? cellTooltip?.(cell.row, cell.col) ?? null;
+      if (text !== null) {
+        tooltipTimerRef.current = setTimeout(() => {
+          tooltipTimerRef.current = null;
+          setTooltip({ row: cell.row, col: cell.col, text });
+        }, TOOLTIP_DELAY_MS);
+      }
+    },
+    [cellTooltip, clearTooltipTimer, controller],
+  );
 
   const ensureVisible = useCallback(() => {
     const { active } = controller.selection.getState();
@@ -646,12 +702,28 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
         return;
       }
 
-      // Idle hover: show a resize cursor when over a header border.
+      // Idle hover: show a resize cursor when over a header border, and drive
+      // the comment / custom cell tooltip for hovered body cells.
       const border = hitResizeHandle(geom, scroll.left, scroll.top, x, y);
       root.style.cursor = border === null ? '' : border.type === 'col' ? 'col-resize' : 'row-resize';
+      let hoverCell: { row: number; col: number } | null = null;
+      if (border === null) {
+        const edge = contentEdge();
+        if (x < edge.right && y < edge.bottom) {
+          const hit = hitTest(geom, scroll.left, scroll.top, x, y);
+          if (hit.region === 'cell') {
+            hoverCell = { row: hit.row, col: hit.col };
+          }
+        }
+      }
+      updateHover(hoverCell);
     },
-    [controller, geom, scroll],
+    [controller, geom, scroll, contentEdge, updateHover],
   );
+
+  const onMouseLeave = useCallback(() => {
+    updateHover(null);
+  }, [updateHover]);
 
   const onMouseUp = useCallback(() => {
     const resizing = resizeRef.current;
@@ -892,6 +964,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     cellOverlay !== null && cellOverlay !== undefined && renderCellOverlay !== undefined
       ? getVisibleCellRect(cellOverlay.row, cellOverlay.col)
       : null;
+  const tooltipRect = tooltip !== null ? getVisibleCellRect(tooltip.row, tooltip.col) : null;
 
   // Fill handle nub at the bottom-right corner of the selection (hidden while editing).
   const selBounds = controller.selection.getSelectionBounds();
@@ -1066,6 +1139,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       onKeyDown={onKeyDown}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
       onMouseUp={onMouseUp}
       onContextMenu={onContextMenu}
       onDoubleClick={onDoubleClick}
@@ -1351,6 +1425,33 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
             zIndex: 5,
           }}
         />
+      )}
+
+      {/* Hover tooltip (cell comment or `cellTooltip` content), below the cell. */}
+      {tooltip !== null && tooltipRect !== null && (
+        <div
+          role="tooltip"
+          data-testid="lattica-tooltip"
+          style={{
+            position: 'absolute',
+            left: tooltipRect.x,
+            top: tooltipRect.y + tooltipRect.height + 2,
+            zIndex: 12,
+            maxWidth: 280,
+            padding: '4px 8px',
+            boxSizing: 'border-box',
+            background: theme.background,
+            border: `1px solid ${theme.headerGridLineColor}`,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            fontFamily: theme.fontFamily,
+            fontSize: theme.fontSize,
+            color: theme.textColor,
+            whiteSpace: 'pre-wrap',
+            pointerEvents: 'none',
+          }}
+        >
+          {tooltip.text}
+        </div>
       )}
 
       {/* Context menu overlay. */}

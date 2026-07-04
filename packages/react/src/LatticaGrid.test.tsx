@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, waitFor, act } from '@testing-library/react';
 import { createRef } from 'react';
 import { LatticaGrid } from './LatticaGrid.js';
@@ -1763,5 +1763,137 @@ describe('displayValue prop', () => {
     expect(c.getDisplay(0, 0)).toBe('Z');
     unmount();
     expect(c.getDisplay(0, 0)).toBe('Z');
+  });
+});
+
+describe('LatticaGrid tooltips', () => {
+  // Default geometry: rowHeaderWidth 48, colHeaderHeight 24, rows 24px, cols 100px.
+  // Cell (0,0) spans x∈[48,148), y∈[24,48); cell (1,0) spans y∈[48,72).
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows a comment tooltip after the hover delay and hides it on an empty cell', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setComment(0, 0, '異常値検知');
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.mouseMove(grid, { clientX: 60, clientY: 30 });
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByTestId('lattica-tooltip').textContent).toBe('異常値検知');
+    // Moving to a cell without content hides it immediately.
+    fireEvent.mouseMove(grid, { clientX: 60, clientY: 54 });
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+
+  it('keeps the pending delay and visible tooltip while moving within the same cell', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setComment(0, 0, 'note');
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.mouseMove(grid, { clientX: 60, clientY: 30 });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    fireEvent.mouseMove(grid, { clientX: 100, clientY: 40 }); // same cell
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(screen.getByTestId('lattica-tooltip').textContent).toBe('note');
+    fireEvent.mouseMove(grid, { clientX: 120, clientY: 44 }); // still same cell
+    expect(screen.getByTestId('lattica-tooltip')).toBeTruthy();
+  });
+
+  it('renders generic cellTooltip content and prefers comments when both exist', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setComment(0, 0, 'comment wins');
+    renderGrid(c, undefined, {
+      cellTooltip: (row, col) => (row === 0 ? (col === 1 ? 'warn' : 'generic') : null),
+    });
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.mouseMove(grid, { clientX: 160, clientY: 30 }); // (0,1): cellTooltip only
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByTestId('lattica-tooltip').textContent).toBe('warn');
+    fireEvent.mouseMove(grid, { clientX: 60, clientY: 30 }); // (0,0): comment beats cellTooltip
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByTestId('lattica-tooltip').textContent).toBe('comment wins');
+    fireEvent.mouseMove(grid, { clientX: 160, clientY: 54 }); // (1,1): cellTooltip → null
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+
+  it('cancels a pending tooltip and hides a visible one when the pointer leaves', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setComment(0, 0, 'bye');
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.mouseMove(grid, { clientX: 60, clientY: 30 });
+    fireEvent.mouseLeave(grid);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+    fireEvent.mouseMove(grid, { clientX: 60, clientY: 30 });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByTestId('lattica-tooltip')).toBeTruthy();
+    fireEvent.mouseLeave(grid);
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+
+  it('ignores hover past the content edge, on headers, and on resize borders', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setComment(0, 0, 'never');
+    renderGrid(c); // content: right = 48+200 = 248, bottom = 24+72 = 96
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.mouseMove(grid, { clientX: 300, clientY: 30 }); // past the last column
+    fireEvent.mouseMove(grid, { clientX: 60, clientY: 150 }); // past the last row
+    fireEvent.mouseMove(grid, { clientX: 10, clientY: 40 }); // row-header gutter
+    fireEvent.mouseMove(grid, { clientX: 148, clientY: 10 }); // column resize border
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+
+  it('hides the tooltip element when the anchor cell scrolls out of view', () => {
+    const c = new GridController({ rowCount: 50, colCount: 2 });
+    c.setComment(0, 0, 'scrolled');
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    fireEvent.mouseMove(grid, { clientX: 60, clientY: 30 });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByTestId('lattica-tooltip')).toBeTruthy();
+    fireEvent.wheel(grid, { deltaX: 0, deltaY: 200 });
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+
+  it('clears a pending tooltip timer on unmount', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setComment(0, 0, 'pending');
+    const { unmount } = renderGrid(c);
+    fireEvent.mouseMove(screen.getByTestId('lattica-grid'), { clientX: 60, clientY: 30 });
+    unmount();
+    expect(() => {
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+    }).not.toThrow();
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
   });
 });

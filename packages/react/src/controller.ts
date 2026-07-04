@@ -17,6 +17,7 @@ import {
   MergeModel,
   ValidationModel,
   DetailModel,
+  CommentModel,
   validators,
   aggregate,
   distinctValues,
@@ -284,6 +285,8 @@ export class GridController {
   readonly merges = new MergeModel();
   /** Per-cell validation; invalid cells are tinted red. Keyed by physical coords. */
   readonly validation = new ValidationModel();
+  /** Cell comments (keyed by physical coords, like sparklines/validation). */
+  readonly comments = new CommentModel();
   /** Master/detail expansion state (physical row keys). */
   readonly details = new DetailModel();
   /** Extra height reserved below an expanded master row for its detail panel. */
@@ -365,6 +368,8 @@ export class GridController {
     });
     // Repaint when the invalid-cell set changes (validation runs on commit).
     this.validation.subscribe(() => this.emitter.emit('change', undefined));
+    // Repaint when comments change (corner marker + hover tooltip source).
+    this.comments.subscribe(() => this.emitter.emit('change', undefined));
     // Expanding/collapsing a detail panel changes row heights.
     this.details.subscribe(() => {
       this.rebuildViewSizes();
@@ -877,6 +882,34 @@ export class GridController {
       this.merges.remove(area.row, area.col);
       this.emitter.emit('change', undefined);
     }
+  }
+
+  // ── Cell comments (visual coordinates in, stored by physical cell) ─────────
+  /**
+   * Attach a comment to a (visual) cell. Empty or whitespace-only text removes
+   * any existing comment. Triggers a repaint via the comment subscription.
+   */
+  setComment(visualRow: number, visualCol: number, text: string): void {
+    const p = this.toPhysical(visualRow, visualCol);
+    this.comments.set(p.row, p.col, text);
+  }
+
+  /** The comment text of a (visual) cell, or null when none. */
+  getComment(visualRow: number, visualCol: number): string | null {
+    const p = this.toPhysical(visualRow, visualCol);
+    return this.comments.get(p.row, p.col);
+  }
+
+  /** Remove the comment of a (visual) cell. Returns whether one was removed. */
+  deleteComment(visualRow: number, visualCol: number): boolean {
+    const p = this.toPhysical(visualRow, visualCol);
+    return this.comments.remove(p.row, p.col);
+  }
+
+  /** Whether the (visual) cell has a comment attached. */
+  hasComment(visualRow: number, visualCol: number): boolean {
+    const p = this.toPhysical(visualRow, visualCol);
+    return this.comments.has(p.row, p.col);
   }
 
   // ── Nested rows (tree on physical rows; queries take visual rows) ──────────

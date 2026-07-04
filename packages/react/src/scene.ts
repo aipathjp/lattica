@@ -40,6 +40,8 @@ export interface CellPaint {
   /** Wrapped text lines for a wrap-enabled column. Present only when the text
    *  actually broke into 2+ lines; single-line text paints the normal path. */
   lines?: string[];
+  /** True when the cell has a comment (paints the top-right corner marker). */
+  comment?: boolean;
   /** True for pinned (frozen) rows/columns — painted last, over scrolled cells. */
   frozen?: boolean;
   /** True when pinned on both axes (the frozen corner) — painted last of all,
@@ -89,6 +91,8 @@ export interface BuildSceneParams {
   font?: string;
   /** Horizontal cell padding (per side) subtracted from the wrap width. */
   wrapPaddingX?: number;
+  /** Whether a cell has a comment attached (paints a corner marker). */
+  hasComment?: (row: number, col: number) => boolean;
 }
 
 /** Sum the sizes of `count` indices starting at `start`. */
@@ -190,6 +194,7 @@ export function buildScene(params: BuildSceneParams): Scene {
         bar: visual?.bar,
         icon: visual?.icon,
         sparkline: params.getSparkline?.(row, col, rect.width, rect.height) ?? undefined,
+        comment: params.hasComment?.(row, col) === true ? true : undefined,
         frozen: row < geom.frozenRows || col < geom.frozenCols,
         frozenCorner: row < geom.frozenRows && col < geom.frozenCols,
       };
