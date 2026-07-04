@@ -44,6 +44,9 @@ export interface CellPaint {
   lines?: string[];
   /** True when the cell has a comment (paints the top-right corner marker). */
   comment?: boolean;
+  /** Placeholder hint painted (muted) when the cell's display text is empty.
+   *  Display-only — never stored, copied, or used as the edit text. */
+  placeholder?: string;
   /** True for pinned (frozen) rows/columns — painted last, over scrolled cells. */
   frozen?: boolean;
   /** True when pinned on both axes (the frozen corner) — painted last of all,
@@ -108,6 +111,9 @@ export interface BuildSceneParams {
   wrapPaddingX?: number;
   /** Whether a cell has a comment attached (paints a corner marker). */
   hasComment?: (row: number, col: number) => boolean;
+  /** Placeholder hint for a cell (consulted only when the display text is
+   *  empty). Return undefined for none. */
+  getPlaceholder?: (row: number, col: number) => string | undefined;
   /** Display text for a pinned summary (footer) cell (optional). */
   getSummaryDisplay?: (summaryRow: number, col: number) => string;
   /** Suppress selection visuals: no selected/active flags, no activeRect. */
@@ -229,6 +235,13 @@ export function buildScene(params: BuildSceneParams): Scene {
         frozen: row < geom.frozenRows || col < geom.frozenCols,
         frozenCorner: row < geom.frozenRows && col < geom.frozenCols,
       };
+      // Placeholder hints apply only to empty cells (a display value wins).
+      if (params.getPlaceholder !== undefined && cell.text === '') {
+        const hint = params.getPlaceholder(row, col);
+        if (hint !== undefined) {
+          cell.placeholder = hint;
+        }
+      }
       // Wrap only the default text paint path (undefined type or 'text');
       // typed cells keep their renderer's single-line behavior.
       if (

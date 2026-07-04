@@ -2268,3 +2268,97 @@ describe('LatticaGrid context menu presets (P1-5)', () => {
     expect(screen.queryByTestId('lattica-menu')).toBeNull();
   });
 });
+
+describe('LatticaGrid empty-cell placeholders (P0-4)', () => {
+  /** fillText texts of the most recent paint (each paint starts with clearRect). */
+  const lastPaint = (calls: ReturnType<typeof createMockContext>['calls']): unknown[] => {
+    const lastClear = calls.map((k) => k.method).lastIndexOf('clearRect');
+    return calls.slice(lastClear + 1).filter((k) => k.method === 'fillText').map((k) => k.args[0]);
+  };
+
+  /** Render with a shared recording context; return the final paint's texts. */
+  const paintTexts = (run: () => void): unknown[] => {
+    const shared = createMockContext();
+    const spy = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation(() => shared as unknown as CanvasRenderingContext2D);
+    try {
+      run();
+      return lastPaint(shared.calls);
+    } finally {
+      spy.mockRestore();
+    }
+  };
+
+  it('paints the hint in empty cells and hides it behind values', () => {
+    const texts = paintTexts(() => {
+      const c = new GridController({ rowCount: 2, colCount: 2 });
+      c.setColumnPlaceholder(0, '0.00');
+      c.setCellText(0, 0, '12.5');
+      renderGrid(c);
+    });
+    expect(texts).toContain('0.00'); // empty (1,0) shows the hint
+    expect(texts).toContain('12.5'); // value cell shows the value…
+    expect(texts.filter((t) => t === '0.00').length).toBe(1); // …not the hint
+  });
+
+  it('hides the hint on read-only cells in the default editable mode', () => {
+    const texts = paintTexts(() => {
+      const c = new GridController({ rowCount: 2, colCount: 2 });
+      c.setColumnPlaceholder(0, '00:00');
+      c.setCellReadOnly(0, 0, true);
+      renderGrid(c);
+    });
+    expect(texts.filter((t) => t === '00:00').length).toBe(1); // only editable (1,0)
+  });
+
+  it('paints read-only cells too with placeholderMode="always"', () => {
+    const texts = paintTexts(() => {
+      const c = new GridController({ rowCount: 2, colCount: 2 });
+      c.setColumnPlaceholder(0, '00:00');
+      c.setCellReadOnly(0, 0, true);
+      renderGrid(c, undefined, { placeholderMode: 'always' });
+    });
+    expect(texts.filter((t) => t === '00:00').length).toBe(2);
+  });
+
+  it('suppresses the hint of the cell being edited (others keep theirs)', () => {
+    const shared = createMockContext();
+    const spy = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation(() => shared as unknown as CanvasRenderingContext2D);
+    try {
+      const c = new GridController({ rowCount: 2, colCount: 2 });
+      c.setColumnPlaceholder(0, 'YYYY-MM-DD');
+      renderGrid(c);
+      const hints = () => lastPaint(shared.calls).filter((t) => t === 'YYYY-MM-DD').length;
+      expect(hints()).toBe(2); // both empty cells show the hint
+      act(() => {
+        c.beginEdit(0, 0);
+      });
+      expect(hints()).toBe(1); // the repaint keeps only the non-edited row's hint
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('skips columns without a hint while another column has one', () => {
+    const texts = paintTexts(() => {
+      const c = new GridController({ rowCount: 1, colCount: 2 });
+      c.setColumnPlaceholder(1, '0.00');
+      renderGrid(c);
+    });
+    expect(texts.filter((t) => t === '0.00').length).toBe(1);
+  });
+
+  it('applies ColumnDef.placeholder through the columns prop', () => {
+    const texts = paintTexts(() => {
+      const c = new GridController({ rowCount: 1, colCount: 2 });
+      renderGrid(c, [
+        { headerName: 'Qty', field: 'qty', placeholder: '0.000' },
+        { headerName: 'Memo', field: 'memo' },
+      ]);
+    });
+    expect(texts.filter((t) => t === '0.000').length).toBe(1);
+  });
+});

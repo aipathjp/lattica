@@ -7,6 +7,9 @@ import { densityPresets, type Density, type DensityTokens } from './density.js';
 /** Default color of the cell-comment corner marker (Excel-like red). */
 export const DEFAULT_COMMENT_MARKER_COLOR = '#d64545';
 
+/** Default color of empty-cell placeholder hints (muted grey). */
+export const DEFAULT_PLACEHOLDER_COLOR = '#9aa5b1';
+
 export interface GridTheme {
   fontFamily: string;
   fontSize: number;
@@ -23,6 +26,9 @@ export interface GridTheme {
   editableCellBackground?: string;
   /** Color of the comment marker triangle in a cell's top-right corner. */
   commentMarkerColor?: string;
+  /** Color of empty-cell placeholder hints. Defaults to
+   *  {@link DEFAULT_PLACEHOLDER_COLOR}. */
+  placeholderColor?: string;
   /** Background of pinned summary (footer) rows; header background when unset. */
   summaryRowBackground?: string;
   /** Text color of pinned summary (footer) rows; the base text color when unset. */
@@ -67,6 +73,7 @@ export const defaultTheme: GridTheme = {
   readOnlyCellBackground: undefined,
   editableCellBackground: undefined,
   commentMarkerColor: DEFAULT_COMMENT_MARKER_COLOR,
+  placeholderColor: DEFAULT_PLACEHOLDER_COLOR,
   summaryRowBackground: undefined,
   summaryRowTextColor: undefined,
   cellPaddingX: 6,
@@ -120,6 +127,7 @@ export function buildTheme(options: BuildThemeOptions = {}): GridTheme {
     headerLineHeight: DEFAULT_HEADER_LINE_HEIGHT,
     headerPaddingY: DEFAULT_HEADER_PADDING_Y,
     commentMarkerColor: DEFAULT_COMMENT_MARKER_COLOR,
+    placeholderColor: DEFAULT_PLACEHOLDER_COLOR,
     summaryRowBackground: undefined,
     summaryRowTextColor: undefined,
     ...palette,

@@ -55,6 +55,12 @@ export interface ColumnDef {
   /** Wrap cell text onto multiple lines when it exceeds the column width. */
   readonly wrap?: boolean;
   /**
+   * Hint text painted (in a muted color) inside empty cells of this column,
+   * e.g. `"0.00"` / `"00:00"` / `"YYYY-MM-DD"`. Display-only: it is never
+   * stored, copied, or used as the edit text.
+   */
+  readonly placeholder?: string;
+  /**
    * Full-width (zenkaku) numeric input policy for `number`/`time` columns:
    * normalize to half-width (default), reject the commit, or leave as-is.
    */

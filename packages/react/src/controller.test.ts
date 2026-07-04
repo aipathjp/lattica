@@ -2136,3 +2136,46 @@ describe('empty commit stores null / zero display (P1-1b)', () => {
     expect(c.getDisplay(0, 0)).toBe('1,234.50');
   });
 });
+
+describe('column placeholders (P0-4)', () => {
+  it('sets, reads, and clears a placeholder hint, emitting change', () => {
+    const c = make();
+    const listener = vi.fn();
+    c.on('change', listener);
+    expect(c.getColumnPlaceholder(0)).toBeUndefined();
+    expect(c.hasPlaceholderColumns()).toBe(false);
+    c.setColumnPlaceholder(0, '0.00');
+    expect(c.getColumnPlaceholder(0)).toBe('0.00');
+    expect(c.hasPlaceholderColumns()).toBe(true);
+    c.setColumnPlaceholder(0, null);
+    expect(c.getColumnPlaceholder(0)).toBeUndefined();
+    expect(c.hasPlaceholderColumns()).toBe(false);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not affect stored values, edit text, or copy output', () => {
+    const c = make();
+    c.setColumnPlaceholder(0, 'YYYY-MM-DD');
+    expect(c.getValue(0, 0)).toBeNull();
+    expect(c.getDisplay(0, 0)).toBe('');
+    expect(c.getEditText(0, 0)).toBe('');
+    c.selection.setActive({ row: 0, col: 0 });
+    expect(c.copySelection()).toEqual([['']]);
+  });
+
+  it('reads by visual column after a column move', () => {
+    const c = make();
+    c.setColumnPlaceholder(0, '00:00'); // physical column 0
+    c.moveColumn(0, 2); // physical 0 now sits at visual 1 (before position 2)
+    expect(c.getColumnPlaceholder(1)).toBe('00:00');
+    expect(c.getColumnPlaceholder(0)).toBeUndefined();
+  });
+
+  it('applies placeholder from rich column definitions', () => {
+    const c = new GridController({ rowCount: 2, colCount: 2 });
+    c.applyColumnDefs([{ headerName: 'Qty', placeholder: '0.00' }, { headerName: 'Unset' }]);
+    expect(c.getColumnPlaceholder(0)).toBe('0.00');
+    expect(c.getColumnPlaceholder(1)).toBeUndefined();
+    expect(c.hasPlaceholderColumns()).toBe(true);
+  });
+});

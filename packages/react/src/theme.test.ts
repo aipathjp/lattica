@@ -6,6 +6,7 @@ import {
   DEFAULT_HEADER_LINE_HEIGHT,
   DEFAULT_HEADER_PADDING_Y,
   DEFAULT_COMMENT_MARKER_COLOR,
+  DEFAULT_PLACEHOLDER_COLOR,
 } from './theme.js';
 import { darkPalette } from './palette.js';
 import { compactDensity } from './density.js';
@@ -97,5 +98,18 @@ describe('summary row tokens', () => {
     const theme = buildTheme({ overrides: { summaryRowBackground: '#eef2ff', summaryRowTextColor: '#1e3a8a' } });
     expect(theme.summaryRowBackground).toBe('#eef2ff');
     expect(theme.summaryRowTextColor).toBe('#1e3a8a');
+  });
+});
+
+describe('placeholder color token (P0-4)', () => {
+  it('defaults to the muted grey in defaultTheme and buildTheme', () => {
+    expect(defaultTheme.placeholderColor).toBe(DEFAULT_PLACEHOLDER_COLOR);
+    expect(buildTheme().placeholderColor).toBe(DEFAULT_PLACEHOLDER_COLOR);
+    expect(DEFAULT_PLACEHOLDER_COLOR).toBe('#9aa5b1');
+  });
+
+  it('is overridable via buildTheme overrides and resolveTheme', () => {
+    expect(buildTheme({ overrides: { placeholderColor: '#666666' } }).placeholderColor).toBe('#666666');
+    expect(resolveTheme({ placeholderColor: '#777777' }).placeholderColor).toBe('#777777');
   });
 });

@@ -179,6 +179,14 @@ export interface LatticaGridProps {
    * A cell comment (see `controller.setComment`) takes priority when both exist.
    */
   cellTooltip?: (row: number, col: number) => string | null;
+  /**
+   * When empty-cell placeholder hints are shown (see
+   * `controller.setColumnPlaceholder` / `ColumnDef.placeholder`):
+   * `'editable'` (default) paints them only in cells the user can edit;
+   * `'always'` paints them in read-only cells too. The cell being edited
+   * never shows its placeholder.
+   */
+  placeholderMode?: 'editable' | 'always';
 }
 
 /** Hover dwell time (ms) before the cell tooltip appears. */
@@ -255,6 +263,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   const filterable = props.filterable ?? true;
   const showFilterIcons = props.showFilterIcons ?? true;
   const editSelection = props.editSelection ?? 'all';
+  const placeholderMode = props.placeholderMode ?? 'editable';
   // Behavior options: an explicit prop wins, then the controller option.
   const enterMoves = props.enterMoves ?? controller.enterMoves;
   const enterBeginsEditing = props.enterBeginsEditing ?? controller.enterBeginsEditing;
@@ -559,6 +568,24 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     // Wrap wiring is only assembled when a wrap column exists — otherwise the
     // scene builder sees no wrap accessor and pays zero extra cost per cell.
     const wrapEnabled = controller.hasWrapColumns();
+    // Placeholder wiring is likewise assembled only when a column declares a
+    // hint. The cell being edited never shows its placeholder, and in
+    // 'editable' mode (the default) read-only cells hide theirs too.
+    const getPlaceholder = controller.hasPlaceholderColumns()
+      ? (r: number, c: number): string | undefined => {
+          if (edit !== null && edit.row === r && edit.col === c) {
+            return undefined;
+          }
+          const hint = controller.getColumnPlaceholder(c);
+          if (hint === undefined) {
+            return undefined;
+          }
+          if (placeholderMode === 'editable' && !controller.isCellEditable(r, c)) {
+            return undefined;
+          }
+          return hint;
+        }
+      : undefined;
     const scene = buildScene({
       geom,
       scrollLeft: scroll.left,
@@ -581,6 +608,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       font: `${theme.fontSize}px ${theme.fontFamily}`,
       wrapPaddingX: theme.cellPaddingX,
       hasComment: (r, c) => controller.hasComment(r, c),
+      getPlaceholder,
       getSummaryDisplay: (s, c) => controller.getSummaryDisplay(s, c),
       hideSelection: selectionHidden,
     });
