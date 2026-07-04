@@ -55,6 +55,7 @@ import { columnHeaderCells, computeHeaderRowHeights, rowHeaderCells } from './he
 import type { EditorRegistry } from './editors.js';
 import { buildMenu, type MenuItem, type MenuItemSpec } from './menu.js';
 import { hitResizeHandle, type ResizeTarget } from './resize.js';
+import { registerGridInstance } from './grid-registry.js';
 
 /**
  * Built-in context-menu presets:
@@ -214,6 +215,10 @@ export interface LatticaGridHandle {
   getCellClientRect(row: number, col: number): DOMRect | null;
   focus(): void;
   scrollCellIntoView(row: number, col: number): void;
+  /** Commit the in-flight edit through the normal commit path; true if one existed. */
+  commitEditing(): boolean;
+  /** Cancel the in-flight edit (discarding the draft); true if one existed. */
+  cancelEditing(): boolean;
 }
 
 interface MenuState {
@@ -430,6 +435,31 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     };
   }, [controller]);
 
+  // External edit control: force-commit / cancel the in-flight edit through
+  // the controller's normal edit lifecycle (the DOM editor keeps the draft in
+  // sync via updateDraft, so no editor read-back is needed here).
+  const commitEditing = useCallback((): boolean => {
+    if (controller.getEdit() === null) {
+      return false;
+    }
+    controller.commitEdit();
+    return true;
+  }, [controller]);
+  const cancelEditing = useCallback((): boolean => {
+    if (controller.getEdit() === null) {
+      return false;
+    }
+    controller.cancelEdit();
+    return true;
+  }, [controller]);
+
+  // While mounted, expose commit/cancel to the module-level grid registry so
+  // commitAllEditing()/cancelAllEditing() can reach every live grid.
+  useEffect(
+    () => registerGridInstance({ commit: commitEditing, cancel: cancelEditing }),
+    [commitEditing, cancelEditing],
+  );
+
   // Any selection activity (mouse, keyboard, or programmatic) re-shows it.
   useEffect(() => controller.selection.subscribe(() => setDeselected(false)), [controller]);
 
@@ -554,8 +584,10 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
         }
         setScroll((prev) => scrollToCell(geom, prev, width, height, row, col));
       },
+      commitEditing,
+      cancelEditing,
     }),
-    [controller, geom, getVisibleCellRect, height, width],
+    [controller, geom, getVisibleCellRect, height, width, commitEditing, cancelEditing],
   );
 
   // Paint on every render (cheap: only visible cells).
