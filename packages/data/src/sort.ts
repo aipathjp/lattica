@@ -200,6 +200,12 @@ export class SortModel {
     return this.configs.map((c) => ({ ...c }));
   }
 
+  /** Replace the active sort configs, in priority order. */
+  setConfigs(configs: SortConfig[]): void {
+    this.configs = configs.map((c) => ({ ...c }));
+    this.emit();
+  }
+
   /** Remove all sort configs. */
   clear(): void {
     this.configs = [];

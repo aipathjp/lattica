@@ -927,3 +927,40 @@ describe('LatticaGrid frozen header z-order', () => {
     expect(lastRow.style.background).not.toBe('');
   });
 });
+
+describe('LatticaGrid view-state callbacks', () => {
+  it('fires onColumnResize only when a column drag changes width', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    const onColumnResize = vi.fn();
+    renderGrid(c, undefined, { onColumnResize });
+    const grid = screen.getByTestId('lattica-grid');
+
+    fireEvent.mouseDown(grid, { clientX: 148, clientY: 10 });
+    fireEvent.mouseMove(grid, { clientX: 168, clientY: 10 });
+    fireEvent.mouseUp(grid);
+    expect(onColumnResize).toHaveBeenCalledTimes(1);
+    expect(onColumnResize).toHaveBeenCalledWith({ col: 0, physicalCol: 0, width: 120 });
+
+    fireEvent.mouseDown(grid, { clientX: 168, clientY: 10 });
+    fireEvent.mouseUp(grid);
+    expect(onColumnResize).toHaveBeenCalledTimes(1);
+  });
+
+  it('subscribes onViewStateChange and unsubscribes on unmount', () => {
+    const c = new GridController({ rowCount: 10, colCount: 5 });
+    const onViewStateChange = vi.fn();
+    const { unmount } = renderGrid(c, undefined, { onViewStateChange });
+    act(() => {
+      c.resizeCol(0, 130);
+    });
+    expect(onViewStateChange).toHaveBeenCalledWith({
+      version: 1,
+      columnWidths: { 0: 130 },
+    });
+    unmount();
+    act(() => {
+      c.resizeCol(1, 140);
+    });
+    expect(onViewStateChange).toHaveBeenCalledTimes(1);
+  });
+});

@@ -21,7 +21,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react';
-import { HeaderModel, type ColumnNode } from '@ai-path/lattica-core';
+import { HeaderModel, type ColumnNode, type GridStateSnapshot } from '@ai-path/lattica-core';
 import type { GridController, EditState } from './controller.js';
 import { resolveTheme, type GridTheme } from './theme.js';
 import { buildScene } from './scene.js';
@@ -65,6 +65,10 @@ export interface LatticaGridProps {
   onCellClick?: (hit: { row: number; col: number }, event: ReactMouseEvent<HTMLDivElement>) => void;
   /** スクロール位置が変わったとき */
   onScrollChange?: (scroll: ScrollOffset) => void;
+  /** Fired once a column-border drag is committed and the width actually changed. */
+  onColumnResize?: (change: { col: number; physicalCol: number; width: number }) => void;
+  /** Fired when controller view state changes through user-facing view operations. */
+  onViewStateChange?: (snapshot: GridStateSnapshot) => void;
 }
 
 interface MenuState {
@@ -78,7 +82,7 @@ function effectiveGeometry(geom: GridGeometry, showRowNumbers: boolean): GridGeo
 }
 
 export function LatticaGrid(props: LatticaGridProps): ReactElement {
-  const { controller, columns, onCellClick, onScrollChange } = props;
+  const { controller, columns, onCellClick, onScrollChange, onColumnResize, onViewStateChange } = props;
   const theme = resolveTheme(props.theme);
   const fill = props.fill ?? false;
   const fixedWidth = props.width ?? 640;
@@ -96,7 +100,12 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   const draggingRef = useRef(false);
   const fillDraggingRef = useRef(false);
   const fillTargetRef = useRef<{ row: number; col: number } | null>(null);
-  const resizeRef = useRef<{ target: ResizeTarget; start: number; startSize: number } | null>(null);
+  const resizeRef = useRef<{
+    target: ResizeTarget;
+    start: number;
+    startSize: number;
+    physicalIndex: number;
+  } | null>(null);
 
   const [scroll, setScroll] = useState<ScrollOffset>({ left: 0, top: 0 });
   const [edit, setEdit] = useState<EditState | null>(null);
@@ -141,6 +150,13 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       offEdit();
     };
   }, [controller]);
+
+  useEffect(() => {
+    if (onViewStateChange === undefined) {
+      return;
+    }
+    return controller.on('viewstate', onViewStateChange);
+  }, [controller, onViewStateChange]);
 
   // Focus the editor when an edit begins. `<select>` has no select() method.
   useEffect(() => {
@@ -295,9 +311,13 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       if (border !== null) {
         const startSize =
           border.type === 'col'
-            ? controller.colSizes.getSize(border.index)
-            : controller.rowSizes.getSize(border.index);
-        resizeRef.current = { target: border, start: border.type === 'col' ? x : y, startSize };
+            ? controller.getColumnWidth(border.index)
+            : controller.getRowHeight(border.index);
+        const physicalIndex =
+          border.type === 'col'
+            ? controller.getPhysicalCol(border.index)
+            : controller.getPhysicalRow(border.index);
+        resizeRef.current = { target: border, start: border.type === 'col' ? x : y, startSize, physicalIndex };
         root.focus();
         return;
       }
@@ -381,14 +401,25 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   );
 
   const onMouseUp = useCallback(() => {
+    const resizing = resizeRef.current;
     if (fillDraggingRef.current && fillTargetRef.current !== null) {
       controller.fillTo(fillTargetRef.current.row, fillTargetRef.current.col);
+    }
+    if (resizing !== null && resizing.target.type === 'col') {
+      const width = controller.getColumnWidth(resizing.target.index);
+      if (width !== resizing.startSize) {
+        onColumnResize?.({
+          col: resizing.target.index,
+          physicalCol: resizing.physicalIndex,
+          width,
+        });
+      }
     }
     fillDraggingRef.current = false;
     fillTargetRef.current = null;
     draggingRef.current = false;
     resizeRef.current = null;
-  }, [controller]);
+  }, [controller, onColumnResize]);
 
   const openFilterPanel = useCallback(
     (col: number, x: number, y: number): void => {

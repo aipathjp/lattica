@@ -105,6 +105,11 @@ export class IndexMapper {
     return [...this.visibleToPhysical];
   }
 
+  /** Physical indices in visual order, including hidden ones. */
+  getOrder(): number[] {
+    return [...this.order];
+  }
+
   /**
    * Reorder a run of `count` visible items starting at visual position
    * `fromVisual` so it sits before visual position `toVisual`. Operates in

@@ -261,6 +261,19 @@ describe('SortModel', () => {
     });
   });
 
+  describe('setConfigs', () => {
+    it('replaces configs, stores copies, and notifies', () => {
+      const m = new SortModel();
+      const listener = vi.fn();
+      const cfgs = [{ col: 2, direction: 'desc' as const }];
+      m.subscribe(listener);
+      m.setConfigs(cfgs);
+      cfgs[0]!.col = 9;
+      expect(m.getConfigs()).toEqual([{ col: 2, direction: 'desc' }]);
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('apply', () => {
     it('returns identity when no configs', () => {
       const m = new SortModel();

@@ -56,6 +56,10 @@
 凡例: ✅完了 / 🚧進行中 / ⏳未着手
 
 ## 変更履歴
+- 2026-07-04: **View-state persistence 結線**。
+  - `SizeManager.getOverrides()` と `IndexMapper.getOrder()` を追加し、サイズ上書き・非表示・列順を物理 index ベースで snapshot 化可能にした。
+  - `GridController.captureViewState()` / `applyViewState()` と `viewstate` イベントを追加。列幅・行高・非表示列/行・列順・ソート・固定行列を保存/復元できるようにした。
+  - `<LatticaGrid>` に `onColumnResize` / `onViewStateChange` props を追加し、Freeze & Resize デモで localStorage 永続化と Reset saved view を結線。
 - 2026-06-06: 進捗報告書作成。100% カバレッジ基準を確立。Wave 0（Phase 1/9/11/12 の追加的モジュール）に着手。
 - 2026-06-06: **Wave 0 完了**（マルチエージェント・ハーネス: 実装4＋レビュー4 = 10エージェント並列）。
   - Phase 1 完了: `@ai-path/lattica-data`（IndexMapper・DataSource）新規パッケージ。

@@ -188,6 +188,8 @@ describe('resizing', () => {
     c.resizeCol(0, 200);
     expect(c.rowSizes.getSize(0)).toBe(40);
     expect(c.colSizes.getSize(0)).toBe(200);
+    expect(c.getRowHeight(0)).toBe(40);
+    expect(c.getColumnWidth(0)).toBe(200);
     expect(listener).toHaveBeenCalledTimes(2);
   });
 });
@@ -616,6 +618,12 @@ describe('Phase B — column ops, facets, aggregation, replace', () => {
     expect(c.getDisplay(0, 2)).toBe('30');
   });
 
+  it('reports the physical column behind a visual column', () => {
+    const c = make();
+    c.moveColumn(0, 2);
+    expect(c.getPhysicalCol(0)).toBe(1);
+  });
+
   it('computes column facets (distinct labels sorted)', () => {
     const c = make();
     seedCol(c, 0, ['b', 'a', 'b', 'c', 'a']);
@@ -902,5 +910,123 @@ describe('parseNumberInput / formatted input', () => {
     c.setCellText(0, 0, '50%');
     expect(c.getValue(0, 0)).toBe(0.5);
     expect(c.getDisplay(0, 0)).toBe('50.0%');
+  });
+});
+
+describe('view-state persistence', () => {
+  const seed = (c: GridController) => {
+    c.setCellText(0, 0, '3');
+    c.setCellText(1, 0, '1');
+    c.setCellText(2, 0, '2');
+    c.setCellText(0, 1, 'A');
+    c.setCellText(1, 1, 'B');
+    c.setCellText(2, 1, 'C');
+  };
+
+  it('captures resize, hide, move, sort, and frozen state in physical coordinates', () => {
+    const c = new GridController({ rowCount: 4, colCount: 4 });
+    seed(c);
+    c.resizeCol(1, 140);
+    c.resizeRow(2, 36);
+    c.moveColumn(0, 3);
+    c.hideColumn(1); // visual 1 is physical 2 after the move
+    c.toggleSort(1); // visual 1 is physical 3 after hiding physical 2
+    c.frozenRows = 1;
+    c.frozenCols = 2;
+    expect(c.captureViewState()).toEqual({
+      version: 1,
+      columnWidths: { 1: 140 },
+      rowHeights: { 2: 36 },
+      hiddenColumns: [2],
+      columnOrder: [1, 2, 0, 3],
+      sort: [{ col: 0, direction: 'asc' }],
+      frozenRows: 1,
+      frozenCols: 2,
+    });
+  });
+
+  it('applies captured state and round-trips it', () => {
+    const source = new GridController({ rowCount: 4, colCount: 4 });
+    seed(source);
+    source.resizeCol(1, 140);
+    source.resizeRow(2, 36);
+    source.moveColumn(0, 3);
+    source.hideColumn(1);
+    source.toggleSort(1);
+    source.frozenRows = 1;
+    source.frozenCols = 2;
+    const snapshot = source.captureViewState();
+
+    const restored = new GridController({ rowCount: 4, colCount: 4 });
+    seed(restored);
+    restored.applyViewState(snapshot);
+
+    expect(restored.captureViewState()).toEqual(snapshot);
+    expect(restored.getColumnWidth(restored.view.cols.getVisualIndex(1))).toBe(140);
+    expect(restored.getRowHeight(restored.view.rows.getVisualIndex(2))).toBe(36);
+    expect(restored.isColumnHidden(2)).toBe(true);
+    expect(restored.geometry().frozenRows).toBe(1);
+    expect(restored.geometry().frozenCols).toBe(2);
+  });
+
+  it('ignores out-of-range snapshot entries', () => {
+    const c = new GridController({ rowCount: 2, colCount: 2 });
+    expect(() =>
+      c.applyViewState({
+        version: 1,
+        columnWidths: { 0: 120, 99: 300 },
+        rowHeights: { 1: 30, 42: 90 },
+        hiddenColumns: [1, 9],
+        hiddenRows: [0, 7],
+        columnOrder: [9, 1],
+        sort: [{ col: 8, direction: 'asc' }],
+        frozenRows: 99,
+        frozenCols: 99,
+      }),
+    ).not.toThrow();
+    expect(c.getColumnWidth(0)).toBe(120);
+    expect(c.getRowHeight(0)).toBe(30);
+    expect(c.getColCount()).toBe(1);
+    expect(c.getRowCount()).toBe(1);
+    expect(c.captureViewState().columnOrder).toEqual([1, 0]);
+    expect(c.captureViewState().sort).toBeUndefined();
+    expect(c.geometry().frozenRows).toBe(2);
+    expect(c.geometry().frozenCols).toBe(2);
+  });
+
+  it('emits viewstate for user view operations but not applyViewState', () => {
+    const c = new GridController({ rowCount: 4, colCount: 4 });
+    const listener = vi.fn();
+    c.on('viewstate', listener);
+    c.resizeCol(0, 120);
+    c.resizeRow(0, 30);
+    c.hideColumn(0);
+    c.showColumn(0);
+    c.hideColumn(0);
+    c.showAllColumns();
+    c.moveColumn(0, 2);
+    c.toggleSort(0);
+    c.clearView();
+    expect(listener).toHaveBeenCalledTimes(9);
+    c.applyViewState({ version: 1, columnWidths: { 1: 130 } });
+    expect(listener).toHaveBeenCalledTimes(9);
+  });
+
+  it('uses present empty fields to reset that slice while omitted fields layer over prior state', () => {
+    const c = new GridController({ rowCount: 3, colCount: 3 });
+    c.resizeCol(0, 120);
+    c.resizeRow(0, 32);
+    c.hideColumn(1);
+    c.moveColumn(0, 2);
+    c.toggleSort(0);
+    c.applyViewState({ version: 1, columnWidths: {}, rowHeights: {} });
+    expect(c.getColumnWidth(c.view.cols.getVisualIndex(0))).toBe(100);
+    expect(c.getRowHeight(0)).toBe(24);
+    expect(c.isColumnHidden(1)).toBe(true);
+    expect(c.captureViewState().sort).toEqual([{ col: 2, direction: 'asc' }]);
+    c.applyViewState({ version: 1, hiddenColumns: [], columnOrder: [0, 1, 2], sort: [] });
+    expect(c.getColCount()).toBe(3);
+    expect(c.captureViewState().columnOrder).toBeUndefined();
+    expect(c.captureViewState().sort).toBeUndefined();
   });
 });
