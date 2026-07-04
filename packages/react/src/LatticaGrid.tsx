@@ -96,6 +96,17 @@ export interface LatticaGridProps {
    *  parent however you like — e.g. `width:100%; height:100vh`. Ignored when
    *  `autoSize` is set. */
   fill?: boolean;
+  /**
+   * Show every row: the grid's height becomes header + all rows + summary
+   * band, vertical virtualization is bypassed, and there is no internal
+   * vertical scrolling — wheel/keyboard vertical scrolling passes through to
+   * the page. Horizontal scrolling is unchanged. Height follows row-count and
+   * row-height changes automatically. Overrides `height` (and the vertical
+   * half of `fill`); ignored when `autoSize` is set. Intended for
+   * report-style grids of at most a few hundred rows — every row is painted,
+   * so very large grids are the caller's performance responsibility.
+   */
+  autoHeight?: boolean;
   className?: string;
   style?: CSSProperties;
   /**
@@ -309,6 +320,9 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   const theme = resolveTheme(props.theme);
   const autoSize = props.autoSize;
   const fill = props.fill ?? false;
+  // autoHeight (all rows shown, page owns vertical scrolling) is meaningless
+  // under autoSize='content', which already sizes to the full content height.
+  const autoHeight = (props.autoHeight ?? false) && autoSize !== 'content';
   const fixedWidth = props.width ?? 640;
   const fixedHeight = props.height ?? 400;
   const showRowNumbers = props.showRowNumbers ?? true;
@@ -393,12 +407,18 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       : fill && measured !== null
         ? measured.w
         : fixedWidth;
+  // autoHeight pins the client height to the full content height. That single
+  // equality makes the pure modules do the rest: `maxScroll` yields maxTop=0
+  // (every scroll clamp keeps top at 0) and `computeVisibleWindow` covers all
+  // rows (vertical virtualization is naturally bypassed).
   const height =
     autoSize === 'content'
       ? clampAutoSize(contentHeight, props.maxHeight)
-      : fill && measured !== null
-        ? measured.h
-        : fixedHeight;
+      : autoHeight
+        ? contentHeight
+        : fill && measured !== null
+          ? measured.h
+          : fixedHeight;
 
   const getVisibleCellRect = useCallback(
     (row: number, col: number): { x: number; y: number; width: number; height: number } | null => {
@@ -410,6 +430,15 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     },
     [controller, geom, height, scroll.left, scroll.top, width],
   );
+
+  // autoHeight owns no vertical offset: clear any scroll top inherited from a
+  // scrolled fixed-height session so row 0 sits right under the header again.
+  useEffect(() => {
+    if (!autoHeight) {
+      return;
+    }
+    setScroll((prev) => (prev.top === 0 ? prev : { left: prev.left, top: 0 }));
+  }, [autoHeight]);
 
   // Measure the container when filling, so the canvas matches its parent.
   useEffect(() => {
@@ -1270,16 +1299,19 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
 
   const onWheel = useCallback(
     (e: ReactWheelEvent<HTMLDivElement>) => {
+      // autoHeight: the vertical delta belongs to the outer page — leave it
+      // unconsumed (and never preventDefault) so the page scrolls; horizontal
+      // wheel scrolling stays internal as usual.
       setScroll((prev) =>
         clampScroll(
           geom,
-          { left: prev.left + e.deltaX, top: prev.top + e.deltaY },
+          { left: prev.left + e.deltaX, top: autoHeight ? prev.top : prev.top + e.deltaY },
           width,
           height,
         ),
       );
     },
-    [geom, width, height],
+    [geom, width, height, autoHeight],
   );
 
   const scene = buildScene({
@@ -1569,7 +1601,9 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       style={{
         position: 'relative',
         width: autoSize !== 'content' && fill ? '100%' : width,
-        height: autoSize !== 'content' && fill ? '100%' : height,
+        // autoHeight always uses the computed pixel height (all rows), even
+        // when `fill` still drives the width from the parent element.
+        height: autoSize !== 'content' && fill && !autoHeight ? '100%' : height,
         overflow: 'hidden',
         outline: 'none',
         background: theme.background,

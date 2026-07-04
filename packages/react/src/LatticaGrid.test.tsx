@@ -2798,3 +2798,140 @@ describe('LatticaGrid onLayoutChange', () => {
     expect(onLayoutChange).not.toHaveBeenCalled();
   });
 });
+
+describe('LatticaGrid autoHeight', () => {
+  it('sizes the grid to header + all rows and renders every row (no vertical virtualization)', () => {
+    const c = new GridController({ rowCount: 40, colCount: 3 });
+    render(<LatticaGrid controller={c} autoHeight width={400} height={200} />);
+    const root = screen.getByTestId('lattica-grid');
+    const canvas = root.querySelector('canvas')!;
+    // Header (24) + 40 rows × 24 = 984; the fixed width still applies.
+    expect(root.style.width).toBe('400px');
+    expect(root.style.height).toBe('984px');
+    expect(canvas.style.height).toBe('984px');
+    // All 40 gutter rows exist — none were virtualized away.
+    const rowHeaders = screen.getAllByRole('rowheader');
+    expect(rowHeaders).toHaveLength(40);
+    expect(rowHeaders.some((h) => h.textContent === '40')).toBe(true);
+  });
+
+  it('includes the summary band and follows row count / row height changes', async () => {
+    const c = new GridController({ rowCount: 4, colCount: 2 });
+    renderGrid(c, undefined, { autoHeight: true, summaryRows: [{ cells: { 1: 'sum' } }] });
+    const root = screen.getByTestId('lattica-grid');
+    // Header 24 + 4×24 rows + one 24px summary row.
+    await waitFor(() => expect(root.style.height).toBe('144px'));
+    act(() => c.setRowCount(6));
+    expect(root.style.height).toBe('192px');
+    act(() => c.resizeRow(0, 48)); // e.g. what autoSizeRows does per row
+    expect(root.style.height).toBe('216px');
+  });
+
+  it('autoSize="content" wins over autoHeight (clamping stays possible)', () => {
+    const c = new GridController({ rowCount: 5, colCount: 2 });
+    render(<LatticaGrid controller={c} autoSize="content" autoHeight maxHeight={50} />);
+    // autoHeight would forbid clamping; autoSize='content' + maxHeight clamps.
+    expect(screen.getByTestId('lattica-grid').style.height).toBe('50px');
+  });
+
+  it('keeps the pixel height while fill drives the width', () => {
+    let cb: ((entries: { contentRect: { width: number; height: number } }[]) => void) | null = null;
+    class MockRO {
+      constructor(handler: typeof cb) {
+        cb = handler;
+      }
+      observe(): void {}
+      disconnect(): void {}
+    }
+    const prev = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = MockRO as unknown;
+    try {
+      const c = new GridController({ rowCount: 2, colCount: 2 });
+      render(<LatticaGrid controller={c} fill autoHeight />);
+      const root = screen.getByTestId('lattica-grid');
+      expect(root.style.width).toBe('100%');
+      expect(root.style.height).toBe('72px'); // 24 + 2×24, not '100%'
+      act(() => cb!([{ contentRect: { width: 800, height: 600 } }]));
+      const canvas = root.querySelector('canvas')!;
+      expect(canvas.style.width).toBe('800px'); // width follows the parent
+      expect(canvas.style.height).toBe('72px'); // height stays content-sized
+    } finally {
+      (globalThis as { ResizeObserver?: unknown }).ResizeObserver = prev;
+    }
+  });
+
+  it('passes vertical wheel scrolling through to the page; horizontal stays internal', () => {
+    const c = new GridController({ rowCount: 10, colCount: 10 });
+    const onScrollChange = vi.fn();
+    render(<LatticaGrid controller={c} autoHeight width={400} onScrollChange={onScrollChange} />);
+    const grid = screen.getByTestId('lattica-grid');
+    // Not cancelled: the outer page receives the vertical wheel untouched.
+    expect(fireEvent.wheel(grid, { deltaY: 300 })).toBe(true);
+    expect(onScrollChange.mock.calls.at(-1)?.[0]).toEqual({ left: 0, top: 0 });
+    fireEvent.wheel(grid, { deltaX: 120, deltaY: 500 });
+    expect(onScrollChange.mock.calls.at(-1)?.[0]).toEqual({ left: 120, top: 0 });
+  });
+
+  it('keyboard navigation to the last row never scrolls vertically', () => {
+    const c = new GridController({ rowCount: 30, colCount: 2 });
+    const onScrollChange = vi.fn();
+    render(<LatticaGrid controller={c} autoHeight width={300} onScrollChange={onScrollChange} />);
+    const grid = screen.getByTestId('lattica-grid');
+    act(() => c.selection.setActive({ row: 28, col: 0 }));
+    fireEvent.keyDown(grid, { key: 'ArrowDown' });
+    expect(c.selection.getState().active).toEqual({ row: 29, col: 0 });
+    expect(onScrollChange.mock.calls.at(-1)?.[0]).toEqual({ left: 0, top: 0 });
+  });
+
+  it('selects, edits, and fill-drags on rows far below a fixed-height viewport', () => {
+    const c = new GridController({ rowCount: 30, colCount: 3 });
+    c.setCellText(20, 0, '1');
+    c.setCellText(21, 0, '2');
+    render(<LatticaGrid controller={c} autoHeight width={400} />);
+    const grid = screen.getByTestId('lattica-grid');
+    // Row 25 body: y = 24 + 25×24 = 624 (outside any fixed 200px viewport).
+    fireEvent.mouseDown(grid, { clientX: 60, clientY: 630 });
+    fireEvent.mouseUp(grid);
+    expect(c.selection.getState().active).toEqual({ row: 25, col: 0 });
+    fireEvent.doubleClick(grid, { clientX: 60, clientY: 630 });
+    const editor = screen.getByTestId('lattica-editor');
+    expect(editor.style.top).toBe('624px'); // editor overlays the true cell rect
+    fireEvent.keyDown(editor, { key: 'Escape' });
+    // Fill handle: select 1,2 in rows 20:21 and drag the nub down to row 24.
+    act(() => {
+      c.selection.setActive({ row: 20, col: 0 });
+      c.selection.extendTo({ row: 21, col: 0 });
+    });
+    fireEvent.mouseDown(screen.getByTestId('lattica-fill-handle'));
+    fireEvent.mouseMove(grid, { clientX: 60, clientY: 24 + 24 * 24 + 10 }); // row 24
+    fireEvent.mouseUp(grid);
+    expect(c.getDisplay(24, 0)).toBe('5');
+  });
+
+  it('coexists with frozen rows/cols without duplicating rows', () => {
+    const c = new GridController({ rowCount: 12, colCount: 6, frozenRows: 2, frozenCols: 1 });
+    render(<LatticaGrid controller={c} autoHeight width={300} />);
+    const root = screen.getByTestId('lattica-grid');
+    expect(root.style.height).toBe(`${24 + 12 * 24}px`);
+    expect(screen.getAllByRole('rowheader')).toHaveLength(12);
+    // Horizontal scroll keeps the frozen column pinned on top; deltaY passes.
+    fireEvent.wheel(root, { deltaX: 150, deltaY: 150 });
+    const colHeaders = screen.getAllByRole('columnheader');
+    expect(colHeaders[colHeaders.length - 1]!.textContent).toContain('A');
+  });
+
+  it('clears an inherited vertical scroll offset when autoHeight turns on', async () => {
+    const c = new GridController({ rowCount: 40, colCount: 2 });
+    const onScrollChange = vi.fn();
+    const { rerender } = render(
+      <LatticaGrid controller={c} width={300} height={120} onScrollChange={onScrollChange} />,
+    );
+    fireEvent.wheel(screen.getByTestId('lattica-grid'), { deltaY: 200 });
+    expect((onScrollChange.mock.calls.at(-1)?.[0] as { top: number }).top).toBeGreaterThan(0);
+    rerender(
+      <LatticaGrid controller={c} width={300} height={120} autoHeight onScrollChange={onScrollChange} />,
+    );
+    await waitFor(() => expect(onScrollChange.mock.calls.at(-1)?.[0]).toEqual({ left: 0, top: 0 }));
+    expect(screen.getByTestId('lattica-grid').style.height).toBe(`${24 + 40 * 24}px`);
+  });
+});
