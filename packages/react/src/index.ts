@@ -22,8 +22,23 @@ export {
   type CellCommitEvent,
   type ColumnInputOptions,
   type DisplayOverride,
+  type ColumnTypeOptions,
 } from './controller.js';
-export { sanitizeTimeDraft, normalizeTimeInput } from './time-input.js';
+export {
+  sanitizeTimeDraft,
+  normalizeTimeInput,
+  sanitizeFlexibleTimeDraft,
+  normalizeFlexibleTimeInput,
+  excelTimeSerialToHhMm,
+  type TimeInputOptions,
+} from './time-input.js';
+export {
+  sanitizeElapsedDraft,
+  parseElapsedTime,
+  normalizeElapsedInput,
+  formatElapsedDisplay,
+  type ElapsedTime,
+} from './elapsed-time.js';
 export {
   defaultTheme,
   resolveTheme,

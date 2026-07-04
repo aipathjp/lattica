@@ -62,7 +62,14 @@ import { SheetEngine, FormulaError, type CellContent } from '@ai-path/tb-formula
 import type { GridGeometry } from './geometry.js';
 import type { CellAlign } from './cell-types.js';
 import { editorKindForType, type EditorKind } from './editors.js';
-import { normalizeTimeInput, sanitizeTimeDraft } from './time-input.js';
+import {
+  normalizeFlexibleTimeInput,
+  normalizeTimeInput,
+  sanitizeFlexibleTimeDraft,
+  sanitizeTimeDraft,
+  type TimeInputOptions,
+} from './time-input.js';
+import { formatElapsedDisplay, normalizeElapsedInput, sanitizeElapsedDraft } from './elapsed-time.js';
 import { autoRowHeight, type MeasureText } from './measure.js';
 
 export interface GridControllerOptions {
@@ -136,6 +143,13 @@ export type DisplayOverride = (
   physicalCol: number,
   baseDisplay: string,
 ) => string | null;
+
+/**
+ * Per-column behavior options attached alongside the cell type via
+ * {@link GridController.setColumnType}. Currently these tune the `time`
+ * input pipeline; see {@link TimeInputOptions}.
+ */
+export type ColumnTypeOptions = TimeInputOptions;
 
 interface ControllerEvents {
   change: void;
@@ -309,6 +323,7 @@ export class GridController {
   private readonly columnTypes = new Map<number, string>();
   /** Custom editor kind per physical column (consumed by the React view). */
   private readonly columnEditors = new Map<number, string>();
+  private readonly columnTypeOptions = new Map<number, ColumnTypeOptions>();
   private readonly columnAligns = new Map<number, CellAlign>();
   /** Text-wrap flags per physical column (default off). */
   private readonly columnWraps = new Map<number, boolean>();
@@ -1058,7 +1073,13 @@ export class GridController {
     const p = this.toPhysical(row, col);
     const value = this.engine.getValue(p);
     const fmt = this.columnFormats.get(p.col);
-    const base = fmt !== undefined && typeof value === 'number' ? formatNumber(value, fmt) : formatValue(value);
+    // Elapsed durations render as "HH:MM" / "d:HH:MM" while storing "H:MM".
+    const base =
+      fmt !== undefined && typeof value === 'number'
+        ? formatNumber(value, fmt)
+        : this.columnTypes.get(p.col) === 'elapsed' && typeof value === 'string'
+          ? formatElapsedDisplay(value)
+          : formatValue(value);
     if (this.displayOverride !== null) {
       const overridden = this.displayOverride(p.row, p.col, base);
       if (overridden !== null) {
@@ -1147,12 +1168,26 @@ export class GridController {
   }
 
   // ── Column type & alignment (keyed by physical column) ─────────────────────
-  setColumnType(col: number, type: string): void {
+  /**
+   * Set a column's cell type. `options` tunes type-specific behavior (e.g.
+   * `{ timeOrDecimalHours: true }` or `{ excelTimeSerial: true }` for `time`
+   * columns); omitting it clears any previously-set options.
+   */
+  setColumnType(col: number, type: string, options?: ColumnTypeOptions): void {
     this.columnTypes.set(col, type);
+    if (options === undefined) {
+      this.columnTypeOptions.delete(col);
+    } else {
+      this.columnTypeOptions.set(col, options);
+    }
     this.emitter.emit('change', undefined);
   }
   getColumnType(visualCol: number): string | undefined {
     return this.columnTypes.get(this.view.cols.getPhysicalIndex(visualCol));
+  }
+  /** Type options for a (visual) column, or undefined when none set. */
+  getColumnTypeOptions(visualCol: number): ColumnTypeOptions | undefined {
+    return this.columnTypeOptions.get(this.view.cols.getPhysicalIndex(visualCol));
   }
   setColumnAlign(col: number, align: CellAlign): void {
     this.columnAligns.set(col, align);
@@ -1266,11 +1301,25 @@ export class GridController {
     if (explicit !== undefined) {
       return explicit;
     }
-    if (this.columnTypes.get(physicalCol) === 'time') {
+    const type = this.columnTypes.get(physicalCol);
+    if (type === 'time') {
+      const typeOptions = this.columnTypeOptions.get(physicalCol);
+      if (typeOptions?.timeOrDecimalHours === true || typeOptions?.excelTimeSerial === true) {
+        return {
+          sanitizeDraft: sanitizeFlexibleTimeDraft,
+          commitTransform: (raw) => normalizeFlexibleTimeInput(raw, typeOptions),
+        };
+      }
       return {
         sanitizeDraft: sanitizeTimeDraft,
         maxLength: 5,
         commitTransform: normalizeTimeInput,
+      };
+    }
+    if (type === 'elapsed') {
+      return {
+        sanitizeDraft: sanitizeElapsedDraft,
+        commitTransform: normalizeElapsedInput,
       };
     }
     return undefined;
