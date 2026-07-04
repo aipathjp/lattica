@@ -3,6 +3,7 @@ import { render, cleanup, fireEvent, screen, waitFor, act } from '@testing-libra
 import { createRef } from 'react';
 import { LatticaGrid } from './LatticaGrid.js';
 import { GridController } from './controller.js';
+import { commitAllEditing, cancelAllEditing } from './grid-registry.js';
 import { EditorRegistry, type CustomEditorContext } from './editors.js';
 import { createMockContext } from './test-utils.js';
 import type { ColumnNode } from '@ai-path/tb-core';
@@ -2488,5 +2489,113 @@ describe('link cells (onCellAction)', () => {
     expect(grid.style.cursor).toBe('');
     fireEvent.mouseMove(grid, { clientX: 160, clientY: 30 }); // non-link cell
     expect(grid.style.cursor).toBe('');
+  });
+});
+
+describe('LatticaGrid external commit/cancel control', () => {
+  it('commitEditing() commits the in-flight edit through the normal path and returns true', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    const ref = createRef<LatticaGridHandle>();
+    const onCellCommit = vi.fn();
+    render(<LatticaGrid ref={ref} controller={c} width={400} height={200} onCellCommit={onCellCommit} />);
+
+    expect(ref.current?.commitEditing()).toBe(false);
+
+    act(() => c.beginEdit(0, 0, 'forced'));
+    const editor = screen.getByTestId('lattica-editor');
+    fireEvent.change(editor, { target: { value: 'forced!' } });
+
+    let committed: boolean | undefined;
+    act(() => {
+      committed = ref.current?.commitEditing();
+    });
+    expect(committed).toBe(true);
+    expect(c.getEdit()).toBeNull();
+    expect(c.getDisplay(0, 0)).toBe('forced!');
+    expect(onCellCommit).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'edit', changes: [expect.objectContaining({ next: 'forced!' })] }),
+    );
+  });
+
+  it('cancelEditing() discards the draft and returns true only while editing', () => {
+    const c = new GridController({ rowCount: 5, colCount: 5 });
+    c.setCellText(0, 0, 'keep');
+    const ref = createRef<LatticaGridHandle>();
+    render(<LatticaGrid ref={ref} controller={c} width={400} height={200} />);
+
+    expect(ref.current?.cancelEditing()).toBe(false);
+
+    act(() => c.beginEdit(0, 0, 'discard-me'));
+    let cancelled: boolean | undefined;
+    act(() => {
+      cancelled = ref.current?.cancelEditing();
+    });
+    expect(cancelled).toBe(true);
+    expect(c.getEdit()).toBeNull();
+    expect(c.getDisplay(0, 0)).toBe('keep');
+    expect(screen.queryByTestId('lattica-editor')).toBeNull();
+  });
+
+  it('commitAllEditing()/cancelAllEditing() sweep every mounted grid and report the count', () => {
+    const c1 = new GridController({ rowCount: 3, colCount: 3 });
+    const c2 = new GridController({ rowCount: 3, colCount: 3 });
+    const c3 = new GridController({ rowCount: 3, colCount: 3 });
+    // Focus-free custom editors keep several grids in the editing state at
+    // once (a focused DOM editor would blur-commit as soon as another grid's
+    // editor took focus, which is the normal single-edit behavior).
+    const editors = new EditorRegistry();
+    editors.registerEditor('noop', () => ({}));
+    const columns: ColumnNode[] = [
+      { headerName: 'A', field: 'a', editor: 'noop' },
+      { headerName: 'B', field: 'b', editor: 'noop' },
+      { headerName: 'C', field: 'c', editor: 'noop' },
+    ];
+    render(
+      <>
+        <LatticaGrid controller={c1} columns={columns} editors={editors} width={200} height={100} />
+        <LatticaGrid controller={c2} columns={columns} editors={editors} width={200} height={100} />
+        <LatticaGrid controller={c3} columns={columns} editors={editors} width={200} height={100} />
+      </>,
+    );
+
+    expect(commitAllEditing()).toBe(0);
+
+    act(() => {
+      c1.beginEdit(0, 0, 'one');
+      c2.beginEdit(1, 1, 'two');
+    });
+    let count = 0;
+    act(() => {
+      count = commitAllEditing();
+    });
+    expect(count).toBe(2);
+    expect(c1.getDisplay(0, 0)).toBe('one');
+    expect(c2.getDisplay(1, 1)).toBe('two');
+    expect(c1.getEdit()).toBeNull();
+    expect(c2.getEdit()).toBeNull();
+    expect(c3.getEdit()).toBeNull();
+
+    act(() => {
+      c3.beginEdit(2, 2, 'zap');
+    });
+    let cancelledCount = 0;
+    act(() => {
+      cancelledCount = cancelAllEditing();
+    });
+    expect(cancelledCount).toBe(1);
+    expect(c3.getEdit()).toBeNull();
+    expect(c3.getDisplay(2, 2)).toBe('');
+  });
+
+  it('unmounted grids leave the registry and are no longer swept', () => {
+    const c = new GridController({ rowCount: 3, colCount: 3 });
+    const view = render(<LatticaGrid controller={c} width={200} height={100} />);
+    act(() => c.beginEdit(0, 0, 'pending'));
+    view.unmount();
+
+    expect(commitAllEditing()).toBe(0);
+    // The edit belongs to the controller; nothing swept or committed it.
+    expect(c.getEdit()).not.toBeNull();
+    c.cancelEdit();
   });
 });

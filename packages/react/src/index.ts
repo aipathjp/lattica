@@ -8,6 +8,7 @@ export {
   type ContextMenuPreset,
   type CellActionEvent,
 } from './LatticaGrid.js';
+export { commitAllEditing, cancelAllEditing, type GridEditingHooks } from './grid-registry.js';
 export { LatticaStatusBar, type LatticaStatusBarProps } from './StatusBar.js';
 export { LatticaFormulaBar, type LatticaFormulaBarProps } from './FormulaBar.js';
 export { LatticaColumnSettings, type LatticaColumnSettingsProps } from './ColumnSettings.js';
