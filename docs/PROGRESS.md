@@ -56,6 +56,10 @@
 凡例: ✅完了 / 🚧進行中 / ⏳未着手
 
 ## 変更履歴
+- 2026-07-04: **Column Settings UI**。
+  - `GridController` に物理 index ベースの `setColumnVisible` / `setColumnWidth` / `resetColumnWidths` を追加し、列表示・幅変更を `viewstate` に反映。
+  - `<LatticaColumnSettings>` を追加。一般ユーザ向けの表示列トグルと、管理者向けの列幅編集・幅リセットを提供。
+  - playground `/columns` に org-wide → per-user の順で view state を重ねる永続化デモを追加し、E2E で列非表示・幅編集・リロード復元・data-ops 表示トグルを検証。
 - 2026-07-04: **View-state persistence 結線**。
   - `SizeManager.getOverrides()` と `IndexMapper.getOrder()` を追加し、サイズ上書き・非表示・列順を物理 index ベースで snapshot 化可能にした。
   - `GridController.captureViewState()` / `applyViewState()` と `viewstate` イベントを追加。列幅・行高・非表示列/行・列順・ソート・固定行列を保存/復元できるようにした。

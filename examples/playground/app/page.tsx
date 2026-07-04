@@ -5,6 +5,7 @@ const FEATURES: { href: string; title: string; desc: string }[] = [
   { href: '/editors', title: 'Editors & Validation', desc: 'Dropdown / date / autocomplete editors and data validation (invalid cells turn red).' },
   { href: '/formatting', title: 'Formatting & Status Bar', desc: 'Number formats, color scales, data bars, icon sets, and a live selection status bar.' },
   { href: '/data-ops', title: 'Sort / Filter / Find', desc: 'Multi-sort, faceted filter dropdown, column hide/move, find & replace, column aggregates.' },
+  { href: '/columns', title: 'Column Settings', desc: 'Visibility and width settings with layered org-wide and per-user persistence.' },
   { href: '/formulas', title: 'Formulas & Spill', desc: 'Dynamic arrays, XLOOKUP, LET, LAMBDA/MAP, SORTBY, structured references (150 functions).' },
   { href: '/pivot', title: 'Pivot Table', desc: 'Cross-tabulate records by row/column fields with aggregates and totals.' },
   { href: '/charts', title: 'Charts & Sparklines', desc: 'Line / bar / pie charts and in-cell sparklines.' },

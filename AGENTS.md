@@ -95,6 +95,7 @@ setColumnOptions(col, string[])        // dropdown/autocomplete + list validator
 setColumnFormat(col, '#,##0.00')       // Excel number format
 setColumnValidator(col, v => boolean)  // invalid cells tint red
 hideColumn(visualCol); showColumn(physicalCol); showAllColumns()
+setColumnVisible(physicalCol, visible); setColumnWidth(physicalCol, width); resetColumnWidths()
 moveColumn(fromVisual, toVisual)
 
 // sort / filter / find
@@ -181,6 +182,25 @@ const c = useGridController({ rowCount: 100, colCount: 8, ...densityOptions('com
 ```
 Palettes: `light dark highContrast midnight sepia solarizedLight solarizedDark`.
 Densities: `compact comfortable spacious`. `buildTheme({ palette, density, fontFamily, overrides })`.
+
+**Column settings panel**
+```tsx
+import { LatticaColumnSettings } from '@lattica/react';
+
+<LatticaColumnSettings
+  controller={controller}
+  columns={columns}
+  showVisibility
+  showWidths={isAdmin}
+  title="Columns"
+/>
+```
+
+`<LatticaColumnSettings>` lists physical columns in the current visual order and
+lets users toggle visibility. Admin-style UIs can pass `showWidths` to expose
+number inputs for physical column widths, plus a reset button. Props:
+`controller` (required), `columns`, `theme`, `showVisibility` (default `true`),
+`showWidths` (default `false`), and `title` (default `Columns`).
 
 **View-state persistence (per-user / org-wide)**
 ```tsx

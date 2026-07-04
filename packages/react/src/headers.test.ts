@@ -65,6 +65,38 @@ describe('columnHeaderCells (multi-level)', () => {
     expect(cells.some((c) => c.label === 'A')).toBe(true);
   });
 
+  it('drops hidden leaves and shrinks their group via leafToVisual', () => {
+    const layout = computeHeaderLayout(cols);
+    // Leaf 1 (B) hidden: physical 0 -> visual 0, 1 -> hidden (-1), 2 -> visual 1.
+    const leafToVisual = (leaf: number) => (leaf === 1 ? -1 : leaf === 2 ? 1 : leaf);
+    const cells = columnHeaderCells(geom(), 0, [0, 1], layout, leafToVisual);
+    expect(cells.some((c) => c.label === 'B')).toBe(false);
+    const group = cells.find((c) => c.label === 'Group')!;
+    // Group now covers only visual col 1 (x 90, one column wide).
+    expect(group.x).toBe(90);
+    expect(group.width).toBe(50);
+    const leafC = cells.find((c) => c.label === 'C')!;
+    expect(leafC.col).toBe(1);
+  });
+
+  it('spans a group over moved leaves whose visual order is reversed', () => {
+    const layout = computeHeaderLayout(cols);
+    // Physical leaves 1,2 render at swapped visual positions 2,1.
+    const leafToVisual = (leaf: number) => (leaf === 1 ? 2 : leaf === 2 ? 1 : 0);
+    const cells = columnHeaderCells(geom(), 0, [0, 1, 2], layout, leafToVisual);
+    const group = cells.find((c) => c.label === 'Group')!;
+    expect(group.x).toBe(90);
+    expect(group.width).toBe(100);
+    expect(cells.find((c) => c.label === 'B')!.col).toBe(2);
+  });
+
+  it('omits a group whose leaves are all hidden', () => {
+    const layout = computeHeaderLayout(cols);
+    const leafToVisual = (leaf: number) => (leaf === 0 ? 0 : -1);
+    const cells = columnHeaderCells(geom(), 0, [0], layout, leafToVisual);
+    expect(cells.map((c) => c.label)).toEqual(['A']);
+  });
+
   it('exposes collapse metadata', () => {
     const collapsible: ColumnNode[] = [
       { id: 'g', headerName: 'G', collapsible: true, children: [{ headerName: 'X' }] },
