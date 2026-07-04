@@ -262,6 +262,22 @@ describe('barRenderer', () => {
     expect(texts[0]!.text).toBe('abcde…');
   });
 
+  it('estimates label width from fontSize when the context has no measureText', () => {
+    const { ctx, fills, texts } = paintingContext();
+    const bare = ctx as unknown as { measureText?: unknown };
+    delete bare.measureText;
+    barRenderer({
+      ctx,
+      rect: { x: 0, y: 0, width: 80, height: 20 },
+      value: { label: 'abcdefghijklmnop' },
+      text: '',
+      theme: defaultTheme,
+      align: 'left',
+    });
+    expect(fills[0]!.args).toEqual([2, 2, 76, 16]);
+    expect(texts[0]!.text.endsWith('…')).toBe(true);
+  });
+
   it('uses dark label text on a light hex fill', () => {
     const { texts } = renderBar({ color: '#ffff00', label: 'x' });
     expect(texts[0]!.style).toBe('#1f2937');

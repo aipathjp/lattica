@@ -1355,3 +1355,83 @@ describe('header height APIs', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('column wrap & autoSizeRows', () => {
+  /** Deterministic measurer: 7px per character, font-independent. */
+  const measure = (text: string) => text.length * 7;
+
+  it('sets and reads the wrap flag, emitting change', () => {
+    const c = make();
+    const listener = vi.fn();
+    c.on('change', listener);
+    expect(c.getColumnWrap(0)).toBe(false);
+    expect(c.hasWrapColumns()).toBe(false);
+    c.setColumnWrap(0, true);
+    expect(c.getColumnWrap(0)).toBe(true);
+    expect(c.hasWrapColumns()).toBe(true);
+    c.setColumnWrap(0, false);
+    expect(c.getColumnWrap(0)).toBe(false);
+    expect(c.hasWrapColumns()).toBe(false);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('applies wrap from rich column definitions', () => {
+    const c = new GridController({ rowCount: 2, colCount: 3 });
+    c.applyColumnDefs([
+      { headerName: 'Note', wrap: true },
+      { headerName: 'Off', wrap: false },
+      { headerName: 'Unset' },
+    ]);
+    expect(c.getColumnWrap(0)).toBe(true);
+    expect(c.getColumnWrap(1)).toBe(false);
+    expect(c.getColumnWrap(2)).toBe(false);
+    expect(c.hasWrapColumns()).toBe(true);
+  });
+
+  it('autoSizeRows is a silent no-op without wrap columns', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setCellText(0, 0, 'some very long text that would wrap');
+    const listener = vi.fn();
+    c.on('change', listener);
+    c.autoSizeRows({ measure, font: 'x', lineHeight: 20 });
+    expect(c.getRowHeight(0)).toBe(24);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('sizes each row to its tallest wrapped block (one change event)', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setColumnWrap(0, true);
+    c.setColumnWrap(1, true);
+    c.setColumnWidth(0, 50);
+    c.setCellText(0, 0, 'foo bar baz'); // 50 - 12 = 38px → 3 lines
+    c.setCellText(0, 1, 'a'); // wraps to 1 line — shorter candidate is ignored
+    c.setCellText(1, 0, 'hi'); // 1 line, but 20 + 6 = 26 > default 24
+    const listener = vi.fn();
+    c.on('change', listener);
+    c.autoSizeRows({ measure, font: 'x', lineHeight: 20 });
+    expect(c.getRowHeight(0)).toBe(66); // 3 * 20 + paddingY 6
+    expect(c.getRowHeight(1)).toBe(26); // 1 * 20 + 6
+    expect(c.getRowHeight(2)).toBe(24); // empty → default min height
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('honors rows subset, paddings and minHeight', () => {
+    const c = new GridController({ rowCount: 2, colCount: 1 });
+    c.setColumnWrap(0, true);
+    c.setColumnWidth(0, 50);
+    c.setCellText(0, 0, 'foo bar baz');
+    c.setCellText(1, 0, 'foo bar baz'); // 50 - 2 = 48px → "foo bar" 49 > 48 → 3 lines
+    c.autoSizeRows({ measure, font: 'x', lineHeight: 10, paddingX: 1, paddingY: 0, minHeight: 40, rows: [1] });
+    expect(c.getRowHeight(0)).toBe(24); // untouched — not in the subset
+    expect(c.getRowHeight(1)).toBe(40); // 3 * 10 + 0 = 30, clamped to minHeight
+  });
+
+  it('grows past minHeight when the wrapped block is taller', () => {
+    const c = new GridController({ rowCount: 1, colCount: 1 });
+    c.setColumnWrap(0, true);
+    c.setColumnWidth(0, 50);
+    c.setCellText(0, 0, 'foo bar baz');
+    c.autoSizeRows({ measure, font: 'x', lineHeight: 30, rows: [0] });
+    expect(c.getRowHeight(0)).toBe(96); // 3 * 30 + 6 > default 24
+  });
+});

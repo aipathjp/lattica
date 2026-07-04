@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { SizeManager, SelectionModel } from '@ai-path/tb-core';
-import { buildScene, visibleIndices } from './scene.js';
+import { buildScene, visibleIndices, type BuildSceneParams } from './scene.js';
 import type { GridGeometry } from './geometry.js';
+import type { MeasureText } from './measure.js';
 
 const geom = (overrides: Partial<GridGeometry> = {}): GridGeometry => ({
   rowSizes: new SizeManager({ count: 100, defaultSize: 20 }),
@@ -206,6 +207,78 @@ describe('buildScene visual conditional formatting', () => {
     });
     expect(scene.cells.find((k) => k.col === 0)!.cfStyle).toEqual({ background: '#808080' });
     expect(scene.cells.find((k) => k.col === 1)!.cfStyle).toEqual({ background: '#fee', color: '#900' });
+  });
+});
+
+describe('buildScene text wrapping', () => {
+  /** Deterministic measurer: 7px per character. Column width is 50. */
+  const measure: MeasureText = (t) => t.length * 7;
+  const wrapParams = (over: Partial<BuildSceneParams> = {}): BuildSceneParams => ({
+    geom: geom(),
+    scrollLeft: 0,
+    scrollTop: 0,
+    clientWidth: 200,
+    clientHeight: 60,
+    selection: new SelectionModel({ rowCount: 100, colCount: 100 }),
+    getDisplay: () => 'foo bar baz',
+    getWrap: () => true,
+    measureText: measure,
+    font: '13px x',
+    ...over,
+  });
+
+  it('splits wrap-column text into lines (snapshot of the line division)', () => {
+    // 50px wide, no padding: "foo bar" = 49px fits, "+ baz" = 77px breaks.
+    const scene = buildScene(wrapParams());
+    expect(scene.cells[0]!.lines).toEqual(['foo bar', 'baz']);
+    // The unwrapped display text is still present for consumers.
+    expect(scene.cells[0]!.text).toBe('foo bar baz');
+  });
+
+  it('subtracts wrapPaddingX per side from the wrap width', () => {
+    // 50 - 2*10 = 30px: every 21px word gets its own line.
+    const scene = buildScene(wrapParams({ wrapPaddingX: 10 }));
+    expect(scene.cells[0]!.lines).toEqual(['foo', 'bar', 'baz']);
+  });
+
+  it('omits lines when the text fits on a single line', () => {
+    const scene = buildScene(wrapParams({ getDisplay: () => 'ab' }));
+    expect(scene.cells[0]!.lines).toBeUndefined();
+  });
+
+  it('omits lines for empty text', () => {
+    const scene = buildScene(wrapParams({ getDisplay: () => '' }));
+    expect(scene.cells[0]!.lines).toBeUndefined();
+  });
+
+  it('wraps only the default text path: plain and "text" cells, not typed cells', () => {
+    const scene = buildScene(
+      wrapParams({ getType: (_r, c) => (c === 0 ? 'checkbox' : c === 1 ? 'text' : undefined) }),
+    );
+    expect(scene.cells.find((k) => k.col === 0)!.lines).toBeUndefined();
+    expect(scene.cells.find((k) => k.col === 1)!.lines).toEqual(['foo bar', 'baz']);
+    expect(scene.cells.find((k) => k.col === 2)!.lines).toEqual(['foo bar', 'baz']);
+  });
+
+  it('does not wrap cells whose column has wrap disabled', () => {
+    const scene = buildScene(wrapParams({ getWrap: (_r, c) => c === 1 }));
+    expect(scene.cells.find((k) => k.col === 0)!.lines).toBeUndefined();
+    expect(scene.cells.find((k) => k.col === 1)!.lines).toEqual(['foo bar', 'baz']);
+  });
+
+  it('stays inert when measureText is missing', () => {
+    const scene = buildScene(wrapParams({ measureText: undefined }));
+    expect(scene.cells[0]!.lines).toBeUndefined();
+  });
+
+  it('stays inert when the font is missing', () => {
+    const scene = buildScene(wrapParams({ font: undefined }));
+    expect(scene.cells[0]!.lines).toBeUndefined();
+  });
+
+  it('stays inert when no wrap accessor is provided (zero-cost default)', () => {
+    const scene = buildScene(wrapParams({ getWrap: undefined }));
+    expect(scene.cells[0]!.lines).toBeUndefined();
   });
 });
 

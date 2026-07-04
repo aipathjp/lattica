@@ -6,8 +6,39 @@
  * mock (e.g. `(t) => t.length * 7`).
  */
 
+import type { Canvas2D } from './painter.js';
+
 /** Measures the rendered pixel width of `text` in the given CSS `font`. */
 export type MeasureText = (text: string, font: string) => number;
+
+/**
+ * The line height (px) used when painting wrapped cell text at `fontSize`.
+ * Shared by the painter and row auto-sizing so a row sized with
+ * {@link autoRowHeight} exactly fits its wrapped lines.
+ */
+export function wrapLineHeight(fontSize: number): number {
+  return Math.round(fontSize * 1.4);
+}
+
+/**
+ * A {@link MeasureText} backed by a real canvas context, or `undefined` when
+ * the context has no `measureText` (e.g. a minimal recording mock). The
+ * context's font is synced lazily — repeated calls with the same font are
+ * a single `measureText` each.
+ */
+export function canvasMeasurer(ctx: Canvas2D): MeasureText | undefined {
+  const c = ctx as Canvas2D & { measureText?: (text: string) => { width: number } };
+  const fn = c.measureText;
+  if (typeof fn !== 'function') {
+    return undefined;
+  }
+  return (text, font) => {
+    if (c.font !== font) {
+      c.font = font;
+    }
+    return fn.call(c, text).width;
+  };
+}
 
 /**
  * Greedy word wrap to fit within `maxWidth`.

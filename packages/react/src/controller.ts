@@ -60,6 +60,7 @@ import type { GridGeometry } from './geometry.js';
 import type { CellAlign } from './cell-types.js';
 import { editorKindForType, type EditorKind } from './editors.js';
 import { normalizeTimeInput, sanitizeTimeDraft } from './time-input.js';
+import { autoRowHeight, type MeasureText } from './measure.js';
 
 export interface GridControllerOptions {
   rowCount: number;
@@ -76,6 +77,24 @@ export interface EditState {
   row: number;
   col: number;
   draft: string;
+}
+
+/** Options for {@link GridController.autoSizeRows} (wrap-aware row heights). */
+export interface AutoSizeRowsOptions {
+  /** Text measurer, e.g. `canvasMeasurer(ctx)` or a deterministic mock. */
+  measure: MeasureText;
+  /** CSS font the cells are painted with, e.g. `13px system-ui`. */
+  font: string;
+  /** Line height in px — use `wrapLineHeight(theme.fontSize)` to match paint. */
+  lineHeight: number;
+  /** Horizontal cell padding per side (default 6, the theme default). */
+  paddingX?: number;
+  /** Vertical padding added to the wrapped block height (default 6). */
+  paddingY?: number;
+  /** Minimum row height; defaults to the controller's default row height. */
+  minHeight?: number;
+  /** Visual rows to size; every visible row when omitted. */
+  rows?: readonly number[];
 }
 
 export interface CellChange {
@@ -271,6 +290,8 @@ export class GridController {
   private readonly nestedRows = new NestedRowModel([]);
   private readonly columnTypes = new Map<number, string>();
   private readonly columnAligns = new Map<number, CellAlign>();
+  /** Text-wrap flags per physical column (default off). */
+  private readonly columnWraps = new Map<number, boolean>();
   private readonly columnEditable = new Map<number, boolean>();
   private readonly cellReadOnly = new Set<string>();
   private readonly columnInputs = new Map<number, ColumnInputOptions>();
@@ -987,6 +1008,24 @@ export class GridController {
   getColumnAlign(visualCol: number): CellAlign | undefined {
     return this.columnAligns.get(this.view.cols.getPhysicalIndex(visualCol));
   }
+  /** Enable/disable text wrapping for a physical column. */
+  setColumnWrap(col: number, wrap: boolean): void {
+    this.columnWraps.set(col, wrap);
+    this.emitter.emit('change', undefined);
+  }
+  /** Whether a (visual) column wraps its cell text. Default false. */
+  getColumnWrap(visualCol: number): boolean {
+    return this.columnWraps.get(this.view.cols.getPhysicalIndex(visualCol)) ?? false;
+  }
+  /** True when at least one column has wrapping enabled (cheap early-out). */
+  hasWrapColumns(): boolean {
+    for (const wrap of this.columnWraps.values()) {
+      if (wrap) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   setColumnEditable(visualCol: number, editable: boolean): void {
     this.columnEditable.set(this.view.cols.getPhysicalIndex(visualCol), editable);
@@ -1007,6 +1046,9 @@ export class GridController {
       }
       if (def.align !== undefined) {
         this.columnAligns.set(physicalCol, def.align);
+      }
+      if (def.wrap !== undefined) {
+        this.columnWraps.set(physicalCol, def.wrap);
       }
       if (def.format !== undefined) {
         this.columnFormats.set(physicalCol, def.format);
@@ -1580,6 +1622,49 @@ export class GridController {
   resetColumnWidths(): void {
     for (const col of this.colSizes.getOverrides().keys()) {
       this.colSizes.resetSize(col);
+    }
+    this.rebuildViewSizes();
+    this.emitter.emit('change', undefined);
+    this.emitViewState();
+  }
+
+  /**
+   * Opt-in, wrap-aware row auto-sizing: for each targeted row, wrap the display
+   * text of every wrap-enabled column to its current width and set the row
+   * height to fit the tallest wrapped block (clamped to `minHeight`). No-op
+   * when no column has wrapping enabled. One change event for the whole batch.
+   */
+  autoSizeRows(options: AutoSizeRowsOptions): void {
+    const wrapCols: number[] = [];
+    for (let col = 0; col < this.getColCount(); col++) {
+      if (this.getColumnWrap(col)) {
+        wrapCols.push(col);
+      }
+    }
+    if (wrapCols.length === 0) {
+      return;
+    }
+    const paddingX = options.paddingX ?? 6;
+    const paddingY = options.paddingY ?? 6;
+    const minHeight = options.minHeight ?? this.defaultRowHeight;
+    const rows =
+      options.rows ?? Array.from({ length: this.getRowCount() }, (_, i) => i);
+    for (const row of rows) {
+      let height = minHeight;
+      for (const col of wrapCols) {
+        const text = this.getDisplay(row, col);
+        if (text === '') {
+          continue;
+        }
+        const wrapWidth = Math.max(1, this.getColumnWidth(col) - paddingX * 2);
+        const candidate = autoRowHeight(text, wrapWidth, options.font, options.lineHeight, options.measure, {
+          padding: paddingY,
+        });
+        if (candidate > height) {
+          height = candidate;
+        }
+      }
+      this.rowSizes.setSize(this.view.rows.getPhysicalIndex(row), height);
     }
     this.rebuildViewSizes();
     this.emitter.emit('change', undefined);

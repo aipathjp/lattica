@@ -50,6 +50,8 @@ export interface ColumnDef {
   readonly options?: readonly string[];
   /** Maximum edit length for default text input handling. */
   readonly maxLength?: number;
+  /** Wrap cell text onto multiple lines when it exceeds the column width. */
+  readonly wrap?: boolean;
   readonly showWhen?: ShowWhen;
 }
 

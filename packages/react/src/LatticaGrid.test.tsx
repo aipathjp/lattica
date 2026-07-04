@@ -3,6 +3,7 @@ import { render, cleanup, fireEvent, screen, waitFor, act } from '@testing-libra
 import { createRef } from 'react';
 import { LatticaGrid } from './LatticaGrid.js';
 import { GridController } from './controller.js';
+import { createMockContext } from './test-utils.js';
 import type { ColumnNode } from '@ai-path/tb-core';
 import type { LatticaGridHandle, LatticaGridProps } from './LatticaGrid.js';
 
@@ -1458,5 +1459,47 @@ describe('LatticaGrid view-state callbacks', () => {
       c.resizeCol(1, 140);
     });
     expect(onViewStateChange).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('LatticaGrid text wrapping', () => {
+  it('paints wrap-column text as multiple lines through the canvas', () => {
+    const shared = createMockContext();
+    const spy = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation(() => shared as unknown as CanvasRenderingContext2D);
+    try {
+      const c = new GridController({ rowCount: 2, colCount: 2 });
+      c.setCellText(0, 0, 'foo bar baz');
+      c.setColumnWrap(0, true);
+      c.setColumnWidth(0, 60); // 60 - 2*6 padding = 48px; mock measures 7px/char
+      renderGrid(c);
+      const texts = shared.calls.filter((k) => k.method === 'fillText').map((k) => k.args[0]);
+      expect(texts).toContain('foo');
+      expect(texts).toContain('bar');
+      expect(texts).toContain('baz');
+      expect(texts).not.toContain('foo bar baz');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('keeps the single-line paint path when no column wraps', () => {
+    const shared = createMockContext();
+    const spy = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation(() => shared as unknown as CanvasRenderingContext2D);
+    try {
+      const c = new GridController({ rowCount: 2, colCount: 2 });
+      c.setCellText(0, 0, 'foo bar baz');
+      c.setColumnWidth(0, 60);
+      renderGrid(c);
+      const texts = shared.calls.filter((k) => k.method === 'fillText').map((k) => k.args[0]);
+      expect(texts).toContain('foo bar baz');
+      // No measurement happens at all without wrap columns (zero extra cost).
+      expect(shared.calls.some((k) => k.method === 'measureText')).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

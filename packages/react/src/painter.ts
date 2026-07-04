@@ -9,6 +9,7 @@ import { iconColor, lerpColor, type IconMark } from '@ai-path/tb-core';
 import type { GridTheme } from './theme.js';
 import type { Scene, CellPaint } from './scene.js';
 import { defaultCellTypes, type CellTypeRegistry } from './cell-types.js';
+import { wrapLineHeight } from './measure.js';
 
 export interface Canvas2D {
   fillStyle: string;
@@ -176,6 +177,13 @@ function paintCell(
     drawIcon(ctx, cell.icon, rect.x + theme.cellPaddingX, rect.y + rect.height / 2, theme);
   }
 
+  // Wrapped text (built by the scene for wrap columns) replaces the default
+  // single-line text path; typed/custom renderers never receive `lines`.
+  if (cell.lines !== undefined) {
+    paintWrappedText(ctx, rect, cell.lines, theme, cell.align ?? 'left', cell.cfStyle?.color);
+    return;
+  }
+
   registry.resolve(cell.type)({
     ctx,
     rect,
@@ -185,6 +193,47 @@ function paintCell(
     align: cell.align ?? 'left',
     color: cell.cfStyle?.color,
   });
+}
+
+/**
+ * Draw wrapped text lines clipped to the cell. The block is vertically
+ * centered when it fits; when the row is too short it is top-aligned so the
+ * leading lines stay readable and the overflow clips at the bottom.
+ */
+function paintWrappedText(
+  ctx: Canvas2D,
+  rect: CellPaint['rect'],
+  lines: readonly string[],
+  theme: GridTheme,
+  align: 'left' | 'center' | 'right',
+  color: string | undefined,
+): void {
+  const lineHeight = wrapLineHeight(theme.fontSize);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(rect.x, rect.y, rect.width, rect.height);
+  ctx.clip();
+  ctx.fillStyle = color ?? theme.textColor;
+  let x: number;
+  if (align === 'right') {
+    ctx.textAlign = 'right';
+    x = rect.x + rect.width - theme.cellPaddingX;
+  } else if (align === 'center') {
+    ctx.textAlign = 'center';
+    x = rect.x + rect.width / 2;
+  } else {
+    ctx.textAlign = 'left';
+    x = rect.x + theme.cellPaddingX;
+  }
+  const blockHeight = lines.length * lineHeight;
+  const startY =
+    blockHeight <= rect.height
+      ? rect.y + (rect.height - blockHeight) / 2 + lineHeight / 2
+      : rect.y + lineHeight / 2;
+  lines.forEach((line, i) => {
+    ctx.fillText(line, x, startY + i * lineHeight);
+  });
+  ctx.restore();
 }
 
 /** Apply a DPR scale by drawing scaled gridlines — kept tiny and overridable. */

@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { wrapText, autoColumnWidth, autoRowHeight, type MeasureText } from './measure.js';
+import {
+  wrapText,
+  autoColumnWidth,
+  autoRowHeight,
+  wrapLineHeight,
+  canvasMeasurer,
+  type MeasureText,
+} from './measure.js';
+import { createMockContext } from './test-utils.js';
+import type { Canvas2D } from './painter.js';
 
 /** Deterministic measurer: 7px per character, font-independent. */
 const measure: MeasureText = (text) => text.length * 7;
@@ -63,5 +72,32 @@ describe('autoRowHeight', () => {
   it('measures multiple wrapped lines plus padding', () => {
     // "foo bar baz" wraps to 2 lines at width 50 -> 2 * 20 + 4
     expect(autoRowHeight('foo bar baz', 50, 'x', 20, measure, { padding: 4 })).toBe(44);
+  });
+});
+
+describe('wrapLineHeight', () => {
+  it('rounds 1.4x the font size', () => {
+    expect(wrapLineHeight(13)).toBe(18);
+    expect(wrapLineHeight(10)).toBe(14);
+  });
+});
+
+describe('canvasMeasurer', () => {
+  it('returns undefined when the context has no measureText', () => {
+    const bare = { font: '' } as unknown as Canvas2D;
+    expect(canvasMeasurer(bare)).toBeUndefined();
+  });
+
+  it('measures via the context and syncs the font lazily', () => {
+    const ctx = createMockContext();
+    const m = canvasMeasurer(ctx)!;
+    expect(m('abc', '13px x')).toBe(21);
+    expect(ctx.font).toBe('13px x');
+    // Same font again: the font assignment is skipped, measurement still runs.
+    expect(m('abcd', '13px x')).toBe(28);
+    // A different font re-syncs.
+    expect(m('a', '15px x')).toBe(7);
+    expect(ctx.font).toBe('15px x');
+    expect(ctx.calls.filter((c) => c.method === 'measureText')).toHaveLength(3);
   });
 });

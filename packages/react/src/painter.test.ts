@@ -315,3 +315,75 @@ describe('paintScene sparklines', () => {
     expect(fills.length).toBe(2);
   });
 });
+
+describe('paintScene wrapped text', () => {
+  // defaultTheme.fontSize = 13 → wrapLineHeight = 18.
+  const wrapCell = (over: Partial<Scene['cells'][number]> = {}): Scene['cells'][number] => ({
+    row: 0,
+    col: 0,
+    rect: { x: 0, y: 0, width: 50, height: 60 },
+    text: 'aa bb',
+    selected: false,
+    active: false,
+    lines: ['aa', 'bb'],
+    ...over,
+  });
+
+  it('draws each wrapped line, vertically centered when the block fits', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, scene({ cells: [wrapCell()], activeRect: null }), defaultTheme, { width: 200, height: 100 });
+    const texts = ctx.calls.filter((c) => c.method === 'fillText');
+    // block = 2 * 18 = 36 ≤ 60 → startY = (60 - 36) / 2 + 9 = 21, next line +18.
+    expect(texts.map((c) => c.args)).toEqual([
+      ['aa', defaultTheme.cellPaddingX, 21],
+      ['bb', defaultTheme.cellPaddingX, 39],
+    ]);
+    // The wrapped block is clipped to the cell rect.
+    expect(methods(ctx)).toContain('clip');
+  });
+
+  it('top-aligns and clips when the row is shorter than the block', () => {
+    const ctx = createMockContext();
+    paintScene(
+      ctx,
+      scene({ cells: [wrapCell({ rect: { x: 0, y: 10, width: 50, height: 20 }, lines: ['aa', 'bb', 'cc'] })], activeRect: null }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    const texts = ctx.calls.filter((c) => c.method === 'fillText');
+    // block = 3 * 18 = 54 > 20 → top-aligned: startY = rect.y + 18 / 2 = 19.
+    expect(texts.map((c) => c.args[2])).toEqual([19, 37, 55]);
+  });
+
+  it('honors right and center alignment for wrapped lines', () => {
+    const right = createMockContext();
+    paintScene(right, scene({ cells: [wrapCell({ align: 'right' })], activeRect: null }), defaultTheme, { width: 200, height: 100 });
+    const rightTexts = right.calls.filter((c) => c.method === 'fillText');
+    expect(rightTexts.map((c) => c.args[1])).toEqual([50 - defaultTheme.cellPaddingX, 50 - defaultTheme.cellPaddingX]);
+
+    const center = createMockContext();
+    paintScene(center, scene({ cells: [wrapCell({ align: 'center' })], activeRect: null }), defaultTheme, { width: 200, height: 100 });
+    const centerTexts = center.calls.filter((c) => c.method === 'fillText');
+    expect(centerTexts.map((c) => c.args[1])).toEqual([25, 25]);
+  });
+
+  it('uses the conditional-format color for wrapped text', () => {
+    const ctx = createMockContext();
+    paintScene(
+      ctx,
+      scene({ cells: [wrapCell({ cfStyle: { color: '#990000' } })], activeRect: null }),
+      defaultTheme,
+      { width: 200, height: 100 },
+    );
+    // The wrapped text fill is the last fillStyle write for the cell.
+    expect(ctx.fillStyle).toBe('#990000');
+  });
+
+  it('does not invoke the single-line text path for wrapped cells', () => {
+    const ctx = createMockContext();
+    paintScene(ctx, scene({ cells: [wrapCell()], activeRect: null }), defaultTheme, { width: 200, height: 100 });
+    const texts = ctx.calls.filter((c) => c.method === 'fillText').map((c) => c.args[0]);
+    // Only the wrapped lines are drawn — never the joined single-line text.
+    expect(texts).toEqual(['aa', 'bb']);
+  });
+});
