@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { LatticaGrid, useGridController } from '@ai-path/lattica-react';
 import type { ColumnNode } from '@ai-path/lattica-core';
 
@@ -14,6 +14,7 @@ const columns: readonly ColumnNode[] = [
 
 export default function EditorsPage(): React.ReactElement {
   const controller = useGridController({ rowCount: 30, colCount: 5, defaultColWidth: 150 });
+  const [cellOverlay, setCellOverlay] = useState<{ row: number; col: number } | null>(null);
 
   useEffect(() => {
     controller.setColumnType(0, 'dropdown');
@@ -42,7 +43,35 @@ export default function EditorsPage(): React.ReactElement {
         <code>-1</code> and commit to see the cell flagged <span style={{ color: '#b00020' }}>red</span>.
       </p>
       <div style={{ border: '1px solid #cbd2d9', borderRadius: 6, width: 'fit-content' }}>
-        <LatticaGrid controller={controller} columns={columns} width={798} height={420} />
+        <LatticaGrid
+          controller={controller}
+          columns={columns}
+          width={798}
+          height={420}
+          cellOverlay={cellOverlay}
+          onCellOverlayClose={() => setCellOverlay(null)}
+          onCellClick={(hit) => setCellOverlay(hit)}
+          renderCellOverlay={({ row, col, close }) => (
+            <div
+              style={{
+                minWidth: 180,
+                padding: 10,
+                background: '#fff',
+                border: '1px solid #94a3b8',
+                boxShadow: '0 8px 20px rgba(15, 23, 42, 0.16)',
+                fontSize: 13,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                Row {row + 1}, Col {col + 1}
+              </div>
+              <div style={{ marginBottom: 10 }}>Value: {controller.getDisplay(row, col) || '(empty)'}</div>
+              <button type="button" onClick={close}>
+                Close
+              </button>
+            </div>
+          )}
+        />
       </div>
     </main>
   );

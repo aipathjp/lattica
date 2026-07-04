@@ -255,3 +255,7 @@
 - 2026-07-04: **Grid view controls 追加**。
   - `<LatticaGrid>` に `showRowNumbers` / `sortable` / `showSortIcons` / `filterable` / `showFilterIcons` を追加（全て既定 true）。行番号ガター非表示時は effective geometry でセル座標を左端へ詰め、ソート/フィルタ UI はアイコンまたは列ヘッダー/コンテキストメニュー経由に切替可能。
   - examples/playground `/data-ops` に 5 つの表示制御トグルを追加。
+- 2026-07-05: **Cell-anchored overlay API 追加**。
+  - `<LatticaGrid>` を `forwardRef` 化し、`LatticaGridHandle`（`getCellClientRect` / `focus` / `scrollCellIntoView`）を追加。セル矩形は visual 座標を受け取り、effective geometry・scroll・root `getBoundingClientRect()` から viewport 座標を返す。
+  - controlled `cellOverlay` / `renderCellOverlay` / `onCellOverlayClose` を追加。セル左下に root 内絶対配置し、render ctx にはセルの root 相対 rect を渡す。Escape・active セル移動・明示 close で close callback を呼ぶ。
+  - examples/playground `/editors` に、セルクリックで値確認パネルを出す overlay デモを追加。

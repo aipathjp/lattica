@@ -171,6 +171,32 @@ controller.setColumnInput(1, {
 controller.setColumnType(2, 'time');           // accepts 930/1330/9:30 and stores HH:mm
 ```
 
+**Cell-anchored overlays** — use the public ref handle for viewport rects, or the controlled overlay API for React popovers anchored inside the grid:
+```tsx
+import { useRef, useState } from 'react';
+import { LatticaGrid, type LatticaGridHandle } from '@ai-path/lattica-react';
+
+const gridRef = useRef<LatticaGridHandle>(null);
+const [overlay, setOverlay] = useState<{ row: number; col: number } | null>(null);
+
+<LatticaGrid
+  ref={gridRef}
+  controller={controller}
+  cellOverlay={overlay}
+  onCellClick={(cell) => setOverlay(cell)}
+  onCellOverlayClose={() => setOverlay(null)}
+  renderCellOverlay={({ row, col, rect, close }) => (
+    <div style={{ minWidth: rect.width }}>
+      {controller.getDisplay(row, col)}
+      <button type="button" onClick={close}>Close</button>
+    </div>
+  )}
+/>;
+
+gridRef.current?.scrollCellIntoView(20, 3);
+const viewportRect = gridRef.current?.getCellClientRect(20, 3);
+```
+
 **Faceted filter / hide / move** — UI is built in (`▽` header button, header context menu),
 or drive headlessly via `setColumnSetFilter` / `hideColumn` / `moveColumn`.
 

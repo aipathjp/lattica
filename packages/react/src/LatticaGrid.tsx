@@ -9,8 +9,10 @@
  */
 
 import {
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useReducer,
   useRef,
   useState,
@@ -73,6 +75,23 @@ export interface LatticaGridProps {
   onCellCommit?: (event: CellCommitEvent) => void;
   /** How to place the text cursor when editing begins. Defaults to selecting all text. */
   editSelection?: 'all' | 'end' | 'preserve';
+  /** Controlled visual cell anchor for a root-local overlay. */
+  cellOverlay?: { row: number; col: number } | null;
+  /** Render a controlled overlay anchored to `cellOverlay`. */
+  renderCellOverlay?: (ctx: {
+    row: number;
+    col: number;
+    rect: { left: number; top: number; width: number; height: number };
+    close: () => void;
+  }) => ReactNode;
+  /** Called when the grid requests that the controlled cell overlay close. */
+  onCellOverlayClose?: () => void;
+}
+
+export interface LatticaGridHandle {
+  getCellClientRect(row: number, col: number): DOMRect | null;
+  focus(): void;
+  scrollCellIntoView(row: number, col: number): void;
 }
 
 interface MenuState {
@@ -85,8 +104,26 @@ function effectiveGeometry(geom: GridGeometry, showRowNumbers: boolean): GridGeo
   return showRowNumbers ? geom : { ...geom, rowHeaderWidth: 0 };
 }
 
-export function LatticaGrid(props: LatticaGridProps): ReactElement {
-  const { controller, columns, onCellClick, onScrollChange, onColumnResize, onViewStateChange, onCellCommit } = props;
+function rectIsVisibleInGrid(rect: { x: number; y: number; width: number; height: number }, geom: GridGeometry, width: number, height: number): boolean {
+  return rect.x + rect.width > geom.rowHeaderWidth && rect.y + rect.height > geom.colHeaderHeight && rect.x < width && rect.y < height;
+}
+
+const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function LatticaGrid(
+  props,
+  ref,
+): ReactElement {
+  const {
+    controller,
+    columns,
+    onCellClick,
+    onScrollChange,
+    onColumnResize,
+    onViewStateChange,
+    onCellCommit,
+    cellOverlay,
+    renderCellOverlay,
+    onCellOverlayClose,
+  } = props;
   const theme = resolveTheme(props.theme);
   const fill = props.fill ?? false;
   const fixedWidth = props.width ?? 640;
@@ -124,6 +161,17 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   const width = fill && measured !== null ? measured.w : fixedWidth;
   const height = fill && measured !== null ? measured.h : fixedHeight;
   const geom = effectiveGeometry(controller.geometry(), showRowNumbers);
+
+  const getVisibleCellRect = useCallback(
+    (row: number, col: number): { x: number; y: number; width: number; height: number } | null => {
+      if (row < 0 || col < 0 || row >= controller.getRowCount() || col >= controller.getColCount()) {
+        return null;
+      }
+      const rect = cellRect(geom, scroll.left, scroll.top, row, col);
+      return rectIsVisibleInGrid(rect, geom, width, height) ? rect : null;
+    },
+    [controller, geom, height, scroll.left, scroll.top, width],
+  );
 
   // Measure the container when filling, so the canvas matches its parent.
   useEffect(() => {
@@ -191,6 +239,47 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
   useEffect(() => {
     onScrollChange?.(scroll);
   }, [scroll, onScrollChange]);
+
+  useEffect(() => {
+    if (cellOverlay === null || cellOverlay === undefined || onCellOverlayClose === undefined) {
+      return;
+    }
+    return controller.on('change', () => {
+      const { active } = controller.selection.getState();
+      if (active.row !== cellOverlay.row || active.col !== cellOverlay.col) {
+        onCellOverlayClose();
+      }
+    });
+  }, [cellOverlay, controller, onCellOverlayClose]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getCellClientRect(row, col) {
+        const root = rootRef.current;
+        /* v8 ignore next 3 -- the imperative handle is only observable after the root ref is attached */
+        if (root === null) {
+          return null;
+        }
+        const rect = getVisibleCellRect(row, col);
+        if (rect === null) {
+          return null;
+        }
+        const rootRect = root.getBoundingClientRect();
+        return new DOMRect(rootRect.left + rect.x, rootRect.top + rect.y, rect.width, rect.height);
+      },
+      focus() {
+        rootRef.current?.focus();
+      },
+      scrollCellIntoView(row, col) {
+        if (row < 0 || col < 0 || row >= controller.getRowCount() || col >= controller.getColCount()) {
+          return;
+        }
+        setScroll((prev) => scrollToCell(geom, prev, width, height, row, col));
+      },
+    }),
+    [controller, geom, getVisibleCellRect, height, width],
+  );
 
   // Paint on every render (cheap: only visible cells).
   useEffect(() => {
@@ -297,6 +386,11 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       if (composingRef.current) {
         return;
       }
+      if (e.key === 'Escape' && cellOverlay !== null && cellOverlay !== undefined && renderCellOverlay !== undefined) {
+        onCellOverlayClose?.();
+        e.preventDefault();
+        return;
+      }
       const handled = dispatchKey({
         key: e.key,
         shiftKey: e.shiftKey,
@@ -308,7 +402,7 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
         e.preventDefault();
       }
     },
-    [dispatchKey],
+    [cellOverlay, dispatchKey, onCellOverlayClose, renderCellOverlay],
   );
 
   /**
@@ -611,6 +705,10 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
 
   const editRect =
     edit !== null ? cellRect(geom, scroll.left, scroll.top, edit.row, edit.col) : null;
+  const overlayRect =
+    cellOverlay !== null && cellOverlay !== undefined && renderCellOverlay !== undefined
+      ? getVisibleCellRect(cellOverlay.row, cellOverlay.col)
+      : null;
 
   // Fill handle nub at the bottom-right corner of the selection (hidden while editing).
   const selBounds = controller.selection.getSelectionBounds();
@@ -994,6 +1092,34 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       {/* Active-cell editor overlay (kind depends on the column's cell type). */}
       {edit !== null && editRect !== null && renderEditor(edit, editRect)}
 
+      {/* Controlled cell overlay, anchored to the target cell's bottom-left. */}
+      {cellOverlay !== null && cellOverlay !== undefined && renderCellOverlay !== undefined && overlayRect !== null && (
+        <div
+          data-testid="lattica-cell-overlay"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
+          style={{
+            position: 'absolute',
+            left: overlayRect.x,
+            top: overlayRect.y + overlayRect.height,
+            zIndex: 6,
+          }}
+        >
+          {renderCellOverlay({
+            row: cellOverlay.row,
+            col: cellOverlay.col,
+            rect: {
+              left: overlayRect.x,
+              top: overlayRect.y,
+              width: overlayRect.width,
+              height: overlayRect.height,
+            },
+            close: () => onCellOverlayClose?.(),
+          })}
+        </div>
+      )}
+
       {/* Fill handle nub at the selection's bottom-right corner. */}
       {fillNubRect !== null && (
         <div
@@ -1155,7 +1281,9 @@ export function LatticaGrid(props: LatticaGridProps): ReactElement {
       )}
     </div>
   );
-}
+});
+
+export const LatticaGrid = LatticaGridImpl;
 
 async function writeClipboard(matrix: string[][]): Promise<void> {
   /* v8 ignore next 8 -- exercised only with a real async Clipboard API */
