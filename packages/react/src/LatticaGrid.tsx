@@ -31,7 +31,7 @@ import {
   type GridStateSnapshot,
   type SummaryRowSpec,
 } from '@ai-path/tb-core';
-import type { CellCommitEvent, DisplayOverride, GridController, EditState } from './controller.js';
+import type { CellCommitEvent, DisplayOverride, GridController, EditState, InputRejectEvent } from './controller.js';
 import {
   DEFAULT_HEADER_LINE_HEIGHT,
   DEFAULT_HEADER_PADDING_Y,
@@ -99,6 +99,8 @@ export interface LatticaGridProps {
   onViewStateChange?: (snapshot: GridStateSnapshot) => void;
   /** Fired after user-facing cell writes are committed. */
   onCellCommit?: (event: CellCommitEvent) => void;
+  /** Fired when an edit commit is refused (full-width reject / transform / validator). */
+  onInputReject?: (event: InputRejectEvent) => void;
   /** How to place the text cursor when editing begins. Defaults to selecting all text. */
   editSelection?: 'all' | 'end' | 'preserve';
   /**
@@ -190,6 +192,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     onColumnResize,
     onViewStateChange,
     onCellCommit,
+    onInputReject,
     cellOverlay,
     renderCellOverlay,
     onCellOverlayClose,
@@ -369,6 +372,13 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     }
     return controller.on('cellcommit', onCellCommit);
   }, [controller, onCellCommit]);
+
+  useEffect(() => {
+    if (onInputReject === undefined) {
+      return;
+    }
+    return controller.on('inputreject', onInputReject);
+  }, [controller, onInputReject]);
 
   // Focus the editor when an edit begins. `<select>` has no select() method.
   useEffect(() => {

@@ -1770,3 +1770,186 @@ describe('summary (footer) rows', () => {
     expect(c.getSummaryDisplay(0, 1)).toBe('');
   });
 });
+
+describe('full-width input hardening (P1-1b)', () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it('normalizes full-width digits/comma/period on number columns by default', () => {
+    const c = make();
+    c.setColumnType(0, 'number');
+    expect(c.getColumnFullWidthMode(0)).toBe('normalize');
+    c.beginEdit(0, 0, '');
+    c.updateDraft('１，２３４．５');
+    expect(c.getEdit()?.draft).toBe('1,234.5');
+    c.commitEdit();
+    expect(c.getValue(0, 0)).toBe(1234.5);
+  });
+
+  it('normalizes at commit time when the draft was seeded via beginEdit', () => {
+    const c = make();
+    c.setColumnType(0, 'number');
+    c.beginEdit(0, 0, '－１２３');
+    c.commitEdit();
+    expect(c.getValue(0, 0)).toBe(-123);
+  });
+
+  it('normalizes full-width colons for time columns ahead of the time pipeline', () => {
+    const c = make();
+    c.setColumnType(0, 'time');
+    expect(c.getColumnFullWidthMode(0)).toBe('normalize');
+    c.beginEdit(0, 0, '');
+    c.updateDraft('９：３０');
+    expect(c.getEdit()?.draft).toBe('9:30');
+    c.commitEdit();
+    expect(c.getEditText(0, 0)).toBe('09:30');
+  });
+
+  it('leaves text columns untouched (effective mode off outside number/time)', () => {
+    const c = make();
+    expect(c.getColumnFullWidthMode(0)).toBe('off');
+    c.beginEdit(0, 0, '');
+    c.updateDraft('１２３');
+    expect(c.getEdit()?.draft).toBe('１２３');
+    c.commitEdit();
+    expect(c.getValue(0, 0)).toBe('１２３');
+  });
+
+  it("rejects full-width input under fullWidthMode 'reject' and emits inputreject", () => {
+    const c = make();
+    c.setColumnType(0, 'number');
+    c.setColumnFullWidthMode(0, 'reject');
+    expect(c.getColumnFullWidthMode(0)).toBe('reject');
+    const rejects = vi.fn();
+    const commits = vi.fn();
+    const edits: unknown[] = [];
+    c.on('inputreject', rejects);
+    c.on('cellcommit', commits);
+    c.on('edit', (e) => edits.push(e));
+    c.setCellText(0, 0, '5');
+    c.beginEdit(0, 0, '１２３');
+    c.commitEdit();
+    expect(rejects).toHaveBeenCalledWith({ row: 0, col: 0, raw: '１２３', reason: 'fullwidth' });
+    expect(commits).not.toHaveBeenCalled();
+    expect(c.getValue(0, 0)).toBe(5); // cell unchanged
+    expect(c.getEdit()).toBeNull(); // edit session ended
+    expect(edits.at(-1)).toBeNull();
+  });
+
+  it('reject mode still commits half-width input normally', () => {
+    const c = make();
+    c.setColumnType(0, 'number');
+    c.setColumnFullWidthMode(0, 'reject');
+    const rejects = vi.fn();
+    c.on('inputreject', rejects);
+    c.beginEdit(0, 0, '42');
+    c.commitEdit();
+    expect(rejects).not.toHaveBeenCalled();
+    expect(c.getValue(0, 0)).toBe(42);
+  });
+
+  it("'off' disables handling so full-width text is stored as-is", () => {
+    const c = make();
+    c.setColumnType(0, 'number');
+    c.setColumnFullWidthMode(0, 'off');
+    c.beginEdit(0, 0, '');
+    c.updateDraft('１２３');
+    expect(c.getEdit()?.draft).toBe('１２３');
+    c.commitEdit();
+    expect(c.getValue(0, 0)).toBe('１２３');
+  });
+
+  it('clears an explicit mode back to the default with null', () => {
+    const c = make();
+    c.setColumnType(0, 'number');
+    c.setColumnFullWidthMode(0, 'off');
+    expect(c.getColumnFullWidthMode(0)).toBe('off');
+    c.setColumnFullWidthMode(0, null);
+    expect(c.getColumnFullWidthMode(0)).toBe('normalize');
+  });
+
+  it('wires fullWidthMode from column defs', () => {
+    const c = make();
+    c.applyColumnDefs([{ headerName: 'Qty', type: 'number', fullWidthMode: 'reject' }]);
+    expect(c.getColumnFullWidthMode(0)).toBe('reject');
+  });
+
+  it('emits inputreject when a validator fails after commit (and not on success)', async () => {
+    const c = make();
+    c.setColumnValidator(0, (v) => typeof v === 'number' && v > 0);
+    const rejects = vi.fn();
+    c.on('inputreject', rejects);
+    c.beginEdit(0, 0, '-3');
+    c.commitEdit();
+    await flush();
+    expect(rejects).toHaveBeenCalledWith({ row: 0, col: 0, raw: '-3', reason: 'validator' });
+    c.beginEdit(0, 0, '7');
+    c.commitEdit();
+    await flush();
+    expect(rejects).toHaveBeenCalledTimes(1);
+  });
+
+  it('emits inputreject when a commitTransform refuses non-empty input', () => {
+    const c = make();
+    c.setColumnType(0, 'time');
+    const rejects = vi.fn();
+    c.on('inputreject', rejects);
+    c.beginEdit(0, 0, '99:99');
+    c.commitEdit();
+    expect(rejects).toHaveBeenCalledWith({ row: 0, col: 0, raw: '99:99', reason: 'transform' });
+    expect(c.getEditText(0, 0)).toBe('');
+  });
+
+  it('does not emit inputreject for an empty draft through a null transform', () => {
+    const c = make();
+    c.setColumnType(0, 'time');
+    const rejects = vi.fn();
+    c.on('inputreject', rejects);
+    c.beginEdit(0, 0, '');
+    c.commitEdit();
+    expect(rejects).not.toHaveBeenCalled();
+  });
+});
+
+describe('empty commit stores null / zero display (P1-1b)', () => {
+  it('clearing a cell stores null (never ""), consistently across value and event', () => {
+    const c = make();
+    c.setCellText(0, 0, '42');
+    const events: import('./controller.js').CellCommitEvent[] = [];
+    c.on('cellcommit', (e) => events.push(e));
+    c.beginEdit(0, 0);
+    c.updateDraft('');
+    c.commitEdit();
+    expect(c.engine.getContent({ row: 0, col: 0 })).toBeNull(); // stored value is null
+    expect(c.getValue(0, 0)).toBeNull();
+    expect(c.getDisplay(0, 0)).toBe('');
+    expect(events).toHaveLength(1);
+    expect(events[0]!.changes).toEqual([
+      { row: 0, col: 0, physicalRow: 0, physicalCol: 0, prev: '42', next: '' },
+    ]);
+  });
+
+  it('renders 0 through a number format as "0.00", never blank', () => {
+    const c = make();
+    c.setColumnType(0, 'number');
+    c.setColumnFormat(0, '0.00');
+    c.beginEdit(0, 0, '0');
+    c.commitEdit();
+    expect(c.getValue(0, 0)).toBe(0);
+    expect(c.getDisplay(0, 0)).toBe('0.00');
+    c.beginEdit(0, 0, '０'); // full-width zero also lands as numeric 0
+    c.commitEdit();
+    expect(c.getValue(0, 0)).toBe(0);
+    expect(c.getDisplay(0, 0)).toBe('0.00');
+  });
+
+  it('parses comma-grouped decimals like "1,234.5" on the commit path', () => {
+    expect(parseNumberInput('1,234.5')).toBe(1234.5);
+    const c = make();
+    c.setColumnType(0, 'number');
+    c.setColumnFormat(0, '#,##0.00');
+    c.beginEdit(0, 0, '1,234.5');
+    c.commitEdit();
+    expect(c.getValue(0, 0)).toBe(1234.5);
+    expect(c.getDisplay(0, 0)).toBe('1,234.50');
+  });
+});

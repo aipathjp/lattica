@@ -554,6 +554,22 @@ describe('LatticaGrid editing', () => {
     expect(onCellCommit).not.toHaveBeenCalled();
   });
 
+  it('subscribes and unsubscribes onInputReject', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    c.setColumnType(0, 'number');
+    c.setColumnFullWidthMode(0, 'reject');
+    const onInputReject = vi.fn();
+    const view = renderGrid(c, undefined, { onInputReject });
+    c.beginEdit(0, 0, '１２３');
+    c.commitEdit();
+    expect(onInputReject).toHaveBeenCalledWith({ row: 0, col: 0, raw: '１２３', reason: 'fullwidth' });
+    onInputReject.mockClear();
+    view.rerender(<LatticaGrid controller={c} width={400} height={200} />);
+    c.beginEdit(0, 0, '４５６');
+    c.commitEdit();
+    expect(onInputReject).not.toHaveBeenCalled();
+  });
+
   it('supports all, end, and preserve edit selection modes', () => {
     const c = new GridController({ rowCount: 20, colCount: 10 });
     c.setCellText(0, 0, 'abc');

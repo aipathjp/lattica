@@ -71,6 +71,7 @@ import {
 } from './time-input.js';
 import { formatElapsedDisplay, normalizeElapsedInput, sanitizeElapsedDraft } from './elapsed-time.js';
 import { autoRowHeight, type MeasureText } from './measure.js';
+import { hasFullWidthNumeric, normalizeFullWidth, type FullWidthMode } from './input-normalize.js';
 
 export interface GridControllerOptions {
   rowCount: number;
@@ -151,11 +152,27 @@ export type DisplayOverride = (
  */
 export type ColumnTypeOptions = TimeInputOptions;
 
+/**
+ * Emitted when an edit commit is refused: full-width input on a
+ * `fullWidthMode: 'reject'` column, a `commitTransform` returning null for
+ * non-empty input, or a column/cell validator failing after commit.
+ */
+export interface InputRejectEvent {
+  /** Visual row of the edited cell. */
+  row: number;
+  /** Visual column of the edited cell. */
+  col: number;
+  /** The raw text whose commit was refused. */
+  raw: string;
+  reason: 'fullwidth' | 'transform' | 'validator';
+}
+
 interface ControllerEvents {
   change: void;
   edit: EditState | null;
   cellcommit: CellCommitEvent;
   viewstate: GridStateSnapshot;
+  inputreject: InputRejectEvent;
 }
 
 /** Format an engine value for display in a cell. */
@@ -335,6 +352,8 @@ export class GridController {
   private readonly columnFields = new Map<string, number>();
   /** Pinned summary (footer) row specs, rendered below the body. */
   private summarySpecs: readonly SummaryRowSpec[] = [];
+  /** Explicit full-width input policy overrides (physical col). */
+  private readonly columnFullWidthModes = new Map<number, FullWidthMode>();
   private readonly searchKeys = new Set<string>();
   /** Display-only text override (audit snapshots, per-column formatting…). */
   private displayOverride: DisplayOverride | null = null;
@@ -1254,6 +1273,9 @@ export class GridController {
       if (def.editable !== undefined) {
         this.columnEditable.set(physicalCol, def.editable);
       }
+      if (def.fullWidthMode !== undefined) {
+        this.columnFullWidthModes.set(physicalCol, def.fullWidthMode);
+      }
       if (
         def.maxLength !== undefined &&
         (!this.columnInputs.has(physicalCol) || this.columnInputsFromDefs.has(physicalCol))
@@ -1293,6 +1315,34 @@ export class GridController {
     } else {
       this.columnInputs.set(physicalCol, options);
     }
+  }
+
+  /**
+   * Set (or clear with null) the full-width input policy of a (visual) column.
+   * Only `number`/`time` columns consult the policy; their default is
+   * `'normalize'`.
+   */
+  setColumnFullWidthMode(visualCol: number, mode: FullWidthMode | null): void {
+    const physicalCol = this.view.cols.getPhysicalIndex(visualCol);
+    if (mode === null) {
+      this.columnFullWidthModes.delete(physicalCol);
+    } else {
+      this.columnFullWidthModes.set(physicalCol, mode);
+    }
+  }
+
+  /**
+   * Effective full-width policy applied on the commit path of a (visual)
+   * column: `'off'` unless the column type is `number`/`time`, otherwise the
+   * explicit override or the `'normalize'` default.
+   */
+  getColumnFullWidthMode(visualCol: number): FullWidthMode {
+    const physicalCol = this.view.cols.getPhysicalIndex(visualCol);
+    const type = this.columnTypes.get(physicalCol);
+    if (type !== 'number' && type !== 'time') {
+      return 'off';
+    }
+    return this.columnFullWidthModes.get(physicalCol) ?? 'normalize';
   }
 
   private inputOptionsFor(visualCol: number): ColumnInputOptions | undefined {
@@ -1780,8 +1830,12 @@ export class GridController {
 
   updateDraft(draft: string): void {
     if (this.editState !== null) {
+      // Normalize full-width digits before column sanitizers run so a time
+      // column's draft filter sees `9:30`, not `９：３０` (which it would strip).
+      const normalized =
+        this.getColumnFullWidthMode(this.editState.col) === 'normalize' ? normalizeFullWidth(draft) : draft;
       const options = this.inputOptionsFor(this.editState.col);
-      let next = options?.sanitizeDraft?.(draft, this.editState.draft) ?? draft;
+      let next = options?.sanitizeDraft?.(normalized, this.editState.draft) ?? normalized;
       if (options?.maxLength !== undefined && next.length > options.maxLength) {
         next = next.slice(0, options.maxLength);
       }
@@ -1794,9 +1848,19 @@ export class GridController {
       return;
     }
     const { row, col } = this.editState;
+    let draft = this.editState.draft;
+    const fullWidthMode = this.getColumnFullWidthMode(col);
+    if (fullWidthMode !== 'off' && hasFullWidthNumeric(draft)) {
+      if (fullWidthMode === 'reject') {
+        this.editState = null;
+        this.emitter.emit('inputreject', { row, col, raw: draft, reason: 'fullwidth' });
+        this.emitter.emit('edit', null);
+        return;
+      }
+      draft = normalizeFullWidth(draft);
+    }
     const options = this.inputOptionsFor(col);
-    const transformed =
-      options?.commitTransform === undefined ? this.editState.draft : options.commitTransform(this.editState.draft);
+    const transformed = options?.commitTransform === undefined ? draft : options.commitTransform(draft);
     this.editState = null;
     if (transformed !== null) {
       const p = this.toPhysical(row, col);
@@ -1807,7 +1871,15 @@ export class GridController {
       const change = this.cellChange(row, col, prev, next);
       this.emitCellCommit('edit', change === null ? [] : [change]);
       // Validate the committed value against the column/cell validator (if any).
-      void this.validation.validate(p.row, p.col, this.parseInput(transformed) as CellValue);
+      void this.validation.validate(p.row, p.col, this.parseInput(transformed) as CellValue).then((ok) => {
+        if (!ok) {
+          this.emitter.emit('inputreject', { row, col, raw: transformed, reason: 'validator' });
+        }
+      });
+    } else if (draft !== '') {
+      // A transform refusing non-empty input is a rejection; an empty draft
+      // through a null transform is an intentional no-op (e.g. blank time).
+      this.emitter.emit('inputreject', { row, col, raw: draft, reason: 'transform' });
     }
     this.emitter.emit('edit', null);
   }

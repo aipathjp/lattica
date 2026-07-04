@@ -54,6 +54,11 @@ export interface ColumnDef {
   readonly maxLength?: number;
   /** Wrap cell text onto multiple lines when it exceeds the column width. */
   readonly wrap?: boolean;
+  /**
+   * Full-width (zenkaku) numeric input policy for `number`/`time` columns:
+   * normalize to half-width (default), reject the commit, or leave as-is.
+   */
+  readonly fullWidthMode?: 'reject' | 'normalize' | 'off';
   readonly showWhen?: ShowWhen;
 }
 
