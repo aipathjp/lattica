@@ -5,7 +5,7 @@ Index-mapping and data-source binding that decouples the physical order of rows/
 This package is part of the [Taible](/) monorepo. The full, canonical reference
 lives in the package README in the source tree:
 
-- Source README: [`packages/data/README.md`](https://github.com/aipathjp/lattica/blob/main/packages/data/README.md)
+- Source README: [`packages/data/README.md`](https://github.com/aipathjp/taible/blob/main/packages/data/README.md)
 - Package: `@ai-path/tb-data`
 
 ## Install

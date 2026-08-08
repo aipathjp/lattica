@@ -14,7 +14,7 @@ hero:
       link: /ARCHITECTURE
     - theme: alt
       text: View on GitHub
-      link: https://github.com/aipathjp/lattica
+      link: https://github.com/aipathjp/taible
 
 features:
   - title: Canvas-rendered body

@@ -5,7 +5,7 @@ Realtime collaboration primitives: a last-writer-wins CRDT for cell values (Tabl
 This package is part of the [Taible](/) monorepo. The full, canonical reference
 lives in the package README in the source tree:
 
-- Source README: [`packages/collab/README.md`](https://github.com/aipathjp/lattica/blob/main/packages/collab/README.md)
+- Source README: [`packages/collab/README.md`](https://github.com/aipathjp/taible/blob/main/packages/collab/README.md)
 - Package: `@ai-path/tb-collab`
 
 ## Install

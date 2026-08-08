@@ -5,7 +5,7 @@ A clean-room, Excel-compatible formula engine: lexer, parser, value coercion, an
 This package is part of the [Taible](/) monorepo. The full, canonical reference
 lives in the package README in the source tree:
 
-- Source README: [`packages/formula/README.md`](https://github.com/aipathjp/lattica/blob/main/packages/formula/README.md)
+- Source README: [`packages/formula/README.md`](https://github.com/aipathjp/taible/blob/main/packages/formula/README.md)
 - Package: `@ai-path/tb-formula`
 
 ## Install

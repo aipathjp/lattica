@@ -5,7 +5,7 @@ Exposes a Taible grid to AI agents as a transport-agnostic tool registry. Each G
 This package is part of the [Taible](/) monorepo. The full, canonical reference
 lives in the package README in the source tree:
 
-- Source README: [`packages/mcp/README.md`](https://github.com/aipathjp/lattica/blob/main/packages/mcp/README.md)
+- Source README: [`packages/mcp/README.md`](https://github.com/aipathjp/taible/blob/main/packages/mcp/README.md)
 - Package: `@ai-path/tb-mcp`
 
 ## Install

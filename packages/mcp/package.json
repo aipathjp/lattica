@@ -13,7 +13,7 @@
   "scripts": { "build": "tsup", "typecheck": "tsc --noEmit" },
   "dependencies": { "@ai-path/tb-formula": "workspace:*" },
   "publishConfig": { "access": "public", "provenance": true },
-  "repository": { "type": "git", "url": "https://github.com/aipathjp/lattica.git", "directory": "packages/mcp" },
-  "homepage": "https://github.com/aipathjp/lattica#readme",
-  "bugs": { "url": "https://github.com/aipathjp/lattica/issues" }
+  "repository": { "type": "git", "url": "https://github.com/aipathjp/taible.git", "directory": "packages/mcp" },
+  "homepage": "https://github.com/aipathjp/taible#readme",
+  "bugs": { "url": "https://github.com/aipathjp/taible/issues" }
 }

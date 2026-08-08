@@ -67,6 +67,6 @@ export default defineConfig({
         ],
       },
     ],
-    socialLinks: [{ icon: 'github', link: 'https://github.com/aipathjp/lattica' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/aipathjp/taible' }],
   },
 });

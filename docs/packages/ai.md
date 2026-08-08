@@ -5,7 +5,7 @@ AI-native spreadsheet primitives built on a provider-agnostic AIProvider interfa
 This package is part of the [Taible](/) monorepo. The full, canonical reference
 lives in the package README in the source tree:
 
-- Source README: [`packages/ai/README.md`](https://github.com/aipathjp/lattica/blob/main/packages/ai/README.md)
+- Source README: [`packages/ai/README.md`](https://github.com/aipathjp/taible/blob/main/packages/ai/README.md)
 - Package: `@ai-path/tb-ai`
 
 ## Install

@@ -4,7 +4,7 @@
 > 実装はマルチエージェント・ハーネス（依存を尊重した wave 並列＋敵対的レビュー）で進行。
 
 - 基準: **カバレッジ 100% 必達**（Lines/Branches/Functions/Statements）。typecheck/lint/build クリーン。クリーンルーム維持。
-- 公開: https://github.com/aipathjp/lattica
+- 公開: https://github.com/aipathjp/taible
 
 ## 2026-07-05 — Taible リネーム
 

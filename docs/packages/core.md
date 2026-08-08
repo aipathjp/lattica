@@ -5,7 +5,7 @@ The framework-agnostic data-grid engine at the heart of Taible — coordinate ma
 This package is part of the [Taible](/) monorepo. The full, canonical reference
 lives in the package README in the source tree:
 
-- Source README: [`packages/core/README.md`](https://github.com/aipathjp/lattica/blob/main/packages/core/README.md)
+- Source README: [`packages/core/README.md`](https://github.com/aipathjp/taible/blob/main/packages/core/README.md)
 - Package: `@ai-path/tb-core`
 
 ## Install

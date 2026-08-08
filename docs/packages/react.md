@@ -5,7 +5,7 @@ The canvas-rendered, virtualized React data grid. <LatticaGrid> is a thin view o
 This package is part of the [Taible](/) monorepo. The full, canonical reference
 lives in the package README in the source tree:
 
-- Source README: [`packages/react/README.md`](https://github.com/aipathjp/lattica/blob/main/packages/react/README.md)
+- Source README: [`packages/react/README.md`](https://github.com/aipathjp/taible/blob/main/packages/react/README.md)
 - Package: `@ai-path/tb-react`
 
 ## Install
