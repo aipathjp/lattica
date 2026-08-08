@@ -1,0 +1,123 @@
+name: Release (npm)
+
+# npm への公開を CI に寄せるための workflow。
+#
+# 主経路は **npm Trusted Publishing (OIDC)** で、npm トークンを一切持たない。
+#   - GitHub が発行する OIDC トークンで npm に認証するため secrets が不要
+#   - 対話の 2FA (EOTP) が発生しない
+#   - provenance (来歴証明) が自動で付く
+#
+# 事前に一度だけ、npmjs.com の各パッケージ設定で Trusted Publisher を登録する:
+#   Settings → Publishing access → Trusted publisher
+#     Repository        : aipathjp/taible
+#     Workflow filename : release.yml
+#
+# NPM_TOKEN secret が登録されていれば、そちらでも publish できる (フォールバック)。
+#
+# workspace: プロトコルの解決に注意:
+#   packages/react は tb-core / tb-data / tb-formula を "workspace:*" で参照している。
+#   `npm publish` はこれを書き換えられないため、**pnpm pack で tarball を作り**
+#   (この時点で実バージョンへ解決される)、その tarball を `npm publish` する。
+
+on:
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: '公開対象のディレクトリ名 (例: react,core)。空なら未公開バージョンを全て'
+        required: false
+        default: ''
+      dry_run:
+        description: 'dry-run のみ (実際には公開しない)'
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write # npm Trusted Publishing (OIDC) に必須
+
+concurrency:
+  group: release-npm
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+          cache: pnpm
+
+      # OIDC (Trusted Publishing) は npm >= 11.5.1 が必要
+      - name: Ensure npm supports trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - run: pnpm install --frozen-lockfile
+
+      # 壊れたものを公開しないためのゲート
+      - run: pnpm run build
+      - run: pnpm exec vitest run
+      - run: pnpm run typecheck
+
+      - name: Publish packages whose version is not on npm yet
+        env:
+          # OIDC を使う場合この secret は不要 (空でよい)。
+          # 登録されていればトークン認証のフォールバックとして機能する。
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          FILTER: ${{ inputs.packages }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          published=0
+          skipped=0
+
+          for dir in packages/*/; do
+            pkg="${dir%/}"
+            name=$(node -p "require('./$pkg/package.json').name")
+            version=$(node -p "require('./$pkg/package.json').version")
+            private=$(node -p "String(require('./$pkg/package.json').private === true)")
+
+            if [ "$private" = "true" ]; then
+              echo "skip (private): $name"
+              skipped=$((skipped+1)); continue
+            fi
+
+            # 対象を絞る指定があれば従う
+            if [ -n "${FILTER:-}" ] && ! echo ",${FILTER}," | grep -q ",$(basename "$pkg")," ; then
+              echo "skip (not in filter): $name"
+              skipped=$((skipped+1)); continue
+            fi
+
+            # 既に同じ版が公開されていれば何もしない (再実行しても安全)
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "skip (already published): $name@$version"
+              skipped=$((skipped+1)); continue
+            fi
+
+            echo "::group::publish $name@$version"
+            # workspace: を実バージョンへ解決した tarball を作る
+            tgz=$(cd "$pkg" && pnpm pack --pack-destination "$RUNNER_TEMP" | tail -1)
+
+            if [ "${DRY_RUN:-false}" = "true" ]; then
+              npm publish "$tgz" --access public --provenance --dry-run
+            else
+              npm publish "$tgz" --access public --provenance
+              published=$((published+1))
+            fi
+            echo "::endgroup::"
+          done
+
+          echo "published=$published skipped=$skipped"
+          if [ "$published" -eq 0 ] && [ "${DRY_RUN:-false}" != "true" ]; then
+            echo "::notice::公開対象はありませんでした (全て公開済み)"
+          fi
