@@ -97,6 +97,27 @@ export interface LatticaGridProps {
   /** Controlled record rows bound through leaf column `field` values. */
   rows?: ReadonlyArray<object>;
   theme?: Partial<GridTheme>;
+  /**
+   * Route Japanese/CJK IME input through an always-focused hidden textarea (opt-in).
+   *
+   * 2026-08-08 (aipathjp/lattica IME defect #1): the grid root is a `div[tabindex=0]`.
+   * A div is not an editable element, so while focus sits there the IME cannot compose.
+   * Typing `sakurai` produced `あくらい` — `interpretKey` treats the first character as
+   * `{ type: 'edit', initial }` and opens the editor with it as the draft, so the IME
+   * never receives it. `editSelection='end'` only changes it to `sあくらい`.
+   * Verified against real Chromium via CDP `Input.imeSetComposition`.
+   *
+   * With this enabled a transparent textarea is kept focused over the active cell, so
+   * composition is alive *before* the first keystroke and the whole conversion lands.
+   * Commits still flow through beginEdit → updateDraft → commitEdit, so validation and
+   * persistence paths are unchanged.
+   *
+   * Opt-in because it changes where DOM focus lives, which callers may depend on.
+   * Recommended for any grid that accepts Japanese text.
+   *
+   * @defaultValue false
+   */
+  imeSafeInput?: boolean;
   /** Fixed pixel width (ignored when `autoSize` or `fill` is set). Defaults to 640. */
   width?: number;
   /** Fixed pixel height (ignored when `autoSize` or `fill` is set). Defaults to 400. */
@@ -642,6 +663,19 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     return controller.on('rowschange', onRowsChange);
   }, [controller, onRowsChange]);
 
+  // Identity of the *edit session*, not the draft.
+  //
+  // 2026-08-08 (aipathjp/lattica IME defect #2): this effect used to depend on `edit`
+  // itself. `updateDraft` returns a new object on every keystroke, so the effect re-ran
+  // per key and re-applied `select()` / `setSelectionRange()`, wiping the caret. The
+  // visible symptom was "typing one character clears the whole cell" — you could never
+  // amend existing text. Reproduced with the bare grid, so it was not a caller problem,
+  // and no `editSelection` value avoided it.
+  //
+  // Keying on row/col means the caret is positioned once when the session opens and is
+  // left alone while the user types (which is also what IME composition requires).
+  const editSessionKey = edit === null ? null : `${edit.row}:${edit.col}`;
+
   // Focus the editor when an edit begins. `<select>` has no select() method.
   useEffect(() => {
     const el = editorRef.current;
@@ -658,7 +692,8 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
         el.setSelectionRange(len, len);
       }
     }
-  }, [edit, editSelection]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- edit は毎打鍵で新オブジェクトになるため session key で依存する
+  }, [editSessionKey, editSelection]);
 
   useEffect(() => {
     onScrollChange?.(scroll);
@@ -1548,6 +1583,16 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   const editRect =
     edit !== null ? cellRect(geom, scroll.left, scroll.top, edit.row, edit.col) : null;
 
+  // IME defect #1 (2026-08-08): rect of the *selected* cell while not editing.
+  // The hidden composition textarea is parked here so the IME has a real editable
+  // element focused before the first keystroke.
+  const imeActive =
+    props.imeSafeInput === true ? controller.selection.getState().active : null;
+  const imeRect =
+    imeActive !== null && edit === null
+      ? cellRect(geom, scroll.left, scroll.top, imeActive.row, imeActive.col)
+      : null;
+
   // Resolve a custom editor for the edited column: the column must name an
   // editor kind and the registry must have it. Otherwise the built-in editors
   // below render as usual (unknown kinds fall back to the plain text editor).
@@ -1776,6 +1821,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       tabIndex={0}
       data-testid="lattica-grid"
       className={props.className}
+      data-ime-safe={props.imeSafeInput === true ? 'true' : undefined}
       style={{
         position: 'relative',
         width: autoSize !== 'content' && fill ? '100%' : width,
@@ -2001,6 +2047,52 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
               </div>
             );
           })}
+
+      {/* IME composition surface (opt-in `imeSafeInput`).
+
+          The grid root is a div[tabindex=0]; a div cannot host IME composition, so the
+          first character of a Japanese conversion was swallowed (`sakurai` → `あくらい`).
+          Parking a focused, transparent textarea over the selected cell keeps composition
+          alive before typing starts. The first input opens a normal edit session, so
+          validation/commit paths are unchanged. */}
+      {imeRect !== null && imeActive !== null && (
+        <textarea
+          data-testid="lattica-ime-surface"
+          value=""
+          onChange={(ev) => {
+            const v = ev.target.value;
+            if (v === '') return;
+            controller.beginEdit(imeActive.row, imeActive.col, v);
+            setEdit(controller.getEdit());
+          }}
+          onCompositionEnd={(ev) => {
+            const v = (ev.target as HTMLTextAreaElement).value;
+            if (v === '') return;
+            controller.beginEdit(imeActive.row, imeActive.col, v);
+            setEdit(controller.getEdit());
+          }}
+          autoFocus
+          style={{
+            position: 'absolute',
+            left: imeRect.x,
+            top: imeRect.y,
+            width: imeRect.width,
+            height: imeRect.height,
+            margin: 0,
+            padding: 0,
+            border: 'none',
+            outline: 'none',
+            resize: 'none',
+            // Invisible but focusable and IME-capable. `opacity: 0` (not
+            // visibility/display) is required — hidden elements cannot host composition.
+            opacity: 0,
+            background: 'transparent',
+            color: 'transparent',
+            caretColor: 'transparent',
+            zIndex: 5,
+          }}
+        />
+      )}
 
       {/* Active-cell editor overlay (kind depends on the column's cell type).
           A registered custom editor mounts into a host container instead;

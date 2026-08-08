@@ -603,6 +603,65 @@ describe('LatticaGrid editing', () => {
     expect(c.getDisplay(0, 0)).toBe('blurred');
   });
 
+  // 2026-08-08 (IME defect #2): the focus effect used to depend on the whole `edit`
+  // object, which `updateDraft` recreates per keystroke. That re-applied the caret
+  // reset on every key and made it impossible to amend existing text.
+  it('does not reset the caret while typing inside one edit session', () => {
+    const c = new GridController({ rowCount: 20, colCount: 10 });
+    c.setCellText(0, 0, 'sakurai');
+    renderGrid(c);
+    const grid = screen.getByTestId('lattica-grid');
+    c.selection.setActive({ row: 0, col: 0 });
+    fireEvent.keyDown(grid, { key: 'F2' });
+    const editor = screen.getByTestId('lattica-editor') as HTMLTextAreaElement;
+    // Put the caret in the middle, as a user amending existing text would.
+    editor.setSelectionRange(3, 3);
+    // A keystroke arrives: the draft changes but the session (row/col) does not.
+    act(() => {
+      c.updateDraft('sakXurai');
+    });
+    // The caret must stay where the user left it, not jump to 0/end.
+    expect(editor.selectionStart).toBe(3);
+    expect(editor.selectionEnd).toBe(3);
+  });
+
+  // 2026-08-08 (IME defect #1): opt-in composition surface.
+  describe('imeSafeInput', () => {
+    it('is not rendered by default (focus behaviour unchanged for existing callers)', () => {
+      const c = new GridController({ rowCount: 20, colCount: 10 });
+      renderGrid(c);
+      expect(screen.queryByTestId('lattica-ime-surface')).toBeNull();
+    });
+
+    it('parks a focusable surface over the selected cell when enabled', () => {
+      const c = new GridController({ rowCount: 20, colCount: 10 });
+      render(<LatticaGrid controller={c} width={400} height={200} imeSafeInput />);
+      const surface = screen.getByTestId('lattica-ime-surface') as HTMLTextAreaElement;
+      // Must be a real editable element (a div cannot host IME composition).
+      expect(surface.tagName).toBe('TEXTAREA');
+      // Invisible but focusable: opacity, not display/visibility.
+      expect(surface.style.opacity).toBe('0');
+    });
+
+    it('opens an edit session carrying the composed text (first char is not lost)', () => {
+      const c = new GridController({ rowCount: 20, colCount: 10 });
+      render(<LatticaGrid controller={c} width={400} height={200} imeSafeInput />);
+      const surface = screen.getByTestId('lattica-ime-surface') as HTMLTextAreaElement;
+      // A full IME conversion lands at once; the whole string must reach the draft.
+      fireEvent.compositionEnd(surface, { target: { value: 'さくらい' } });
+      expect(c.getEdit()?.draft).toBe('さくらい');
+    });
+
+    it('disappears while an edit session is open (the real editor takes over)', () => {
+      const c = new GridController({ rowCount: 20, colCount: 10 });
+      render(<LatticaGrid controller={c} width={400} height={200} imeSafeInput />);
+      act(() => {
+        c.beginEdit(0, 0, 'x');
+      });
+      expect(screen.queryByTestId('lattica-ime-surface')).toBeNull();
+    });
+  });
+
   it('subscribes and unsubscribes onCellCommit', () => {
     const c = new GridController({ rowCount: 20, colCount: 10 });
     const onCellCommit = vi.fn();
