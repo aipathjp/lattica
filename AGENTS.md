@@ -472,6 +472,28 @@ controller.getComment(row, col); controller.hasComment(row, col);
 // Theme token: commentMarkerColor (default '#d64545')
 ```
 
+### Truncated-cell tooltips (`overflowTooltip`)
+
+Canvas cell text is **hard-clipped** — a value wider than its column is cut with
+no ellipsis and no `scrollWidth` to detect it with. `overflowTooltip` restores
+the DOM-table affordance: hover a cell whose painted text does not fit and the
+full text appears in the same tooltip overlay; cells that fit show nothing.
+
+```tsx
+<LatticaGrid overflowTooltip ... />   // opt-in; default false (no behavior change)
+```
+
+- Priority: cell comment → `cellTooltip` → truncated text.
+- Column headers follow the same rule (collapse caret + sort/filter buttons are
+  subtracted from the label's usable width).
+- Skipped: `checkbox` / `boolean` / `bar` columns and sparkline cells. Merge
+  anchors measure across their full span; `wrap` columns are judged on the row
+  height and the wrap width; the text measured is the painted one
+  (`displayValue` override included).
+- One `measureText` per newly hovered cell — nothing is added to the paint path.
+- Headless predicates are exported for reuse: `paintsCellText`,
+  `isCellTextClipped`, `headerChromeWidth`, `isHeaderLabelClipped`.
+
 ### Pinned summary (footer) rows
 
 ```tsx

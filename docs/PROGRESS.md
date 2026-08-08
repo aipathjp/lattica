@@ -47,6 +47,18 @@ P1/P2 バッチに続き、置換の成立に必須の P0 要件を 8 並列 wor
 | #76 | `autoHeight` 全行表示モード (内部縦スクロールなし) | P0-6 |
 | #77 | `insertRow`/`removeRow` (undo・rowschange・メタシフト) | P0-8 |
 
+## 2026-08-08 — 切り詰めセルのホバーツールチップ (`overflowTooltip`)
+
+canvas のセル文字列は clip 描画のため、列幅に収まらない値は**省略記号も出ずに黙って切れる**（DOM テーブルの `text-overflow: ellipsis` / `scrollWidth` に相当する手掛かりがない）。aipla の Backlog / 案件一覧が DOM テーブルから Taible へ移行する際に「切り詰め時のみツールチップ」を失う問題に対し、Taible 本体へ標準搭載した。
+
+- 新規純粋モジュール `overflow.ts`: `paintsCellText` / `isCellTextClipped` / `headerChromeWidth` / `isHeaderLabelClipped`。painter と同じフォント文字列・`cellPaddingX`・`wrapText` を使い、**描画されている見た目そのもの**に対して切り詰め判定する。
+- `<LatticaGrid overflowTooltip>` (既定 `false` の opt-in) — 既存の comment / `cellTooltip` ツールチップ機構 (`TOOLTIP_DELAY_MS` 500ms・`data-testid="lattica-tooltip"`) をそのまま再利用し、**切り詰められているセルだけ**に全文を出す。優先順位は comment > `cellTooltip` > 切り詰め全文。
+- 列ヘッダーにも同一規則を適用（折り畳みキャレット・ソート/フィルタボタンの占有幅を差し引いて判定）。ツールチップのアンカーをセル/矩形の 2 種に一般化。
+- 除外: `checkbox`/`boolean`/`bar` 列（文字を描かない）、スパークラインセル。マージアンカーはマージ後の実寸で判定。`wrap` 列は行高からの溢れ + 分割不能行で判定。表示は `displayValue` オーバーライド後の文字列を使う。
+- 計測はホバー中のセル 1 つにつき 1 回のみ（描画パスへの追加コストゼロ）。paint 時に生成済みの `canvasMeasurer` を再利用。
+- `geometry.ts` に `spanSize` を公開（`scene.ts` の私有ヘルパを昇格・重複排除）。
+- **2478 テスト・100% カバレッジ維持**。typecheck/lint/build クリーン。`@ai-path/tb-react@0.4.0`。
+
 ## サマリ
 
 | 区分 | 状態 |

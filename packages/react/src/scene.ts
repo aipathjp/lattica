@@ -13,7 +13,7 @@ import {
   type IconMark,
   type SparklineShape,
 } from '@ai-path/tb-core';
-import { cellRect, columnX, summaryBandHeight, type GridGeometry, type Rect } from './geometry.js';
+import { cellRect, columnX, spanSize, summaryBandHeight, type GridGeometry, type Rect } from './geometry.js';
 import { wrapText, type MeasureText } from './measure.js';
 
 export interface CellPaint {
@@ -118,15 +118,6 @@ export interface BuildSceneParams {
   getSummaryDisplay?: (summaryRow: number, col: number) => string;
   /** Suppress selection visuals: no selected/active flags, no activeRect. */
   hideSelection?: boolean;
-}
-
-/** Sum the sizes of `count` indices starting at `start`. */
-function spanSize(sizes: GridGeometry['rowSizes'], start: number, count: number): number {
-  let total = 0;
-  for (let i = 0; i < count; i++) {
-    total += sizes.getSize(start + i);
-  }
-  return total;
 }
 
 /** The visible index list along one axis: frozen leading indices + the window. */
