@@ -1,5 +1,33 @@
 # @ai-path/tb-react
 
+## 0.4.2 (2026-08-08)
+
+### Fixed
+
+- **Amending existing text no longer wipes the cell.** The focus effect depended on
+  the whole `edit` object, which `updateDraft` recreates on every keystroke. The
+  effect therefore re-ran per key and re-applied `select()` / `setSelectionRange()`,
+  throwing the caret away — typing one character into a filled cell cleared it. The
+  effect now keys on the edit *session* (row/col), so the caret is positioned once
+  when the session opens and left alone while you type. No `editSelection` value
+  worked around this, and it reproduced with a bare `LatticaGrid`.
+
+### Added
+
+- **`<LatticaGrid imeSafeInput>` — opt-in surface for Japanese/CJK input.** The grid
+  root is a `div[tabindex=0]`; a `div` cannot host IME composition, so while focus
+  sat there the first character of a conversion was swallowed (`sakurai` → `あくらい`):
+  `interpretKey` treats it as `{ type: 'edit', initial }` and opens the editor with it
+  as the draft, so the IME never receives it. `editSelection='end'` only turned it into
+  `sあくらい`. With `imeSafeInput`, a transparent textarea is kept focused over the
+  active cell so composition is alive before the first keystroke and the whole
+  conversion lands. Commits still flow through `beginEdit` → `updateDraft` →
+  `commitEdit`, so validation and persistence are unchanged.
+
+  Opt-in because it moves where DOM focus lives, which callers may depend on.
+  Recommended for any grid that accepts Japanese text. Both defects were reproduced
+  and verified against real Chromium via CDP `Input.imeSetComposition`.
+
 ## 0.4.0 (2026-08-08)
 
 ### Added
