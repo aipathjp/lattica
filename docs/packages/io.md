@@ -5,7 +5,7 @@ Import/export and clipboard interop with no runtime dependencies: an RFC 4180 CS
 This package is part of the [Taible](/) monorepo. The full, canonical reference
 lives in the package README in the source tree:
 
-- Source README: [`packages/io/README.md`](https://github.com/aipathjp/lattica/blob/main/packages/io/README.md)
+- Source README: [`packages/io/README.md`](https://github.com/aipathjp/taible/blob/main/packages/io/README.md)
 - Package: `@ai-path/tb-io`
 
 ## Install

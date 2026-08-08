@@ -2,13 +2,13 @@
   "name": "@ai-path/tb-data",
   "version": "0.3.0",
   "description": "Index mapping (physical<->visual) and data-source binding for Taible: the foundation for hiding, moving, sorting, filtering, trimming, and grouping.",
-  "homepage": "https://github.com/aipathjp/lattica#readme",
+  "homepage": "https://github.com/aipathjp/taible#readme",
   "bugs": {
-    "url": "https://github.com/aipathjp/lattica/issues"
+    "url": "https://github.com/aipathjp/taible/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/aipathjp/lattica.git",
+    "url": "https://github.com/aipathjp/taible.git",
     "directory": "packages/data"
   },
   "license": "MIT",

@@ -6,7 +6,7 @@
 
 - 関連: [`ARCHITECTURE.md`](ARCHITECTURE.md) / [`RESEARCH.md`](RESEARCH.md)
 - 現状 (2026-06-08 実測): core / data / formula / react / io / collab / ai / mcp の **8 パッケージ実装済**・**1,955 テスト (108 ファイル) 全パス**・カバレッジ閾値 **100%** (vitest.config thresholds)
-- 公開: https://github.com/aipathjp/lattica (MIT・クリーンルーム) / デモ: https://lattica-demo.vercel.app
+- 公開: https://github.com/aipathjp/taible (MIT・クリーンルーム) / デモ: https://lattica-demo.vercel.app
 
 ---
 

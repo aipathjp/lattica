@@ -5,12 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aipathjp/lattica.git",
+    "url": "https://github.com/aipathjp/taible.git",
     "directory": "packages/react"
   },
-  "homepage": "https://github.com/aipathjp/lattica#readme",
+  "homepage": "https://github.com/aipathjp/taible#readme",
   "bugs": {
-    "url": "https://github.com/aipathjp/lattica/issues"
+    "url": "https://github.com/aipathjp/taible/issues"
   },
   "type": "module",
   "sideEffects": false,

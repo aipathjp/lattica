@@ -11,9 +11,9 @@
   "types": "./dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" } },
   "scripts": { "build": "tsup", "typecheck": "tsc --noEmit" },
-  "repository": { "type": "git", "url": "https://github.com/aipathjp/lattica.git", "directory": "packages/ai" },
-  "homepage": "https://github.com/aipathjp/lattica#readme",
-  "bugs": { "url": "https://github.com/aipathjp/lattica/issues" },
+  "repository": { "type": "git", "url": "https://github.com/aipathjp/taible.git", "directory": "packages/ai" },
+  "homepage": "https://github.com/aipathjp/taible#readme",
+  "bugs": { "url": "https://github.com/aipathjp/taible/issues" },
   "dependencies": { "@ai-path/tb-core": "workspace:*", "@ai-path/tb-formula": "workspace:*", "@ai-path/tb-data": "workspace:*" },
   "publishConfig": { "access": "public", "provenance": true }
 }
