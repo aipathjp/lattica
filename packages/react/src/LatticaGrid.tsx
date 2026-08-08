@@ -47,7 +47,7 @@ import {
   type GridTheme,
 } from './theme.js';
 import { buildScene } from './scene.js';
-import { canvasMeasurer } from './measure.js';
+import { canvasMeasurer, wrapLineHeight, type MeasureText } from './measure.js';
 import { paintScene, type Canvas2D } from './painter.js';
 import {
   cellRect,
@@ -55,14 +55,28 @@ import {
   hitTest,
   layoutSignature,
   rowStripRect,
+  spanSize,
   summaryBandHeight,
   visibleRowStrips,
   type GridGeometry,
   type HitResult,
+  type Rect,
 } from './geometry.js';
+import {
+  headerChromeWidth,
+  isCellTextClipped,
+  isHeaderLabelClipped,
+  paintsCellText,
+  type CellTextFit,
+} from './overflow.js';
 import { interpretKey, type EnterMoves, type KeyInput } from './keyboard.js';
 import { scrollToCell, clampScroll, type ScrollOffset } from './scroll.js';
-import { columnHeaderCells, computeHeaderRowHeights, rowHeaderCells } from './headers.js';
+import {
+  columnHeaderCells,
+  computeHeaderRowHeights,
+  rowHeaderCells,
+  type PositionedHeader,
+} from './headers.js';
 import type { EditorRegistry } from './editors.js';
 import { buildMenu, type MenuItem, type MenuItemSpec } from './menu.js';
 import { hitResizeHandle, type ResizeTarget } from './resize.js';
@@ -222,6 +236,25 @@ export interface LatticaGridProps {
    */
   cellTooltip?: (row: number, col: number) => string | null;
   /**
+   * Show a cell's full text in the hover tooltip **when — and only when — the
+   * painted text does not fit its cell**. Canvas text is hard-clipped (there
+   * is no `text-overflow: ellipsis` and no `scrollWidth`), so long values are
+   * cut with no visual cue; this restores the "hover a truncated cell to read
+   * it" affordance of a DOM table. Cells whose text fully fits show nothing.
+   *
+   * Column-header labels that do not fit their header box (after the collapse
+   * caret and the sort / filter buttons) get the same treatment.
+   *
+   * A cell comment and a `cellTooltip` string both still win over the
+   * truncated text. Truncation is measured on the hovered cell only (one
+   * `measureText` call per newly hovered cell) — nothing is added to the paint
+   * path.
+   *
+   * **Opt-in** (default `false`): enabling it changes hover behavior for every
+   * cell of the grid, so existing consumers keep their current UI untouched.
+   */
+  overflowTooltip?: boolean;
+  /**
    * When empty-cell placeholder hints are shown (see
    * `controller.setColumnPlaceholder` / `ColumnDef.placeholder`):
    * `'editable'` (default) paints them only in cells the user can edit;
@@ -233,6 +266,14 @@ export interface LatticaGridProps {
 
 /** Hover dwell time (ms) before the cell tooltip appears. */
 export const TOOLTIP_DELAY_MS = 500;
+
+/** What the pointer currently rests on, for tooltip purposes. */
+type HoverTarget =
+  | { kind: 'cell'; row: number; col: number }
+  | { kind: 'header'; header: PositionedHeader };
+
+/** Where a visible tooltip is anchored: a (scrollable) cell or a fixed rect. */
+type TooltipAnchor = { kind: 'cell'; row: number; col: number } | { kind: 'rect'; rect: Rect };
 
 /** Payload of {@link LatticaGridProps.onCellAction} (visual coordinates). */
 export interface CellActionEvent {
@@ -329,6 +370,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   const autoHeight = (props.autoHeight ?? false) && autoSize !== 'content';
   const fixedWidth = props.width ?? 640;
   const fixedHeight = props.height ?? 400;
+  const overflowTooltip = props.overflowTooltip ?? false;
   const showRowNumbers = props.showRowNumbers ?? true;
   const sortable = props.sortable ?? true;
   const showSortIcons = props.showSortIcons ?? true;
@@ -358,8 +400,13 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     startSize: number;
     physicalIndex: number;
   } | null>(null);
-  const hoverCellRef = useRef<{ row: number; col: number } | null>(null);
+  /** Identity of the currently hovered tooltip target ("c<row>:<col>" / "h<id>"). */
+  const hoverKeyRef = useRef<string | null>(null);
   const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Canvas-backed text measurer, refreshed by the paint effect. */
+  const measureRef = useRef<MeasureText | undefined>(undefined);
+  /** Positioned column headers of the latest render, for header hit-testing. */
+  const colHeadersRef = useRef<readonly PositionedHeader[]>([]);
 
   const [scroll, setScroll] = useState<ScrollOffset>({ left: 0, top: 0 });
   const [edit, setEdit] = useState<EditState | null>(null);
@@ -367,7 +414,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   const [filterPanel, setFilterPanel] = useState<{ col: number; x: number; y: number } | null>(null);
   const [filterChecked, setFilterChecked] = useState<Set<string>>(new Set());
   const [measured, setMeasured] = useState<{ w: number; h: number } | null>(null);
-  const [tooltip, setTooltip] = useState<{ row: number; col: number; text: string } | null>(null);
+  const [tooltip, setTooltip] = useState<{ text: string; anchor: TooltipAnchor } | null>(null);
   /** True after a click outside the grid (outsideClickDeselects); hides selection visuals. */
   const [deselected, setDeselected] = useState(false);
   const [, force] = useReducer((n: number) => n + 1, 0);
@@ -742,6 +789,11 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     if (ctx === null) {
       return;
     }
+    // One canvas-backed measurer per paint, shared by text wrapping and the
+    // hover truncation probe (see `clippedCellText`) so both use exactly the
+    // metrics the text is painted with.
+    const measure = canvasMeasurer(ctx);
+    measureRef.current = measure;
     /* v8 ignore next -- device pixel ratio is environment-dependent glue */
     const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
     canvas.width = Math.round(width * dpr);
@@ -795,7 +847,7 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
       getSparkline: (r, c, w, h) => controller.getCellSparkline(r, c, w, h),
       getMerge: (r, c) => controller.getMerge(r, c),
       getWrap: wrapEnabled ? (_r, c) => controller.getColumnWrap(c) : undefined,
-      measureText: wrapEnabled ? canvasMeasurer(ctx) : undefined,
+      measureText: wrapEnabled ? measure : undefined,
       font: `${theme.fontSize}px ${theme.fontFamily}`,
       wrapPaddingX: theme.cellPaddingX,
       hasComment: (r, c) => controller.hasComment(r, c),
@@ -817,35 +869,129 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
   useEffect(() => clearTooltipTimer, [clearTooltipTimer]);
 
   /**
-   * Track the hovered cell and drive the shared tooltip overlay: entering a
-   * cell with content (comment first, then `cellTooltip`) schedules the
-   * tooltip after {@link TOOLTIP_DELAY_MS}; leaving hides it immediately.
-   * Moves within the same cell keep the pending timer / visible tooltip.
+   * The cell's own display text when the painter is clipping it, else null.
+   * Off unless `overflowTooltip` is set. Reuses the paint-time measurer and
+   * the paint-time font so the verdict matches what is actually on screen.
+   */
+  const clippedCellText = useCallback(
+    (row: number, col: number): string | null => {
+      const measure = measureRef.current;
+      if (!overflowTooltip || measure === undefined) {
+        return null;
+      }
+      if (!paintsCellText(controller.getColumnType(col))) {
+        return null;
+      }
+      const merge = controller.getMerge(row, col);
+      const cellWidth =
+        merge === null ? geom.colSizes.getSize(col) : spanSize(geom.colSizes, merge.col, merge.colspan);
+      const cellHeight =
+        merge === null ? geom.rowSizes.getSize(row) : spanSize(geom.rowSizes, merge.row, merge.rowspan);
+      // A sparkline replaces the cell's text entirely — nothing to truncate.
+      if (controller.getCellSparkline(row, col, cellWidth, cellHeight) !== null) {
+        return null;
+      }
+      const text = controller.getDisplay(row, col);
+      const fit: CellTextFit = {
+        text,
+        width: cellWidth,
+        height: cellHeight,
+        paddingX: theme.cellPaddingX,
+        align: controller.getColumnAlign(col),
+        font: `${theme.fontSize}px ${theme.fontFamily}`,
+        measure,
+      };
+      if (controller.getColumnWrap(col)) {
+        fit.wrap = { lineHeight: wrapLineHeight(theme.fontSize) };
+      }
+      return isCellTextClipped(fit) ? text : null;
+    },
+    [controller, geom, overflowTooltip, theme],
+  );
+
+  /** The header's own label when the header box is cutting it off, else null. */
+  const clippedHeaderLabel = useCallback(
+    (header: PositionedHeader): string | null => {
+      const measure = measureRef.current;
+      /* v8 ignore next 3 -- header hover is only reachable after the first paint set the measurer */
+      if (measure === undefined) {
+        return null;
+      }
+      const font = `${theme.fontSize}px ${theme.fontFamily}`;
+      const leaf = header.col !== undefined;
+      const chromeWidth = headerChromeWidth({
+        collapsible: header.collapsible,
+        collapsed: header.collapsed,
+        filterIcon: leaf && filterable && showFilterIcons,
+        sortIcon: leaf && sortable && showSortIcons,
+        font,
+        measure,
+      });
+      const clipped = isHeaderLabelClipped({
+        label: header.label,
+        width: header.width,
+        // Group headers are centered with no left padding; leaves are inset.
+        paddingX: header.isGroup ? 0 : theme.cellPaddingX,
+        chromeWidth,
+        font,
+        measure,
+      });
+      return clipped ? header.label : null;
+    },
+    [filterable, showFilterIcons, showSortIcons, sortable, theme],
+  );
+
+  /**
+   * Track the hovered tooltip target and drive the shared overlay: entering a
+   * cell with content (comment first, then `cellTooltip`, then clipped text) —
+   * or a column header whose label is clipped — schedules the tooltip after
+   * {@link TOOLTIP_DELAY_MS}; leaving hides it immediately. Moves within the
+   * same target keep the pending timer / visible tooltip.
    */
   const updateHover = useCallback(
-    (cell: { row: number; col: number } | null) => {
-      const prev = hoverCellRef.current;
-      if (cell === null) {
-        hoverCellRef.current = null;
-        clearTooltipTimer();
-        setTooltip(null);
+    (target: HoverTarget | null) => {
+      const key =
+        target === null
+          ? null
+          : target.kind === 'cell'
+            ? `c${target.row}:${target.col}`
+            : `h${target.header.id}`;
+      if (key === hoverKeyRef.current) {
         return;
       }
-      if (prev !== null && prev.row === cell.row && prev.col === cell.col) {
-        return;
-      }
-      hoverCellRef.current = cell;
+      hoverKeyRef.current = key;
       clearTooltipTimer();
       setTooltip(null);
-      const text = controller.getComment(cell.row, cell.col) ?? cellTooltip?.(cell.row, cell.col) ?? null;
-      if (text !== null) {
-        tooltipTimerRef.current = setTimeout(() => {
-          tooltipTimerRef.current = null;
-          setTooltip({ row: cell.row, col: cell.col, text });
-        }, TOOLTIP_DELAY_MS);
+      if (target === null) {
+        return;
       }
+      const text =
+        target.kind === 'cell'
+          ? (controller.getComment(target.row, target.col) ??
+            cellTooltip?.(target.row, target.col) ??
+            clippedCellText(target.row, target.col))
+          : clippedHeaderLabel(target.header);
+      if (text === null) {
+        return;
+      }
+      const anchor: TooltipAnchor =
+        target.kind === 'cell'
+          ? { kind: 'cell', row: target.row, col: target.col }
+          : {
+              kind: 'rect',
+              rect: {
+                x: target.header.x,
+                y: target.header.y,
+                width: target.header.width,
+                height: target.header.height,
+              },
+            };
+      tooltipTimerRef.current = setTimeout(() => {
+        tooltipTimerRef.current = null;
+        setTooltip({ text, anchor });
+      }, TOOLTIP_DELAY_MS);
     },
-    [cellTooltip, clearTooltipTimer, controller],
+    [cellTooltip, clearTooltipTimer, clippedCellText, clippedHeaderLabel, controller],
   );
 
   const ensureVisible = useCallback(() => {
@@ -1119,15 +1265,26 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
 
       // Idle hover: show a resize cursor when over a header border, a pointer
       // cursor over actionable link cells, and drive the comment / custom cell
-      // tooltip for hovered body cells.
+      // tooltip for hovered body cells (plus clipped column-header labels when
+      // `overflowTooltip` is on).
       const border = hitResizeHandle(geom, scroll.left, scroll.top, x, y);
       let hoverCell: { row: number; col: number } | null = null;
+      let hoverTarget: HoverTarget | null = null;
       if (border === null) {
         const edge = contentEdge();
         if (x < edge.right && y < edge.bottom) {
           const hit = hitTest(geom, scroll.left, scroll.top, x, y);
           if (hit.region === 'cell') {
             hoverCell = { row: hit.row, col: hit.col };
+            hoverTarget = { kind: 'cell', row: hit.row, col: hit.col };
+          }
+        }
+        if (hoverTarget === null && overflowTooltip && y < geom.colHeaderHeight && x >= geom.rowHeaderWidth) {
+          const header = colHeadersRef.current.find(
+            (h) => x >= h.x && x < h.x + h.width && y >= h.y && y < h.y + h.height,
+          );
+          if (header !== undefined) {
+            hoverTarget = { kind: 'header', header };
           }
         }
       }
@@ -1139,9 +1296,9 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
           : hoverCell !== null && linkActionAt(hoverCell.row, hoverCell.col) !== null
             ? 'pointer'
             : '';
-      updateHover(hoverCell);
+      updateHover(hoverTarget);
     },
-    [controller, geom, scroll, contentEdge, linkActionAt, updateHover],
+    [controller, geom, scroll, contentEdge, linkActionAt, overflowTooltip, updateHover],
   );
 
   const onMouseLeave = useCallback(() => {
@@ -1370,6 +1527,9 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     ...rowHeaders.filter((h) => h.row >= geom.frozenRows),
     ...rowHeaders.filter((h) => h.row < geom.frozenRows),
   ];
+  // Published for the pointer handler, which runs outside the render pass and
+  // needs the current header boxes to hit-test clipped header labels.
+  colHeadersRef.current = orderedColHeaders;
 
   // The header band and the row gutter stop at the data's edge (not the canvas
   // edge) so a grid wider/taller than its content shows plain background — not
@@ -1439,7 +1599,14 @@ const LatticaGridImpl = forwardRef<LatticaGridHandle, LatticaGridProps>(function
     cellOverlay !== null && cellOverlay !== undefined && renderCellOverlay !== undefined
       ? getVisibleCellRect(cellOverlay.row, cellOverlay.col)
       : null;
-  const tooltipRect = tooltip !== null ? getVisibleCellRect(tooltip.row, tooltip.col) : null;
+  // Cell-anchored tooltips follow the scroll (and vanish with their cell);
+  // header-anchored ones already carry their own header-band rect.
+  const tooltipRect =
+    tooltip === null
+      ? null
+      : tooltip.anchor.kind === 'cell'
+        ? getVisibleCellRect(tooltip.anchor.row, tooltip.anchor.col)
+        : tooltip.anchor.rect;
 
   // Fill handle nub at the bottom-right corner of the selection (hidden while
   // editing and whenever the selection itself is hidden).

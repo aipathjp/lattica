@@ -63,6 +63,18 @@ export function rowY(geom: GridGeometry, scrollTop: number, row: number): number
   return geom.colHeaderHeight + geom.rowSizes.getOffset(row) - scrollTop;
 }
 
+/**
+ * Total size of `count` consecutive indices starting at `start` — the pixel
+ * span of a merge area along one axis.
+ */
+export function spanSize(sizes: SizeManager, start: number, count: number): number {
+  let total = 0;
+  for (let i = 0; i < count; i++) {
+    total += sizes.getSize(start + i);
+  }
+  return total;
+}
+
 /** The rectangle occupied by a cell, in client pixels. */
 export function cellRect(
   geom: GridGeometry,

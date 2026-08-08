@@ -102,6 +102,7 @@ export {
   columnAt,
   rowAt,
   maxScroll,
+  spanSize,
   summaryBandHeight,
   rowStripRect,
   visibleRowStrips,
@@ -180,6 +181,15 @@ export {
   canvasMeasurer,
   type MeasureText,
 } from './measure.js';
+export {
+  paintsCellText,
+  isCellTextClipped,
+  headerChromeWidth,
+  isHeaderLabelClipped,
+  type CellTextFit,
+  type HeaderChrome,
+  type HeaderLabelFit,
+} from './overflow.js';
 export { I18n, enUS, jaJP, type Locale } from './i18n.js';
 export {
   gridAria,

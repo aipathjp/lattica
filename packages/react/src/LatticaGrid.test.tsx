@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, waitFor, act } from '@testing-library/react';
 import { createRef } from 'react';
-import { LatticaGrid } from './LatticaGrid.js';
+import { LatticaGrid, TOOLTIP_DELAY_MS } from './LatticaGrid.js';
 import { GridController } from './controller.js';
 import { commitAllEditing, cancelAllEditing } from './grid-registry.js';
 import { EditorRegistry, type CustomEditorContext } from './editors.js';
@@ -2069,6 +2069,198 @@ describe('LatticaGrid tooltips', () => {
         vi.advanceTimersByTime(500);
       });
     }).not.toThrow();
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+});
+
+/**
+ * Overflow tooltips. The mock canvas measures 7px per character and the
+ * default theme uses `cellPaddingX: 6` on 100px columns, so a cell fits 13
+ * characters (91px ≤ 94px) and is clipped at 14 (98px > 94px). Leaf headers
+ * additionally lose the sort (7+4) and filter (7+2) buttons → 74px, i.e. 10
+ * characters fit and 11 are clipped.
+ */
+describe('LatticaGrid overflow tooltips', () => {
+  const FITS = 'a'.repeat(13);
+  const CLIPPED = 'b'.repeat(14);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Hover a cell and let the dwell timer elapse. */
+  const hover = (x: number, y: number) => {
+    fireEvent.mouseMove(screen.getByTestId('lattica-grid'), { clientX: x, clientY: y });
+    act(() => {
+      vi.advanceTimersByTime(TOOLTIP_DELAY_MS);
+    });
+  };
+
+  it('stays silent for clipped text until the feature is opted into', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setCellText(0, 0, CLIPPED);
+    renderGrid(c);
+    hover(60, 30);
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+
+  it('shows the full text for a clipped cell and nothing for one that fits', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setCellText(0, 0, CLIPPED);
+    c.setCellText(1, 0, FITS);
+    renderGrid(c, undefined, { overflowTooltip: true });
+    hover(60, 30); // (0,0) — clipped
+    expect(screen.getByTestId('lattica-tooltip').textContent).toBe(CLIPPED);
+    hover(60, 54); // (1,0) — fits exactly, no tooltip
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+
+  it('lets comments and cellTooltip win over the clipped text', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setCellText(0, 0, CLIPPED);
+    c.setCellText(0, 1, CLIPPED);
+    c.setComment(0, 0, 'comment wins');
+    renderGrid(c, undefined, {
+      overflowTooltip: true,
+      cellTooltip: (row, col) => (row === 0 && col === 1 ? 'callback wins' : null),
+    });
+    hover(60, 30);
+    expect(screen.getByTestId('lattica-tooltip').textContent).toBe('comment wins');
+    hover(160, 30);
+    expect(screen.getByTestId('lattica-tooltip').textContent).toBe('callback wins');
+  });
+
+  it('respects the display override rather than the stored value', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setCellText(0, 0, 'short');
+    renderGrid(c, undefined, {
+      overflowTooltip: true,
+      displayValue: (row, col, base) => (row === 0 && col === 0 ? CLIPPED : base),
+    });
+    hover(60, 30);
+    expect(screen.getByTestId('lattica-tooltip').textContent).toBe(CLIPPED);
+  });
+
+  it('skips cell types that paint no text and cells replaced by a sparkline', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setCellText(0, 0, CLIPPED);
+    c.setColumnType(0, 'checkbox');
+    c.setCellText(0, 1, CLIPPED);
+    c.setCellSparkline(0, 1, [1, 4, 2, 6], 'line');
+    renderGrid(c, undefined, { overflowTooltip: true });
+    hover(60, 30); // checkbox column
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+    hover(160, 30); // sparkline cell
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+
+  it('measures a merged anchor across its full span', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setCellText(0, 0, CLIPPED); // 98px: clipped in one column, fits across two
+    c.selection.setActive({ row: 0, col: 0 });
+    c.selection.extendTo({ row: 0, col: 1 });
+    c.mergeSelection();
+    renderGrid(c, undefined, { overflowTooltip: true });
+    hover(60, 30);
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+
+  it('detects wrapped text that overflows the row height', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    c.setColumnWrap(0, true);
+    // Wrap width = 100 - 12 = 88px → 12 chars/line; three lines at 18px each
+    // overflow the 24px row.
+    c.setCellText(0, 0, 'aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc');
+    c.setColumnWrap(1, true);
+    c.setCellText(0, 1, 'aaaa bbbb');
+    renderGrid(c, undefined, { overflowTooltip: true });
+    hover(60, 30);
+    expect(screen.getByTestId('lattica-tooltip').textContent).toBe(
+      'aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc',
+    );
+    hover(160, 30);
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+
+  it('does nothing when the canvas context cannot measure text', () => {
+    const ctx = createMockContext() as Partial<ReturnType<typeof createMockContext>>;
+    delete ctx.measureText;
+    const spy = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation(() => ctx as unknown as CanvasRenderingContext2D);
+    try {
+      const c = new GridController({ rowCount: 3, colCount: 2 });
+      c.setCellText(0, 0, CLIPPED);
+      renderGrid(c, undefined, { overflowTooltip: true });
+      hover(60, 30);
+      expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('shows clipped leaf-header labels below the header band', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    renderGrid(c, [{ headerName: 'c'.repeat(11) }, { headerName: 'd'.repeat(10) }], {
+      overflowTooltip: true,
+    });
+    hover(60, 10); // header of column 0 — 77px > 74px
+    const tip = screen.getByTestId('lattica-tooltip');
+    expect(tip.textContent).toBe('c'.repeat(11));
+    // Anchored to the header box (x = 48, height 24), not to a body cell.
+    expect(tip.style.left).toBe('48px');
+    expect(tip.style.top).toBe('26px');
+    hover(160, 10); // header of column 1 — 70px fits
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+
+  it('accounts for hidden sort and filter buttons when measuring header labels', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    // Without the two buttons the label gets 94px → 13 characters fit.
+    const label = 'e'.repeat(13);
+    renderGrid(c, [{ headerName: label }, { headerName: 'B' }], {
+      overflowTooltip: true,
+      showSortIcons: false,
+      showFilterIcons: false,
+    });
+    hover(60, 10);
+    expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
+  });
+
+  it('accounts for disabled sorting and filtering when measuring header labels', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    renderGrid(c, [{ headerName: 'f'.repeat(14) }, { headerName: 'B' }], {
+      overflowTooltip: true,
+      sortable: false,
+      filterable: false,
+    });
+    hover(60, 10); // 98px > 94px — clipped even with no buttons
+    expect(screen.getByTestId('lattica-tooltip').textContent).toBe('f'.repeat(14));
+  });
+
+  it('measures a collapsible group header across its span, caret included', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    // Group spans both columns (200px), no padding, caret costs 14px → 186px,
+    // so 27 characters (189px) are clipped.
+    const group = 'g'.repeat(27);
+    renderGrid(
+      c,
+      [{ headerName: group, collapsible: true, children: [{ headerName: 'A' }, { headerName: 'B' }] }],
+      { overflowTooltip: true },
+    );
+    hover(60, 4); // top band = the group header
+    expect(screen.getByTestId('lattica-tooltip').textContent).toBe(group);
+  });
+
+  it('ignores header hover past the last column', () => {
+    const c = new GridController({ rowCount: 3, colCount: 2 });
+    renderGrid(c, [{ headerName: 'h'.repeat(20) }, { headerName: 'i'.repeat(20) }], {
+      overflowTooltip: true,
+    });
+    hover(300, 10); // beyond the header band's last column
     expect(screen.queryByTestId('lattica-tooltip')).toBeNull();
   });
 });
